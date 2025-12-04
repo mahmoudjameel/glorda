@@ -519,6 +519,61 @@ export async function registerRoutes(
     }
   });
 
+  // ========== ADMIN MANAGEMENT ROUTES ==========
+  
+  app.get("/api/admin/admins", requireAdmin, async (req, res) => {
+    try {
+      const admins = await storage.getAllAdmins();
+      const sanitizedAdmins = admins.map(({ password, ...admin }) => admin);
+      res.json(sanitizedAdmins);
+    } catch (error) {
+      res.status(500).json({ error: "فشل جلب المسؤولين" });
+    }
+  });
+
+  app.post("/api/admin/admins", requireAdmin, async (req, res) => {
+    try {
+      const { email, password, name } = req.body;
+      
+      if (!email || !password || !name) {
+        return res.status(400).json({ error: "جميع الحقول مطلوبة" });
+      }
+
+      const existing = await storage.getAdminByEmail(email);
+      if (existing) {
+        return res.status(400).json({ error: "البريد الإلكتروني مستخدم بالفعل" });
+      }
+
+      const hashedPassword = await bcrypt.hash(password, 10);
+      const admin = await storage.createAdmin({
+        email,
+        password: hashedPassword,
+        name
+      });
+
+      const { password: _, ...adminData } = admin;
+      res.json(adminData);
+    } catch (error) {
+      console.error("Create admin error:", error);
+      res.status(500).json({ error: "فشل إضافة المسؤول" });
+    }
+  });
+
+  app.delete("/api/admin/admins/:id", requireAdmin, async (req, res) => {
+    try {
+      const adminId = parseInt(req.params.id);
+      
+      if (adminId === req.session.userId) {
+        return res.status(400).json({ error: "لا يمكنك حذف حسابك الحالي" });
+      }
+
+      await storage.deleteAdmin(adminId);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "فشل حذف المسؤول" });
+    }
+  });
+
   // ========== ADMIN BANNERS ROUTES ==========
   
   app.get("/api/admin/banners", requireAdmin, async (req, res) => {

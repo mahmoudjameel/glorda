@@ -18,6 +18,7 @@ import MerchantSocials from "@/pages/merchant/Socials";
 // Admin Pages
 import AdminDashboard from "@/pages/admin/Dashboard";
 import AdminMerchants from "@/pages/admin/Merchants";
+import AdminAdmins from "@/pages/admin/Admins";
 import AdminLogin from "@/pages/admin/Login";
 
 function Router() {
@@ -37,6 +38,7 @@ function Router() {
       <Route path="/admin/login" component={AdminLogin} />
       <Route path="/admin" component={AdminDashboard} />
       <Route path="/admin/merchants" component={AdminMerchants} />
+      <Route path="/admin/admins" component={AdminAdmins} />
 
       {/* Fallback */}
       <Route component={NotFound} />

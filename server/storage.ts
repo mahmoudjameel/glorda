@@ -98,7 +98,9 @@ export interface IStorage {
   // Admins
   getAdmin(id: number): Promise<Admin | undefined>;
   getAdminByEmail(email: string): Promise<Admin | undefined>;
+  getAllAdmins(): Promise<Admin[]>;
   createAdmin(admin: InsertAdmin): Promise<Admin>;
+  deleteAdmin(id: number): Promise<void>;
   
   // Banners
   getBanner(id: number): Promise<Banner | undefined>;
@@ -306,6 +308,14 @@ export class DatabaseStorage implements IStorage {
   async createAdmin(admin: InsertAdmin): Promise<Admin> {
     const result = await db.insert(admins).values(admin).returning();
     return result[0];
+  }
+
+  async getAllAdmins(): Promise<Admin[]> {
+    return await db.select().from(admins).orderBy(desc(admins.createdAt));
+  }
+
+  async deleteAdmin(id: number): Promise<void> {
+    await db.delete(admins).where(eq(admins.id, id));
   }
 
   // ========== Banners ==========

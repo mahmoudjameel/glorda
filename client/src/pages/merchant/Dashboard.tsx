@@ -7,22 +7,24 @@ import {
   YAxis, 
   CartesianGrid, 
   Tooltip, 
-  ResponsiveContainer,
-  AreaChart,
-  Area
+  ResponsiveContainer
 } from "recharts";
-import { DollarSign, ShoppingBag, Users, TrendingUp } from "lucide-react";
+import { DollarSign, ShoppingBag, Package, Loader2, Clock } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { Badge } from "@/components/ui/badge";
 
-const data = [
-  { name: "يناير", total: 1200 },
-  { name: "فبراير", total: 2100 },
-  { name: "مارس", total: 1800 },
-  { name: "أبريل", total: 3200 },
-  { name: "مايو", total: 2800 },
-  { name: "يونيو", total: 4500 },
-];
+interface MerchantStats {
+  productsCount: number;
+  ordersCount: number;
+  pendingOrders: number;
+  completedOrders: number;
+  totalSales: number;
+  balance: number;
+  recentOrders: any[];
+  recentTransactions: any[];
+}
 
-const StatsCard = ({ title, value, icon: Icon, trend, trendUp }: any) => (
+const StatsCard = ({ title, value, icon: Icon, description, loading }: any) => (
   <Card>
     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
       <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -31,16 +33,57 @@ const StatsCard = ({ title, value, icon: Icon, trend, trendUp }: any) => (
       <Icon className="h-4 w-4 text-muted-foreground" />
     </CardHeader>
     <CardContent>
-      <div className="text-2xl font-bold font-display">{value}</div>
-      <p className={`text-xs flex items-center mt-1 ${trendUp ? 'text-emerald-600' : 'text-red-600'}`}>
-        <TrendingUp className={`w-3 h-3 mr-1 ${!trendUp && 'rotate-180'}`} />
-        {trend}
-      </p>
+      {loading ? (
+        <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+      ) : (
+        <>
+          <div className="text-2xl font-bold font-display" data-testid={`stat-${title}`}>{value}</div>
+          {description && (
+            <p className="text-xs text-muted-foreground mt-1">{description}</p>
+          )}
+        </>
+      )}
     </CardContent>
   </Card>
 );
 
+const orderStatusLabels: Record<string, string> = {
+  pending: "قيد الانتظار",
+  confirmed: "مؤكد",
+  preparing: "قيد التحضير",
+  ready: "جاهز",
+  delivered: "تم التسليم",
+  completed: "مكتمل",
+  cancelled: "ملغي"
+};
+
+const orderStatusColors: Record<string, string> = {
+  pending: "bg-amber-100 text-amber-800",
+  confirmed: "bg-blue-100 text-blue-800",
+  preparing: "bg-purple-100 text-purple-800",
+  ready: "bg-cyan-100 text-cyan-800",
+  delivered: "bg-emerald-100 text-emerald-800",
+  completed: "bg-green-100 text-green-800",
+  cancelled: "bg-red-100 text-red-800"
+};
+
 export default function MerchantDashboard() {
+  const { data: stats, isLoading } = useQuery<MerchantStats>({
+    queryKey: ["/api/merchant/stats"],
+    queryFn: async () => {
+      const res = await fetch("/api/merchant/stats");
+      if (!res.ok) throw new Error("Failed to fetch stats");
+      return res.json();
+    }
+  });
+
+  const chartData = [
+    { name: "المنتجات", total: stats?.productsCount || 0 },
+    { name: "الطلبات", total: stats?.ordersCount || 0 },
+    { name: "المكتملة", total: stats?.completedOrders || 0 },
+    { name: "المعلقة", total: stats?.pendingOrders || 0 }
+  ];
+
   return (
     <DashboardLayout role="merchant">
       <div className="space-y-8">
@@ -52,91 +95,116 @@ export default function MerchantDashboard() {
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <StatsCard 
             title="إجمالي المبيعات" 
-            value="45,231.89 ر.س" 
+            value={`${((stats?.totalSales || 0) / 100).toFixed(2)} ر.س`}
             icon={DollarSign}
-            trend="+20.1% من الشهر الماضي"
-            trendUp={true}
+            description="مجموع المبيعات المكتملة"
+            loading={isLoading}
+          />
+          <StatsCard 
+            title="الرصيد الحالي" 
+            value={`${((stats?.balance || 0) / 100).toFixed(2)} ر.س`}
+            icon={DollarSign}
+            description="المتاح للسحب"
+            loading={isLoading}
+          />
+          <StatsCard 
+            title="المنتجات" 
+            value={stats?.productsCount || 0}
+            icon={Package}
+            description="عدد المنتجات في متجرك"
+            loading={isLoading}
           />
           <StatsCard 
             title="الطلبات" 
-            value="+2350" 
+            value={stats?.ordersCount || 0}
             icon={ShoppingBag}
-            trend="+180.1% من الشهر الماضي"
-            trendUp={true}
-          />
-          <StatsCard 
-            title="المبيعات" 
-            value="+12,234" 
-            icon={TrendingUp}
-            trend="+19% من الشهر الماضي"
-            trendUp={true}
-          />
-          <StatsCard 
-            title="الزوار النشطين" 
-            value="+573" 
-            icon={Users}
-            trend="+201 من الساعة الماضية"
-            trendUp={true}
+            description={`${stats?.pendingOrders || 0} طلبات معلقة`}
+            loading={isLoading}
           />
         </div>
 
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
           <Card className="col-span-4">
             <CardHeader>
-              <CardTitle>نظرة عامة على الإيرادات</CardTitle>
+              <CardTitle>نظرة عامة</CardTitle>
             </CardHeader>
             <CardContent className="pl-2">
               <div className="h-[350px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={data}>
-                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" vertical={false} />
-                    <XAxis 
-                      dataKey="name" 
-                      stroke="#888888" 
-                      fontSize={12} 
-                      tickLine={false} 
-                      axisLine={false} 
-                    />
-                    <YAxis 
-                      stroke="#888888" 
-                      fontSize={12} 
-                      tickLine={false} 
-                      axisLine={false} 
-                      tickFormatter={(value) => `${value} ر.س`} 
-                    />
-                    <Tooltip 
-                      contentStyle={{ backgroundColor: 'hsl(var(--popover))', borderRadius: '8px', border: '1px solid hsl(var(--border))' }}
-                      itemStyle={{ color: 'hsl(var(--foreground))' }}
-                    />
-                    <Bar dataKey="total" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
+                {isLoading ? (
+                  <div className="flex items-center justify-center h-full">
+                    <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+                  </div>
+                ) : (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={chartData}>
+                      <CartesianGrid strokeDasharray="3 3" className="stroke-muted" vertical={false} />
+                      <XAxis 
+                        dataKey="name" 
+                        stroke="#888888" 
+                        fontSize={12} 
+                        tickLine={false} 
+                        axisLine={false} 
+                      />
+                      <YAxis 
+                        stroke="#888888" 
+                        fontSize={12} 
+                        tickLine={false} 
+                        axisLine={false} 
+                      />
+                      <Tooltip 
+                        contentStyle={{ backgroundColor: 'hsl(var(--popover))', borderRadius: '8px', border: '1px solid hsl(var(--border))' }}
+                        itemStyle={{ color: 'hsl(var(--foreground))' }}
+                      />
+                      <Bar dataKey="total" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                )}
               </div>
             </CardContent>
           </Card>
           
           <Card className="col-span-3">
             <CardHeader>
-              <CardTitle>المبيعات الأخيرة</CardTitle>
+              <CardTitle>أحدث الطلبات</CardTitle>
               <CardDescription>
-                قمت ببيع 265 منتج هذا الشهر
+                آخر الطلبات الواردة لمتجرك
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="space-y-8">
-                {[1, 2, 3, 4, 5].map((i) => (
-                  <div className="flex items-center" key={i}>
-                    <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-xs">
-                      OM
+              {isLoading ? (
+                <div className="flex justify-center py-8">
+                  <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                </div>
+              ) : stats?.recentOrders && stats.recentOrders.length > 0 ? (
+                <div className="space-y-4">
+                  {stats.recentOrders.map((order: any) => (
+                    <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg" key={order.id} data-testid={`order-card-${order.id}`}>
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+                          <ShoppingBag className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <p className="font-medium text-sm">طلب #{order.orderNumber}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {new Date(order.createdAt).toLocaleDateString('ar-SA')}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex flex-col items-end gap-1">
+                        <Badge variant="outline" className={orderStatusColors[order.status]}>
+                          {orderStatusLabels[order.status]}
+                        </Badge>
+                        <span className="text-sm font-mono">{(order.totalAmount / 100).toFixed(2)} ر.س</span>
+                      </div>
                     </div>
-                    <div className="mr-4 space-y-1">
-                      <p className="text-sm font-medium leading-none">عمر محمد</p>
-                      <p className="text-xs text-muted-foreground">omar@example.com</p>
-                    </div>
-                    <div className="mr-auto font-medium font-mono text-sm">+1,999.00 ر.س</div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <Clock className="w-12 h-12 text-muted-foreground mx-auto mb-2" />
+                  <p className="text-muted-foreground">لا توجد طلبات بعد</p>
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>

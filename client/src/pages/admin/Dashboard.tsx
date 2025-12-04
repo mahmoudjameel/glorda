@@ -1,26 +1,11 @@
 import DashboardLayout from "@/components/layout/DashboardLayout";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { 
-  LineChart, 
-  Line, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
-  ResponsiveContainer 
-} from "recharts";
-import { Users, Store, TrendingUp, Activity } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Users, Store, TrendingUp, Activity, Loader2, Clock, CheckCircle, XCircle } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { Badge } from "@/components/ui/badge";
+import type { Merchant, Transaction } from "@shared/schema";
 
-const data = [
-  { name: "يناير", merchants: 40, users: 240 },
-  { name: "فبراير", merchants: 55, users: 380 },
-  { name: "مارس", merchants: 85, users: 680 },
-  { name: "أبريل", merchants: 120, users: 980 },
-  { name: "مايو", merchants: 160, users: 1300 },
-  { name: "يونيو", merchants: 210, users: 1800 },
-];
-
-const StatsCard = ({ title, value, icon: Icon, description }: any) => (
+const StatsCard = ({ title, value, icon: Icon, description, loading }: any) => (
   <Card>
     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
       <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -29,95 +14,160 @@ const StatsCard = ({ title, value, icon: Icon, description }: any) => (
       <Icon className="h-4 w-4 text-muted-foreground" />
     </CardHeader>
     <CardContent>
-      <div className="text-2xl font-bold font-display">{value}</div>
-      <p className="text-xs text-muted-foreground mt-1">
-        {description}
-      </p>
+      {loading ? (
+        <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+      ) : (
+        <>
+          <div className="text-2xl font-bold font-display" data-testid={`stat-${title}`}>{value}</div>
+          <p className="text-xs text-muted-foreground mt-1">
+            {description}
+          </p>
+        </>
+      )}
     </CardContent>
   </Card>
 );
 
 export default function AdminDashboard() {
+  const { data: merchants = [], isLoading: loadingMerchants } = useQuery<Merchant[]>({
+    queryKey: ["/api/admin/merchants"],
+    queryFn: async () => {
+      const res = await fetch("/api/admin/merchants");
+      if (!res.ok) throw new Error("Failed to fetch");
+      return res.json();
+    }
+  });
+
+  const { data: withdrawals = [], isLoading: loadingWithdrawals } = useQuery<Transaction[]>({
+    queryKey: ["/api/admin/withdrawals"],
+    queryFn: async () => {
+      const res = await fetch("/api/admin/withdrawals");
+      if (!res.ok) throw new Error("Failed to fetch");
+      return res.json();
+    }
+  });
+
+  const activeMerchants = merchants.filter(m => m.status === "active").length;
+  const pendingMerchants = merchants.filter(m => m.status === "pending").length;
+  const totalBalance = merchants.reduce((sum, m) => sum + m.balance, 0);
+
   return (
     <DashboardLayout role="admin">
       <div className="space-y-8">
         <div>
           <h2 className="text-3xl font-bold tracking-tight font-display">لوحة الإدارة</h2>
-          <p className="text-muted-foreground mt-2">مراقبة أداء المنصة والتجار والمستخدمين</p>
+          <p className="text-muted-foreground mt-2">مراقبة أداء المنصة والتجار</p>
         </div>
 
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <StatsCard 
             title="إجمالي التجار" 
-            value="210" 
+            value={merchants.length}
             icon={Store}
-            description="+15 تاجر جديد هذا الشهر"
+            description={`${activeMerchants} نشط`}
+            loading={loadingMerchants}
           />
           <StatsCard 
-            title="المستخدمين النشطين" 
-            value="1,800" 
-            icon={Users}
-            description="+340 مستخدم جديد"
+            title="طلبات معلقة" 
+            value={pendingMerchants}
+            icon={Clock}
+            description="بانتظار المراجعة"
+            loading={loadingMerchants}
           />
           <StatsCard 
-            title="حجم العمليات" 
-            value="1.2M ر.س" 
+            title="طلبات سحب معلقة" 
+            value={withdrawals.length}
             icon={Activity}
-            description="+24% نمو في الإيرادات"
+            description="بانتظار التحويل"
+            loading={loadingWithdrawals}
           />
           <StatsCard 
-            title="معدل النمو" 
-            value="18.2%" 
+            title="إجمالي الأرصدة" 
+            value={`${(totalBalance / 100).toFixed(2)} ر.س`}
             icon={TrendingUp}
-            description="نمو ثابت في الربع الأخير"
+            description="أرصدة التجار"
+            loading={loadingMerchants}
           />
         </div>
 
-        <Card className="col-span-4">
-          <CardHeader>
-            <CardTitle>نمو المنصة</CardTitle>
-          </CardHeader>
-          <CardContent className="pl-2">
-            <div className="h-[400px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={data}>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" vertical={false} />
-                  <XAxis 
-                    dataKey="name" 
-                    stroke="#888888" 
-                    fontSize={12} 
-                    tickLine={false} 
-                    axisLine={false} 
-                  />
-                  <YAxis 
-                    stroke="#888888" 
-                    fontSize={12} 
-                    tickLine={false} 
-                    axisLine={false} 
-                  />
-                  <Tooltip 
-                    contentStyle={{ backgroundColor: 'hsl(var(--popover))', borderRadius: '8px', border: '1px solid hsl(var(--border))' }}
-                    itemStyle={{ color: 'hsl(var(--foreground))' }}
-                  />
-                  <Line 
-                    type="monotone" 
-                    dataKey="merchants" 
-                    stroke="hsl(var(--primary))" 
-                    strokeWidth={3}
-                    dot={{ r: 4, fill: "hsl(var(--primary))" }} 
-                  />
-                  <Line 
-                    type="monotone" 
-                    dataKey="users" 
-                    stroke="hsl(var(--chart-2))" 
-                    strokeWidth={3}
-                    dot={{ r: 4, fill: "hsl(var(--chart-2))" }} 
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
+        <div className="grid gap-4 md:grid-cols-2">
+          <Card>
+            <CardHeader>
+              <CardTitle>أحدث التجار المسجلين</CardTitle>
+              <CardDescription>آخر التجار الذين انضموا للمنصة</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {loadingMerchants ? (
+                <div className="flex justify-center py-8">
+                  <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                </div>
+              ) : merchants.length === 0 ? (
+                <p className="text-center text-muted-foreground py-8">لا يوجد تجار بعد</p>
+              ) : (
+                <div className="space-y-4">
+                  {merchants.slice(0, 5).map((merchant) => (
+                    <div key={merchant.id} className="flex items-center justify-between p-3 bg-muted/30 rounded-lg" data-testid={`merchant-card-${merchant.id}`}>
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">
+                          {merchant.storeName.charAt(0)}
+                        </div>
+                        <div>
+                          <p className="font-medium">{merchant.storeName}</p>
+                          <p className="text-xs text-muted-foreground">{merchant.ownerName}</p>
+                        </div>
+                      </div>
+                      <Badge 
+                        variant="outline"
+                        className={
+                          merchant.status === 'active' ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 
+                          merchant.status === 'suspended' ? 'border-red-200 bg-red-50 text-red-700' : 
+                          'border-amber-200 bg-amber-50 text-amber-700'
+                        }
+                      >
+                        {merchant.status === 'active' ? 'نشط' : merchant.status === 'suspended' ? 'موقوف' : 'معلق'}
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>طلبات السحب المعلقة</CardTitle>
+              <CardDescription>طلبات تحويل الأرصدة للتجار</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {loadingWithdrawals ? (
+                <div className="flex justify-center py-8">
+                  <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                </div>
+              ) : withdrawals.length === 0 ? (
+                <div className="text-center py-8">
+                  <CheckCircle className="w-12 h-12 text-emerald-500 mx-auto mb-2" />
+                  <p className="text-muted-foreground">لا توجد طلبات سحب معلقة</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {withdrawals.slice(0, 5).map((withdrawal) => (
+                    <div key={withdrawal.id} className="flex items-center justify-between p-3 bg-amber-50 rounded-lg border border-amber-200" data-testid={`withdrawal-card-${withdrawal.id}`}>
+                      <div>
+                        <p className="font-medium">طلب سحب #{withdrawal.id}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {new Date(withdrawal.createdAt).toLocaleDateString('ar-SA')}
+                        </p>
+                      </div>
+                      <p className="font-mono font-bold text-amber-700">
+                        {Math.abs(withdrawal.amount / 100).toFixed(2)} ر.س
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </DashboardLayout>
   );

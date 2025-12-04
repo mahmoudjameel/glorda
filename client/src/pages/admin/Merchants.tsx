@@ -9,30 +9,82 @@ import {
   TableHeader, 
   TableRow 
 } from "@/components/ui/table";
-import { Search, MoreHorizontal, ShieldCheck, Ban, CheckCircle } from "lucide-react";
+import { Search, MoreHorizontal, ShieldCheck, Ban, CheckCircle, Loader2, Store, Eye } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
+import type { Merchant } from "@shared/schema";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
-const merchants = [
-  { id: "MER-001", name: "متجر الأناقة", owner: "سارة أحمد", email: "sara@example.com", status: "active", date: "2024-01-15", type: "مؤسسة" },
-  { id: "MER-002", name: "تك زون", owner: "خالد عمر", email: "khaled@example.com", status: "active", date: "2024-02-20", type: "شركة" },
-  { id: "MER-003", name: "بيتي الجميل", owner: "ليلى مصطفى", email: "laila@example.com", status: "pending", date: "2024-03-10", type: "فرد" },
-  { id: "MER-004", name: "عالم الرياضة", owner: "محمد علي", email: "mohamed@example.com", status: "suspended", date: "2024-01-05", type: "مؤسسة" },
-  { id: "MER-005", name: "كتب وقهوة", owner: "نورة سعد", email: "nora@example.com", status: "active", date: "2024-04-01", type: "فرد" },
-  { id: "MER-006", name: "ورود الربيع", owner: "أحمد كمال", email: "ahmed@example.com", status: "pending", date: "2024-05-20", type: "مؤسسة" },
-];
+const storeTypeLabels: Record<string, string> = {
+  company: "شركة",
+  institution: "مؤسسة",
+  individual: "فرد"
+};
+
+const deliveryMethodLabels: Record<string, string> = {
+  representative: "مندوب توصيل",
+  pickup: "استلام من الفرع",
+  all: "الكل"
+};
 
 export default function AdminMerchants() {
   const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedMerchant, setSelectedMerchant] = useState<Merchant | null>(null);
+  const [isDetailsOpen, setIsDetailsOpen] = useState(false);
 
-  const handleApprove = (name: string) => {
-    toast({
-      title: "تم قبول المتجر",
-      description: `تم تفعيل حساب ${name} بنجاح`,
-      className: "bg-emerald-50 border-emerald-200 text-emerald-800"
-    });
+  const { data: merchants = [], isLoading } = useQuery<Merchant[]>({
+    queryKey: ["/api/admin/merchants"],
+    queryFn: async () => {
+      const res = await fetch("/api/admin/merchants");
+      if (!res.ok) throw new Error("Failed to fetch merchants");
+      return res.json();
+    }
+  });
+
+  const updateStatusMutation = useMutation({
+    mutationFn: async ({ id, status }: { id: number; status: string }) => {
+      const res = await fetch(`/api/admin/merchants/${id}/status`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status })
+      });
+      if (!res.ok) throw new Error("Failed to update status");
+      return res.json();
+    },
+    onSuccess: (_, { status }) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/merchants"] });
+      toast({
+        title: status === "active" ? "تم قبول المتجر" : status === "suspended" ? "تم إيقاف المتجر" : "تم تحديث الحالة",
+        className: status === "active" ? "bg-emerald-50 border-emerald-200 text-emerald-800" : ""
+      });
+    },
+    onError: () => {
+      toast({ variant: "destructive", title: "فشل تحديث الحالة" });
+    }
+  });
+
+  const pendingCount = merchants.filter(m => m.status === "pending").length;
+
+  const filteredMerchants = merchants.filter(m =>
+    m.storeName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    m.ownerName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    m.email.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const handleViewDetails = (merchant: Merchant) => {
+    setSelectedMerchant(merchant);
+    setIsDetailsOpen(true);
   };
 
   return (
@@ -43,96 +95,205 @@ export default function AdminMerchants() {
             <h2 className="text-3xl font-bold tracking-tight font-display">التجار</h2>
             <p className="text-muted-foreground mt-2">إدارة حسابات التجار والموافقة على الطلبات الجديدة</p>
           </div>
-          <Button className="gap-2">
-            <ShieldCheck className="w-4 h-4" />
-            مراجعة الطلبات المعلقة (2)
-          </Button>
+          {pendingCount > 0 && (
+            <Badge variant="secondary" className="text-lg px-4 py-2 bg-amber-100 text-amber-800">
+              <ShieldCheck className="w-4 h-4 ml-2" />
+              {pendingCount} طلبات معلقة
+            </Badge>
+          )}
         </div>
 
         <div className="flex items-center gap-4 bg-card p-4 rounded-lg border">
           <Search className="w-5 h-5 text-muted-foreground" />
           <Input 
             placeholder="بحث عن تاجر بالاسم أو البريد..." 
-            className="max-w-sm border-none shadow-none focus-visible:ring-0" 
+            className="max-w-sm border-none shadow-none focus-visible:ring-0"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            data-testid="input-search-merchants"
           />
         </div>
 
-        <div className="rounded-md border bg-card">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-[250px] text-right">التاجر</TableHead>
-                <TableHead className="text-right">النوع</TableHead>
-                <TableHead className="text-right">تاريخ الانضمام</TableHead>
-                <TableHead className="text-right">الحالة</TableHead>
-                <TableHead className="text-right">إجراءات</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {merchants.map((merchant) => (
-                <TableRow key={merchant.id}>
-                  <TableCell>
-                    <div className="flex items-center gap-3">
-                      <Avatar className="h-9 w-9">
-                        <AvatarImage src={`https://avatar.vercel.sh/${merchant.email}`} />
-                        <AvatarFallback>M</AvatarFallback>
-                      </Avatar>
-                      <div className="flex flex-col">
-                        <span className="font-medium">{merchant.name}</span>
-                        <span className="text-xs text-muted-foreground">{merchant.owner} ({merchant.email})</span>
-                      </div>
-                    </div>
-                  </TableCell>
-                  <TableCell>{merchant.type}</TableCell>
-                  <TableCell className="font-mono text-sm">{merchant.date}</TableCell>
-                  <TableCell>
-                    <Badge 
-                      variant="outline"
-                      className={
-                        merchant.status === 'active' ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 
-                        merchant.status === 'suspended' ? 'border-red-200 bg-red-50 text-red-700' : 
-                        'border-amber-200 bg-amber-50 text-amber-700'
-                      }
-                    >
-                      {
-                        merchant.status === 'active' ? 'نشط' : 
-                        merchant.status === 'suspended' ? 'موقوف' : 'قيد المراجعة'
-                      }
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" className="h-8 w-8 p-0">
-                          <span className="sr-only">Open menu</span>
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem className="gap-2 cursor-pointer">
-                          <ShieldCheck className="w-4 h-4" /> تفاصيل الحساب
-                        </DropdownMenuItem>
-                        
-                        {merchant.status === 'pending' && (
-                          <DropdownMenuItem 
-                            className="gap-2 cursor-pointer text-emerald-600 focus:text-emerald-700"
-                            onClick={() => handleApprove(merchant.name)}
-                          >
-                            <CheckCircle className="w-4 h-4" /> قبول المتجر
-                          </DropdownMenuItem>
-                        )}
-
-                        <DropdownMenuItem className="gap-2 cursor-pointer text-destructive focus:text-destructive">
-                          <Ban className="w-4 h-4" /> إيقاف الحساب
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
+        {isLoading ? (
+          <div className="flex justify-center py-12">
+            <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+          </div>
+        ) : filteredMerchants.length === 0 ? (
+          <div className="text-center py-12 border rounded-lg bg-muted/20">
+            <Store className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+            <h3 className="font-semibold text-lg">لا توجد متاجر</h3>
+            <p className="text-muted-foreground">لم يتم التسجيل أي تاجر بعد</p>
+          </div>
+        ) : (
+          <div className="rounded-md border bg-card">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-[250px] text-right">التاجر</TableHead>
+                  <TableHead className="text-right">النوع</TableHead>
+                  <TableHead className="text-right">المدينة</TableHead>
+                  <TableHead className="text-right">الرصيد</TableHead>
+                  <TableHead className="text-right">تاريخ الانضمام</TableHead>
+                  <TableHead className="text-right">الحالة</TableHead>
+                  <TableHead className="text-right">إجراءات</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
+              </TableHeader>
+              <TableBody>
+                {filteredMerchants.map((merchant) => (
+                  <TableRow key={merchant.id} data-testid={`row-merchant-${merchant.id}`}>
+                    <TableCell>
+                      <div className="flex items-center gap-3">
+                        <Avatar className="h-9 w-9">
+                          <AvatarImage src={`https://avatar.vercel.sh/${merchant.email}`} />
+                          <AvatarFallback>{merchant.storeName.charAt(0)}</AvatarFallback>
+                        </Avatar>
+                        <div className="flex flex-col">
+                          <span className="font-medium">{merchant.storeName}</span>
+                          <span className="text-xs text-muted-foreground">{merchant.ownerName} ({merchant.email})</span>
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell>{storeTypeLabels[merchant.storeType] || merchant.storeType}</TableCell>
+                    <TableCell>{merchant.city}</TableCell>
+                    <TableCell className="font-mono">{(merchant.balance / 100).toFixed(2)} ر.س</TableCell>
+                    <TableCell className="font-mono text-sm">
+                      {new Date(merchant.createdAt).toLocaleDateString('ar-SA')}
+                    </TableCell>
+                    <TableCell>
+                      <Badge 
+                        variant="outline"
+                        className={
+                          merchant.status === 'active' ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 
+                          merchant.status === 'suspended' ? 'border-red-200 bg-red-50 text-red-700' : 
+                          'border-amber-200 bg-amber-50 text-amber-700'
+                        }
+                      >
+                        {
+                          merchant.status === 'active' ? 'نشط' : 
+                          merchant.status === 'suspended' ? 'موقوف' : 'قيد المراجعة'
+                        }
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" className="h-8 w-8 p-0" data-testid={`button-merchant-menu-${merchant.id}`}>
+                            <span className="sr-only">Open menu</span>
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem 
+                            className="gap-2 cursor-pointer"
+                            onClick={() => handleViewDetails(merchant)}
+                          >
+                            <Eye className="w-4 h-4" /> تفاصيل الحساب
+                          </DropdownMenuItem>
+                          
+                          {merchant.status === 'pending' && (
+                            <DropdownMenuItem 
+                              className="gap-2 cursor-pointer text-emerald-600 focus:text-emerald-700"
+                              onClick={() => updateStatusMutation.mutate({ id: merchant.id, status: "active" })}
+                            >
+                              <CheckCircle className="w-4 h-4" /> قبول المتجر
+                            </DropdownMenuItem>
+                          )}
+
+                          {merchant.status === 'active' && (
+                            <DropdownMenuItem 
+                              className="gap-2 cursor-pointer text-destructive focus:text-destructive"
+                              onClick={() => updateStatusMutation.mutate({ id: merchant.id, status: "suspended" })}
+                            >
+                              <Ban className="w-4 h-4" /> إيقاف الحساب
+                            </DropdownMenuItem>
+                          )}
+
+                          {merchant.status === 'suspended' && (
+                            <DropdownMenuItem 
+                              className="gap-2 cursor-pointer text-emerald-600 focus:text-emerald-700"
+                              onClick={() => updateStatusMutation.mutate({ id: merchant.id, status: "active" })}
+                            >
+                              <CheckCircle className="w-4 h-4" /> إعادة تفعيل
+                            </DropdownMenuItem>
+                          )}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+
+        <Dialog open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>تفاصيل المتجر</DialogTitle>
+            </DialogHeader>
+            {selectedMerchant && (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm text-muted-foreground">اسم المتجر</p>
+                    <p className="font-medium">{selectedMerchant.storeName}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">اسم المالك</p>
+                    <p className="font-medium">{selectedMerchant.ownerName}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">البريد الإلكتروني</p>
+                    <p className="font-medium font-mono">{selectedMerchant.email}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">رقم الجوال</p>
+                    <p className="font-medium font-mono">{selectedMerchant.mobile}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">نوع الكيان</p>
+                    <p className="font-medium">{storeTypeLabels[selectedMerchant.storeType]}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">رقم السجل</p>
+                    <p className="font-medium font-mono">{selectedMerchant.registrationNumber}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">المدينة</p>
+                    <p className="font-medium">{selectedMerchant.city}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">طريقة التوصيل</p>
+                    <p className="font-medium">{deliveryMethodLabels[selectedMerchant.deliveryMethod]}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">الرصيد الحالي</p>
+                    <p className="font-medium font-mono">{(selectedMerchant.balance / 100).toFixed(2)} ر.س</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">تاريخ التسجيل</p>
+                    <p className="font-medium">{new Date(selectedMerchant.createdAt).toLocaleDateString('ar-SA')}</p>
+                  </div>
+                </div>
+                {selectedMerchant.branches && selectedMerchant.branches.length > 0 && (
+                  <div>
+                    <p className="text-sm text-muted-foreground mb-2">الفروع</p>
+                    <div className="space-y-2">
+                      {selectedMerchant.branches.map((branch: any, idx: number) => (
+                        <div key={idx} className="p-3 bg-muted/50 rounded-md">
+                          <p className="font-medium">{branch.name}</p>
+                          <a href={branch.mapLink} target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline">
+                            {branch.mapLink}
+                          </a>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
       </div>
     </DashboardLayout>
   );

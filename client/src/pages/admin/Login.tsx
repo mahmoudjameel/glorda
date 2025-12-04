@@ -8,6 +8,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { useLocation } from "wouter";
 import { ShieldCheck, Loader2, Lock } from "lucide-react";
 import { useState } from "react";
+import { useToast } from "@/hooks/use-toast";
 import logoUrl from "@assets/شعار_غلوردا_1764881546720.jpg";
 
 const formSchema = z.object({
@@ -18,6 +19,7 @@ const formSchema = z.object({
 export default function AdminLogin() {
   const [, setLocation] = useLocation();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const { toast } = useToast();
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -29,13 +31,40 @@ export default function AdminLogin() {
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsSubmitting(true);
-    // Mock login delay
-    await new Promise(resolve => setTimeout(resolve, 1500));
     
-    // In a real app, you would validate admin credentials here
-    console.log("Admin login attempt:", values);
-    
-    setLocation("/admin");
+    try {
+      const response = await fetch("/api/auth/login/admin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(values),
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        toast({
+          variant: "destructive",
+          title: "خطأ في تسجيل الدخول",
+          description: data.error || "حدث خطأ ما",
+        });
+        return;
+      }
+      
+      toast({
+        title: "تم تسجيل الدخول بنجاح",
+        description: `مرحباً ${data.admin.name}`,
+      });
+      
+      setLocation("/admin");
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "خطأ",
+        description: "فشل الاتصال بالخادم",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   return (
@@ -66,7 +95,7 @@ export default function AdminLogin() {
                     <FormItem>
                       <FormLabel>البريد الإلكتروني</FormLabel>
                       <FormControl>
-                        <Input placeholder="admin@glorada.com" {...field} className="font-mono text-right" />
+                        <Input placeholder="admin@glorda.com" {...field} className="font-mono text-right" data-testid="input-admin-email" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -80,7 +109,7 @@ export default function AdminLogin() {
                       <FormLabel>كلمة المرور</FormLabel>
                       <FormControl>
                         <div className="relative">
-                          <Input type="password" placeholder="••••••••" {...field} className="pl-10" />
+                          <Input type="password" placeholder="••••••••" {...field} className="pl-10" data-testid="input-admin-password" />
                           <Lock className="w-4 h-4 text-muted-foreground absolute left-3 top-3" />
                         </div>
                       </FormControl>
@@ -88,7 +117,7 @@ export default function AdminLogin() {
                     </FormItem>
                   )}
                 />
-                <Button type="submit" className="w-full py-6 mt-2" disabled={isSubmitting}>
+                <Button type="submit" className="w-full py-6 mt-2" disabled={isSubmitting} data-testid="button-admin-submit">
                   {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin" /> : "الدخول للوحة التحكم"}
                 </Button>
               </form>
@@ -99,6 +128,9 @@ export default function AdminLogin() {
         <div className="text-center">
           <p className="text-xs text-muted-foreground">
             هذه الصفحة مخصصة للموظفين المصرح لهم فقط.
+          </p>
+          <p className="text-xs text-muted-foreground mt-2">
+            بيانات الدخول الافتراضية: admin@glorda.com / admin123
           </p>
         </div>
       </div>

@@ -77,25 +77,48 @@ export default function Register() {
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsSubmitting(true);
-    console.log(values);
     
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    
-    toast({
-      title: "تم استلام طلبك بنجاح",
-      description: "حسابك قيد المراجعة الآن. سيتم إشعارك عند التفعيل.",
-    });
-    
-    // Redirect to login or a "pending" page
-    setLocation("/"); // Redirect to login for now
+    try {
+      const { confirmPassword, ...registerData } = values;
+      
+      const response = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(registerData),
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        toast({
+          variant: "destructive",
+          title: "خطأ في التسجيل",
+          description: data.error || "حدث خطأ ما",
+        });
+        return;
+      }
+      
+      toast({
+        title: "تم استلام طلبك بنجاح",
+        description: "حسابك قيد المراجعة الآن. سيتم إشعارك عند التفعيل.",
+      });
+      
+      setLocation("/");
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "خطأ",
+        description: "فشل الاتصال بالخادم",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-muted/30 p-4 py-10" dir="rtl">
-      {/* Admin Login Button */}
       <Link href="/admin/login">
-        <Button variant="outline" className="fixed top-4 left-4 gap-2 hidden md:flex">
+        <Button variant="outline" className="fixed top-4 left-4 gap-2 hidden md:flex" data-testid="link-admin-login">
           <ShieldCheck className="w-4 h-4" />
           دخول الإدارة
         </Button>
@@ -105,7 +128,7 @@ export default function Register() {
         <div className="text-center space-y-4">
           <div className="flex justify-center">
             <div className="w-24 h-24 rounded-full overflow-hidden border-4 border-white shadow-lg">
-              <img src={logoUrl} alt="Logo" className="w-full h-full object-cover" />
+              <img src={logoUrl} alt="Logo" className="w-full h-full object-cover" data-testid="img-logo" />
             </div>
           </div>
           <h1 className="text-3xl font-bold tracking-tight font-display text-primary">انضم إلى غلوردا</h1>
@@ -122,7 +145,6 @@ export default function Register() {
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
                 
-                {/* Personal & Store Info Section */}
                 <div className="grid md:grid-cols-2 gap-6">
                    <FormField
                     control={form.control}
@@ -131,7 +153,7 @@ export default function Register() {
                       <FormItem>
                         <FormLabel>اسم المالك</FormLabel>
                         <FormControl>
-                          <Input placeholder="الاسم الثلاثي" {...field} />
+                          <Input placeholder="الاسم الثلاثي" {...field} data-testid="input-owner-name" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -144,7 +166,7 @@ export default function Register() {
                       <FormItem>
                         <FormLabel>اسم المتجر</FormLabel>
                         <FormControl>
-                          <Input placeholder="اسم المتجر التجاري" {...field} />
+                          <Input placeholder="اسم المتجر التجاري" {...field} data-testid="input-store-name" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -157,7 +179,7 @@ export default function Register() {
                       <FormItem>
                         <FormLabel>رقم الجوال</FormLabel>
                         <FormControl>
-                          <Input placeholder="05xxxxxxxx" {...field} className="font-mono text-right" />
+                          <Input placeholder="05xxxxxxxx" {...field} className="font-mono text-right" data-testid="input-mobile" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -170,7 +192,7 @@ export default function Register() {
                       <FormItem>
                         <FormLabel>البريد الإلكتروني</FormLabel>
                         <FormControl>
-                          <Input placeholder="name@example.com" {...field} className="font-mono text-right" />
+                          <Input placeholder="name@example.com" {...field} className="font-mono text-right" data-testid="input-email" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -187,7 +209,7 @@ export default function Register() {
                         <FormLabel>نوع الكيان</FormLabel>
                         <Select onValueChange={field.onChange} defaultValue={field.value}>
                           <FormControl>
-                            <SelectTrigger>
+                            <SelectTrigger data-testid="select-store-type">
                               <SelectValue placeholder="اختر نوع الكيان" />
                             </SelectTrigger>
                           </FormControl>
@@ -208,7 +230,7 @@ export default function Register() {
                       <FormItem>
                         <FormLabel>رقم السجل / وثيقة العمل الحر</FormLabel>
                         <FormControl>
-                          <Input placeholder="70xxxxxxxxx" {...field} className="font-mono text-right" />
+                          <Input placeholder="70xxxxxxxxx" {...field} className="font-mono text-right" data-testid="input-registration-number" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -225,7 +247,7 @@ export default function Register() {
                         <FormLabel>فئة المتجر</FormLabel>
                         <Select onValueChange={field.onChange} defaultValue={field.value}>
                           <FormControl>
-                            <SelectTrigger>
+                            <SelectTrigger data-testid="select-category">
                               <SelectValue placeholder="اختر الفئة" />
                             </SelectTrigger>
                           </FormControl>
@@ -246,7 +268,7 @@ export default function Register() {
                       <FormItem>
                         <FormLabel>المدينة</FormLabel>
                         <FormControl>
-                          <Input placeholder="الرياض، جدة..." {...field} />
+                          <Input placeholder="الرياض، جدة..." {...field} data-testid="input-city" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -271,7 +293,7 @@ export default function Register() {
                               <FormControl>
                                 <RadioGroupItem value="representative" className="peer sr-only" />
                               </FormControl>
-                              <FormLabel className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary cursor-pointer transition-all">
+                              <FormLabel className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary cursor-pointer transition-all" data-testid="radio-representative">
                                 <div className="mb-3 rounded-full bg-primary/10 p-2 text-primary">
                                   <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-truck"><path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2"/><path d="M15 18H9"/><path d="M19 18h2a1 1 0 0 0 1-1v-3.65a1 1 0 0 0-.22-.624l-3.48-4.35A1 1 0 0 0 17.52 8H14"/><circle cx="17" cy="18" r="2"/><circle cx="7" cy="18" r="2"/></svg>
                                 </div>
@@ -285,7 +307,7 @@ export default function Register() {
                               <FormControl>
                                 <RadioGroupItem value="pickup" className="peer sr-only" />
                               </FormControl>
-                              <FormLabel className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary cursor-pointer transition-all">
+                              <FormLabel className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary cursor-pointer transition-all" data-testid="radio-pickup">
                                 <div className="mb-3 rounded-full bg-primary/10 p-2 text-primary">
                                   <Store className="w-6 h-6" />
                                 </div>
@@ -299,7 +321,7 @@ export default function Register() {
                               <FormControl>
                                 <RadioGroupItem value="all" className="peer sr-only" />
                               </FormControl>
-                              <FormLabel className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary cursor-pointer transition-all">
+                              <FormLabel className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary cursor-pointer transition-all" data-testid="radio-all">
                                 <div className="mb-3 rounded-full bg-primary/10 p-2 text-primary">
                                   <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-check-circle-2"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>
                                 </div>
@@ -332,6 +354,7 @@ export default function Register() {
                           size="sm"
                           onClick={() => append({ name: "", mapLink: "" })}
                           className="gap-2 shadow-sm"
+                          data-testid="button-add-branch"
                         >
                           <Plus className="w-4 h-4" /> إضافة فرع جديد
                         </Button>
@@ -356,6 +379,7 @@ export default function Register() {
                                   size="icon"
                                   className="h-6 w-6 rounded-full shadow-sm"
                                   onClick={() => remove(index)}
+                                  data-testid={`button-remove-branch-${index}`}
                                 >
                                   <Trash2 className="w-3 h-3" />
                                 </Button>
@@ -368,7 +392,7 @@ export default function Register() {
                                   <FormItem>
                                     <FormLabel className="text-xs text-muted-foreground">اسم الفرع</FormLabel>
                                     <FormControl>
-                                      <Input placeholder="مثال: فرع العليا - الرياض" {...field} className="bg-background" />
+                                      <Input placeholder="مثال: فرع العليا - الرياض" {...field} className="bg-background" data-testid={`input-branch-name-${index}`} />
                                     </FormControl>
                                     <FormMessage />
                                   </FormItem>
@@ -384,7 +408,7 @@ export default function Register() {
                                       <FormItem>
                                         <FormLabel className="text-xs text-muted-foreground">رابط الموقع (Google Maps)</FormLabel>
                                         <FormControl>
-                                          <Input placeholder="https://maps.google.com/..." {...field} className="bg-background font-mono text-xs" dir="ltr" />
+                                          <Input placeholder="https://maps.google.com/..." {...field} className="bg-background font-mono text-xs" dir="ltr" data-testid={`input-branch-map-${index}`} />
                                         </FormControl>
                                         <FormMessage />
                                       </FormItem>
@@ -397,6 +421,7 @@ export default function Register() {
                                   size="icon"
                                   className="text-muted-foreground hover:text-destructive hover:bg-destructive/10 hidden md:flex"
                                   onClick={() => remove(index)}
+                                  data-testid={`button-remove-branch-desktop-${index}`}
                                 >
                                   <Trash2 className="w-4 h-4" />
                                 </Button>
@@ -417,7 +442,7 @@ export default function Register() {
                       <FormItem>
                         <FormLabel>كلمة المرور</FormLabel>
                         <FormControl>
-                          <Input type="password" placeholder="••••••••" {...field} />
+                          <Input type="password" placeholder="••••••••" {...field} data-testid="input-password" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -430,7 +455,7 @@ export default function Register() {
                       <FormItem>
                         <FormLabel>تأكيد الكلمة</FormLabel>
                         <FormControl>
-                          <Input type="password" placeholder="••••••••" {...field} />
+                          <Input type="password" placeholder="••••••••" {...field} data-testid="input-confirm-password" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -438,7 +463,7 @@ export default function Register() {
                   />
                 </div>
 
-                <Button type="submit" className="w-full text-lg py-6 font-display mt-4" disabled={isSubmitting}>
+                <Button type="submit" className="w-full text-lg py-6 font-display mt-4" disabled={isSubmitting} data-testid="button-submit">
                   {isSubmitting ? (
                     <>
                       <Loader2 className="w-5 h-5 ml-2 animate-spin" />
@@ -452,7 +477,7 @@ export default function Register() {
             </Form>
             <div className="mt-6 text-center text-sm text-muted-foreground">
               لديك حساب بالفعل؟{" "}
-              <Link href="/" className="text-primary hover:underline font-medium">
+              <Link href="/" className="text-primary hover:underline font-medium" data-testid="link-login">
                 سجل دخولك هنا
               </Link>
             </div>

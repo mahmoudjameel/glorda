@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import session from "express-session";
+import bcrypt from "bcryptjs";
 import { 
   insertMerchantSchema, 
   insertProductSchema, 
@@ -62,7 +63,11 @@ export async function registerRoutes(
         return res.status(400).json({ error: "البريد الإلكتروني مستخدم بالفعل" });
       }
       
-      const merchant = await storage.createMerchant(data);
+      const hashedPassword = await bcrypt.hash(data.password, 10);
+      const merchant = await storage.createMerchant({
+        ...data,
+        password: hashedPassword
+      });
       const { password, ...merchantData } = merchant;
       
       res.json({ 
@@ -88,7 +93,12 @@ export async function registerRoutes(
       }
 
       const merchant = await storage.getMerchantByEmail(email);
-      if (!merchant || merchant.password !== password) {
+      if (!merchant) {
+        return res.status(401).json({ error: "بيانات الدخول غير صحيحة" });
+      }
+      
+      const isValidPassword = await bcrypt.compare(password, merchant.password);
+      if (!isValidPassword) {
         return res.status(401).json({ error: "بيانات الدخول غير صحيحة" });
       }
 
@@ -119,7 +129,12 @@ export async function registerRoutes(
       }
 
       const admin = await storage.getAdminByEmail(email);
-      if (!admin || admin.password !== password) {
+      if (!admin) {
+        return res.status(401).json({ error: "بيانات الدخول غير صحيحة" });
+      }
+      
+      const isValidPassword = await bcrypt.compare(password, admin.password);
+      if (!isValidPassword) {
         return res.status(401).json({ error: "بيانات الدخول غير صحيحة" });
       }
 
@@ -191,6 +206,38 @@ export async function registerRoutes(
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ error: "فشل تحديث بيانات المتجر" });
+    }
+  });
+
+  app.get("/api/merchant/stats", requireMerchant, async (req, res) => {
+    try {
+      const merchantId = req.session.userId!;
+      const [products, orders, transactions] = await Promise.all([
+        storage.getProductsByMerchant(merchantId),
+        storage.getOrdersByMerchant(merchantId),
+        storage.getTransactionsByMerchant(merchantId)
+      ]);
+
+      const merchant = await storage.getMerchant(merchantId);
+      const totalSales = transactions
+        .filter(t => t.type === "sale" && t.status === "completed")
+        .reduce((sum, t) => sum + t.amount, 0);
+      
+      const pendingOrders = orders.filter(o => o.status === "pending").length;
+      const completedOrders = orders.filter(o => o.status === "completed").length;
+
+      res.json({
+        productsCount: products.length,
+        ordersCount: orders.length,
+        pendingOrders,
+        completedOrders,
+        totalSales,
+        balance: merchant?.balance || 0,
+        recentOrders: orders.slice(0, 5),
+        recentTransactions: transactions.slice(0, 5)
+      });
+    } catch (error) {
+      res.status(500).json({ error: "فشل جلب الإحصائيات" });
     }
   });
 
@@ -668,9 +715,10 @@ export async function registerRoutes(
     try {
       const existingAdmin = await storage.getAdminByEmail("admin@glorda.com");
       if (!existingAdmin) {
+        const hashedPassword = await bcrypt.hash("admin123", 10);
         await storage.createAdmin({
           email: "admin@glorda.com",
-          password: "admin123",
+          password: hashedPassword,
           name: "مدير النظام"
         });
         console.log("Default admin created: admin@glorda.com / admin123");

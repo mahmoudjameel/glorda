@@ -94,7 +94,7 @@ export default function Register() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-muted/30 p-4 py-10" dir="rtl">
       {/* Admin Login Button */}
-      <Link href="/admin">
+      <Link href="/admin/login">
         <Button variant="outline" className="fixed top-4 left-4 gap-2 hidden md:flex">
           <ShieldCheck className="w-4 h-4" />
           دخول الإدارة

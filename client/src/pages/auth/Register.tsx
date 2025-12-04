@@ -26,7 +26,7 @@ const formSchema = z.object({
   }),
   city: z.string().min(2, "المدينة مطلوبة"),
   registrationNumber: z.string().min(1, "رقم السجل / الوثيقة مطلوب"),
-  deliveryMethod: z.enum(["representative", "pickup"], {
+  deliveryMethod: z.enum(["representative", "pickup", "all"], {
     required_error: "يرجى اختيار طريقة التوصيل",
   }),
   branches: z.array(z.object({
@@ -39,12 +39,12 @@ const formSchema = z.object({
   message: "كلمات المرور غير متطابقة",
   path: ["confirmPassword"],
 }).refine((data) => {
-  if (data.deliveryMethod === "pickup") {
+  if (data.deliveryMethod === "pickup" || data.deliveryMethod === "all") {
     return data.branches && data.branches.length > 0;
   }
   return true;
 }, {
-  message: "يجب إضافة فرع واحد على الأقل عند اختيار الاستلام من الفرع",
+  message: "يجب إضافة فرع واحد على الأقل",
   path: ["branches"],
 });
 
@@ -295,6 +295,20 @@ export default function Register() {
                                 </div>
                               </FormLabel>
                             </FormItem>
+                            <FormItem className="md:col-span-2">
+                              <FormControl>
+                                <RadioGroupItem value="all" className="peer sr-only" />
+                              </FormControl>
+                              <FormLabel className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary cursor-pointer transition-all">
+                                <div className="mb-3 rounded-full bg-primary/10 p-2 text-primary">
+                                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-check-circle-2"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>
+                                </div>
+                                <div className="text-center">
+                                  <span className="block font-semibold text-lg">الكل (توصيل + استلام)</span>
+                                  <span className="text-xs text-muted-foreground mt-1 block">تفعيل جميع خيارات التوصيل والاستلام للعملاء</span>
+                                </div>
+                              </FormLabel>
+                            </FormItem>
                           </RadioGroup>
                         </FormControl>
                         <FormMessage />
@@ -302,7 +316,7 @@ export default function Register() {
                     )}
                   />
 
-                  {deliveryMethod === "pickup" && (
+                  {(deliveryMethod === "pickup" || deliveryMethod === "all") && (
                     <div className="rounded-lg border border-border bg-card p-6 shadow-sm animate-in fade-in slide-in-from-top-4 duration-300">
                       <div className="flex items-center justify-between mb-6">
                         <div>

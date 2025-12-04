@@ -254,33 +254,45 @@ export default function Register() {
                   />
                 </div>
 
-                <div className="space-y-4 border rounded-lg p-4 bg-muted/20">
+                <div className="space-y-6">
                   <FormField
                     control={form.control}
                     name="deliveryMethod"
                     render={({ field }) => (
-                      <FormItem className="space-y-3">
-                        <FormLabel>طريقة التوصيل / الاستلام</FormLabel>
+                      <FormItem>
+                        <FormLabel className="text-base">طريقة التوصيل / الاستلام</FormLabel>
                         <FormControl>
                           <RadioGroup
                             onValueChange={field.onChange}
                             defaultValue={field.value}
-                            className="flex flex-col space-y-1"
+                            className="grid grid-cols-1 md:grid-cols-2 gap-4"
                           >
-                            <FormItem className="flex items-center space-x-3 space-x-reverse">
+                            <FormItem>
                               <FormControl>
-                                <RadioGroupItem value="representative" />
+                                <RadioGroupItem value="representative" className="peer sr-only" />
                               </FormControl>
-                              <FormLabel className="font-normal cursor-pointer">
-                                مندوب خاص بالمتجر (توصيل للعميل)
+                              <FormLabel className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary cursor-pointer transition-all">
+                                <div className="mb-3 rounded-full bg-primary/10 p-2 text-primary">
+                                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-truck"><path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2"/><path d="M15 18H9"/><path d="M19 18h2a1 1 0 0 0 1-1v-3.65a1 1 0 0 0-.22-.624l-3.48-4.35A1 1 0 0 0 17.52 8H14"/><circle cx="17" cy="18" r="2"/><circle cx="7" cy="18" r="2"/></svg>
+                                </div>
+                                <div className="text-center">
+                                  <span className="block font-semibold text-lg">مندوب توصيل</span>
+                                  <span className="text-xs text-muted-foreground mt-1 block">توصيل الطلبات للعملاء عبر مندوب المتجر</span>
+                                </div>
                               </FormLabel>
                             </FormItem>
-                            <FormItem className="flex items-center space-x-3 space-x-reverse">
+                            <FormItem>
                               <FormControl>
-                                <RadioGroupItem value="pickup" />
+                                <RadioGroupItem value="pickup" className="peer sr-only" />
                               </FormControl>
-                              <FormLabel className="font-normal cursor-pointer">
-                                الاستلام من الفرع (Pickup)
+                              <FormLabel className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary cursor-pointer transition-all">
+                                <div className="mb-3 rounded-full bg-primary/10 p-2 text-primary">
+                                  <Store className="w-6 h-6" />
+                                </div>
+                                <div className="text-center">
+                                  <span className="block font-semibold text-lg">استلام من الفرع</span>
+                                  <span className="text-xs text-muted-foreground mt-1 block">العميل يستلم الطلب من فروعكم</span>
+                                </div>
                               </FormLabel>
                             </FormItem>
                           </RadioGroup>
@@ -291,69 +303,94 @@ export default function Register() {
                   />
 
                   {deliveryMethod === "pickup" && (
-                    <div className="space-y-4 animate-in fade-in slide-in-from-top-2">
-                      <div className="flex items-center justify-between">
-                        <h4 className="text-sm font-medium text-primary">الفروع ومواقع الاستلام</h4>
+                    <div className="rounded-lg border border-border bg-card p-6 shadow-sm animate-in fade-in slide-in-from-top-4 duration-300">
+                      <div className="flex items-center justify-between mb-6">
+                        <div>
+                          <h4 className="text-lg font-semibold text-foreground flex items-center gap-2">
+                            <Store className="w-5 h-5 text-primary" />
+                            الفروع ومواقع الاستلام
+                          </h4>
+                          <p className="text-sm text-muted-foreground mt-1">أضف جميع الفروع التي يمكن للعملاء الاستلام منها</p>
+                        </div>
                         <Button
                           type="button"
-                          variant="outline"
+                          variant="default"
                           size="sm"
                           onClick={() => append({ name: "", mapLink: "" })}
-                          className="gap-2"
+                          className="gap-2 shadow-sm"
                         >
-                          <Plus className="w-3 h-3" /> إضافة فرع
+                          <Plus className="w-4 h-4" /> إضافة فرع جديد
                         </Button>
                       </div>
                       
-                      {fields.length === 0 && (
-                        <p className="text-sm text-destructive text-center py-2 bg-destructive/10 rounded-md">يجب إضافة فرع واحد على الأقل</p>
-                      )}
-
-                      <div className="space-y-3">
-                        {fields.map((field, index) => (
-                          <div key={field.id} className="grid grid-cols-12 gap-2 items-start">
-                            <div className="col-span-5">
+                      {fields.length === 0 ? (
+                        <div className="text-center py-12 border-2 border-dashed rounded-lg bg-muted/10">
+                          <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center mx-auto mb-3">
+                            <Store className="w-6 h-6 text-muted-foreground" />
+                          </div>
+                          <p className="text-sm font-medium text-muted-foreground mb-1">لا توجد فروع مضافة</p>
+                          <p className="text-xs text-muted-foreground">يجب إضافة فرع واحد على الأقل للمتابعة</p>
+                        </div>
+                      ) : (
+                        <div className="space-y-4">
+                          {fields.map((field, index) => (
+                            <div key={field.id} className="group relative grid grid-cols-1 md:grid-cols-2 gap-4 p-4 rounded-lg border bg-background/50 hover:bg-background transition-colors">
+                              <div className="absolute -left-2 -top-2 md:static md:col-span-2 md:hidden">
+                                <Button
+                                  type="button"
+                                  variant="destructive"
+                                  size="icon"
+                                  className="h-6 w-6 rounded-full shadow-sm"
+                                  onClick={() => remove(index)}
+                                >
+                                  <Trash2 className="w-3 h-3" />
+                                </Button>
+                              </div>
+                              
                               <FormField
                                 control={form.control}
                                 name={`branches.${index}.name`}
                                 render={({ field }) => (
                                   <FormItem>
+                                    <FormLabel className="text-xs text-muted-foreground">اسم الفرع</FormLabel>
                                     <FormControl>
-                                      <Input placeholder="اسم الفرع (مثال: فرع العليا)" {...field} />
+                                      <Input placeholder="مثال: فرع العليا - الرياض" {...field} className="bg-background" />
                                     </FormControl>
                                     <FormMessage />
                                   </FormItem>
                                 )}
                               />
+                              
+                              <div className="flex items-end gap-2">
+                                <div className="flex-1">
+                                  <FormField
+                                    control={form.control}
+                                    name={`branches.${index}.mapLink`}
+                                    render={({ field }) => (
+                                      <FormItem>
+                                        <FormLabel className="text-xs text-muted-foreground">رابط الموقع (Google Maps)</FormLabel>
+                                        <FormControl>
+                                          <Input placeholder="https://maps.google.com/..." {...field} className="bg-background font-mono text-xs" dir="ltr" />
+                                        </FormControl>
+                                        <FormMessage />
+                                      </FormItem>
+                                    )}
+                                  />
+                                </div>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  className="text-muted-foreground hover:text-destructive hover:bg-destructive/10 hidden md:flex"
+                                  onClick={() => remove(index)}
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              </div>
                             </div>
-                            <div className="col-span-6">
-                              <FormField
-                                control={form.control}
-                                name={`branches.${index}.mapLink`}
-                                render={({ field }) => (
-                                  <FormItem>
-                                    <FormControl>
-                                      <Input placeholder="رابط قوقل ماب" {...field} className="font-mono text-xs" />
-                                    </FormControl>
-                                    <FormMessage />
-                                  </FormItem>
-                                )}
-                              />
-                            </div>
-                            <div className="col-span-1">
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon"
-                                className="text-destructive hover:text-destructive/80"
-                                onClick={() => remove(index)}
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </Button>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>

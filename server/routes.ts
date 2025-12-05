@@ -59,15 +59,18 @@ export async function registerRoutes(
   app: Express
 ): Promise<Server> {
   
+  const isProduction = process.env.NODE_ENV === "production";
+  const isReplit = !!process.env.REPL_SLUG;
+  
   app.use(session({
     secret: process.env.SESSION_SECRET || "glorada-secret-key-change-in-production",
     resave: false,
     saveUninitialized: false,
     cookie: {
-      secure: process.env.NODE_ENV === "production",
+      secure: isProduction || isReplit,
       httpOnly: true,
       maxAge: 1000 * 60 * 60 * 24 * 7,
-      sameSite: "lax",
+      sameSite: isProduction || isReplit ? "none" : "lax",
     }
   }));
 

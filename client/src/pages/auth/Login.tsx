@@ -126,7 +126,7 @@ export default function Login() {
                     </FormItem>
                   )}
                 />
-                <Button type="submit" className="w-full text-base py-6 font-display" disabled={isSubmitting} data-testid="button-submit">
+                <Button type="submit" className="w-full h-12 text-base font-display rounded-xl bg-primary hover:bg-primary/90 shadow-lg shadow-primary/25 transition-all duration-200" disabled={isSubmitting} data-testid="button-submit">
                   {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin" /> : "تسجيل الدخول"}
                 </Button>
               </form>

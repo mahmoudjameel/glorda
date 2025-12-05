@@ -121,7 +121,7 @@ export default function AdminLogin() {
                     </FormItem>
                   )}
                 />
-                <Button type="submit" className="w-full py-6 mt-2" disabled={isSubmitting} data-testid="button-admin-submit">
+                <Button type="submit" className="w-full h-12 text-base font-display rounded-xl bg-primary hover:bg-primary/90 shadow-lg shadow-primary/25 transition-all duration-200 mt-2" disabled={isSubmitting} data-testid="button-admin-submit">
                   {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin" /> : "الدخول للوحة التحكم"}
                 </Button>
               </form>

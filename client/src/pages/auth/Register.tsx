@@ -512,7 +512,7 @@ export default function Register() {
                   />
                 </div>
 
-                <Button type="submit" className="w-full text-lg py-6 font-display mt-4" disabled={isSubmitting} data-testid="button-submit">
+                <Button type="submit" className="w-full h-14 text-lg font-display rounded-xl bg-primary hover:bg-primary/90 shadow-lg shadow-primary/25 transition-all duration-200 mt-4" disabled={isSubmitting} data-testid="button-submit">
                   {isSubmitting ? (
                     <>
                       <Loader2 className="w-5 h-5 ml-2 animate-spin" />

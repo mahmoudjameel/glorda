@@ -36,7 +36,7 @@ export default function MerchantSocials() {
   const { data: profile, isLoading, isError } = useQuery<MerchantProfile>({
     queryKey: ["/api/merchant/profile"],
     queryFn: async () => {
-      const res = await fetch("/api/merchant/profile");
+      const res = await fetch("/api/merchant/profile", { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch profile");
       return res.json();
     }
@@ -59,6 +59,7 @@ export default function MerchantSocials() {
       const res = await fetch("/api/merchant/profile", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({ socialLinks })
       });
       if (!res.ok) throw new Error("Failed to save");

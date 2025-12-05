@@ -19,7 +19,7 @@ export default function MerchantWallet() {
   const { data: profile } = useQuery<Merchant>({
     queryKey: ["/api/merchant/profile"],
     queryFn: async () => {
-      const res = await fetch("/api/merchant/profile");
+      const res = await fetch("/api/merchant/profile", { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch profile");
       return res.json();
     }
@@ -28,7 +28,7 @@ export default function MerchantWallet() {
   const { data: transactions = [], isLoading } = useQuery<Transaction[]>({
     queryKey: ["/api/merchant/transactions"],
     queryFn: async () => {
-      const res = await fetch("/api/merchant/transactions");
+      const res = await fetch("/api/merchant/transactions", { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch transactions");
       return res.json();
     }
@@ -39,6 +39,7 @@ export default function MerchantWallet() {
       const res = await fetch("/api/merchant/withdraw", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({ amount })
       });
       if (!res.ok) {

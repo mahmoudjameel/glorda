@@ -47,7 +47,7 @@ export default function AdminMerchants() {
   const { data: merchants = [], isLoading } = useQuery<Merchant[]>({
     queryKey: ["/api/admin/merchants"],
     queryFn: async () => {
-      const res = await fetch("/api/admin/merchants");
+      const res = await fetch("/api/admin/merchants", { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch merchants");
       return res.json();
     }
@@ -58,6 +58,7 @@ export default function AdminMerchants() {
       const res = await fetch(`/api/admin/merchants/${id}/status`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({ status })
       });
       if (!res.ok) throw new Error("Failed to update status");

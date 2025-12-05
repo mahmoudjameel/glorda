@@ -45,7 +45,7 @@ export default function AdminAdmins() {
   const { data: admins = [], isLoading } = useQuery<Admin[]>({
     queryKey: ["/api/admin/admins"],
     queryFn: async () => {
-      const res = await fetch("/api/admin/admins");
+      const res = await fetch("/api/admin/admins", { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch admins");
       return res.json();
     }
@@ -56,6 +56,7 @@ export default function AdminAdmins() {
       const res = await fetch("/api/admin/admins", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify(data)
       });
       if (!res.ok) {
@@ -78,7 +79,8 @@ export default function AdminAdmins() {
   const deleteMutation = useMutation({
     mutationFn: async (id: number) => {
       const res = await fetch(`/api/admin/admins/${id}`, {
-        method: "DELETE"
+        method: "DELETE",
+        credentials: "include"
       });
       if (!res.ok) {
         const error = await res.json();

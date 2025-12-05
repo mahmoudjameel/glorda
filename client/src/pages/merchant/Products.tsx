@@ -75,6 +75,7 @@ export default function MerchantProducts() {
     try {
       const res = await fetch("/api/merchant/products/upload-images", {
         method: "POST",
+        credentials: "include",
         body: formData
       });
 
@@ -103,7 +104,7 @@ export default function MerchantProducts() {
   const { data: products = [], isLoading } = useQuery<Product[]>({
     queryKey: ["/api/merchant/products"],
     queryFn: async () => {
-      const res = await fetch("/api/merchant/products");
+      const res = await fetch("/api/merchant/products", { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch products");
       return res.json();
     }
@@ -114,6 +115,7 @@ export default function MerchantProducts() {
       const res = await fetch("/api/merchant/products", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify(data)
       });
       if (!res.ok) throw new Error("Failed to create product");
@@ -135,6 +137,7 @@ export default function MerchantProducts() {
       const res = await fetch(`/api/merchant/products/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify(data)
       });
       if (!res.ok) throw new Error("Failed to update product");

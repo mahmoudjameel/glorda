@@ -32,7 +32,7 @@ export default function AdminDashboard() {
   const { data: merchants = [], isLoading: loadingMerchants } = useQuery<Merchant[]>({
     queryKey: ["/api/admin/merchants"],
     queryFn: async () => {
-      const res = await fetch("/api/admin/merchants");
+      const res = await fetch("/api/admin/merchants", { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch");
       return res.json();
     }
@@ -41,7 +41,7 @@ export default function AdminDashboard() {
   const { data: withdrawals = [], isLoading: loadingWithdrawals } = useQuery<Transaction[]>({
     queryKey: ["/api/admin/withdrawals"],
     queryFn: async () => {
-      const res = await fetch("/api/admin/withdrawals");
+      const res = await fetch("/api/admin/withdrawals", { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch");
       return res.json();
     }

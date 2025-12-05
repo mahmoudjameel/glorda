@@ -71,7 +71,7 @@ export default function MerchantDashboard() {
   const { data: stats, isLoading } = useQuery<MerchantStats>({
     queryKey: ["/api/merchant/stats"],
     queryFn: async () => {
-      const res = await fetch("/api/merchant/stats");
+      const res = await fetch("/api/merchant/stats", { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch stats");
       return res.json();
     }

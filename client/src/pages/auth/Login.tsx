@@ -60,7 +60,9 @@ export default function Login() {
       });
       
       await refetch();
-      setLocation("/dashboard");
+      setTimeout(() => {
+        setLocation("/dashboard");
+      }, 100);
     } catch (error) {
       toast({
         variant: "destructive",

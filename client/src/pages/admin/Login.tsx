@@ -60,7 +60,9 @@ export default function AdminLogin() {
       });
       
       await refetch();
-      setLocation("/admin");
+      setTimeout(() => {
+        setLocation("/admin");
+      }, 100);
     } catch (error) {
       toast({
         variant: "destructive",

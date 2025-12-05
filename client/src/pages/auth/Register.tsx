@@ -16,6 +16,7 @@ import logoUrl from "@assets/شعار_غلوردا_1764881546720.jpg";
 const formSchema = z.object({
   ownerName: z.string().min(2, "اسم المالك مطلوب"),
   storeName: z.string().min(3, "اسم المتجر مطلوب"),
+  username: z.string().min(3, "اسم المستخدم مطلوب").regex(/^[a-zA-Z0-9_]+$/, "اسم المستخدم يجب أن يحتوي على أحرف إنجليزية وأرقام فقط"),
   mobile: z.string().min(9, "رقم الجوال غير صالح"),
   email: z.string().email("البريد الإلكتروني غير صالح"),
   storeType: z.enum(["company", "institution", "individual"], {
@@ -61,6 +62,7 @@ export default function Register() {
     defaultValues: {
       ownerName: "",
       storeName: "",
+      username: "",
       mobile: "",
       email: "",
       city: "",
@@ -175,6 +177,20 @@ export default function Register() {
                         <FormControl>
                           <Input placeholder="اسم المتجر التجاري" {...field} data-testid="input-store-name" />
                         </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="username"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>اسم المستخدم</FormLabel>
+                        <FormControl>
+                          <Input placeholder="store_name" {...field} className="font-mono text-left" dir="ltr" data-testid="input-username" />
+                        </FormControl>
+                        <p className="text-xs text-muted-foreground">سيكون رابط متجرك: glorda.com/{field.value || "username"}</p>
                         <FormMessage />
                       </FormItem>
                     )}

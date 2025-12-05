@@ -15,6 +15,7 @@ import MerchantDashboard from "@/pages/merchant/Dashboard";
 import MerchantProducts from "@/pages/merchant/Products";
 import MerchantWallet from "@/pages/merchant/Wallet";
 import MerchantSocials from "@/pages/merchant/Socials";
+import MerchantSettings from "@/pages/merchant/Settings";
 
 // Admin Pages
 import AdminDashboard from "@/pages/admin/Dashboard";
@@ -49,6 +50,11 @@ function Router() {
       <Route path="/dashboard/socials">
         <ProtectedRoute requiredRole="merchant">
           <MerchantSocials />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/dashboard/settings">
+        <ProtectedRoute requiredRole="merchant">
+          <MerchantSettings />
         </ProtectedRoute>
       </Route>
       <Route path="/dashboard">

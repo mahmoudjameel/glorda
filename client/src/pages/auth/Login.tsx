@@ -73,8 +73,11 @@ export default function Login() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-muted/30 p-4" dir="rtl">
-      <Link href="/admin/login" className="fixed bottom-4 left-4 opacity-10 hover:opacity-50 transition-opacity">
-        <ShieldCheck className="w-4 h-4 text-muted-foreground" data-testid="link-admin-login" />
+      <Link href="/admin/login">
+        <Button variant="outline" className="fixed top-4 left-4 gap-2 hidden md:flex bg-background/50 backdrop-blur" data-testid="link-admin-login">
+          <ShieldCheck className="w-4 h-4" />
+          دخول الإدارة
+        </Button>
       </Link>
 
       <div className="w-full max-w-md space-y-8">

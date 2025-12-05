@@ -12,7 +12,10 @@ import {
   Wallet,
   Share2,
   Shield,
-  ClipboardList
+  ClipboardList,
+  Smartphone,
+  MapPin,
+  FileText
 } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -40,9 +43,9 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
     { href: "/admin", label: "نظرة عامة", icon: LayoutDashboard },
     { href: "/admin/pending", label: "طلبات التسجيل", icon: ClipboardList },
     { href: "/admin/merchants", label: "التجار", icon: Store },
-    { href: "/admin/withdrawals", label: "طلبات السحب", icon: Wallet },
-    { href: "/admin/admins", label: "المسؤولين", icon: Shield },
-    { href: "/admin/users", label: "المستخدمين", icon: Users },
+    { href: "/admin/app-settings", label: "إعدادات التطبيق", icon: Smartphone },
+    { href: "/admin/cities", label: "المدن", icon: MapPin },
+    { href: "/admin/policies", label: "السياسات والشروط", icon: FileText },
     { href: "/admin/settings", label: "الإعدادات", icon: Settings },
   ];
 

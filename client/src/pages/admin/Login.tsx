@@ -9,6 +9,7 @@ import { useLocation } from "wouter";
 import { ShieldCheck, Loader2, Lock } from "lucide-react";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
 import logoUrl from "@assets/شعار_غلوردا_1764881546720.jpg";
 
 const formSchema = z.object({
@@ -20,6 +21,7 @@ export default function AdminLogin() {
   const [, setLocation] = useLocation();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
+  const { refetch } = useAuth();
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -56,6 +58,7 @@ export default function AdminLogin() {
         description: `مرحباً ${data.admin.name}`,
       });
       
+      await refetch();
       setLocation("/admin");
     } catch (error) {
       toast({

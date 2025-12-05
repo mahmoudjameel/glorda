@@ -22,6 +22,10 @@ import AdminMerchants from "@/pages/admin/Merchants";
 import AdminPendingMerchants from "@/pages/admin/PendingMerchants";
 import AdminAdmins from "@/pages/admin/Admins";
 import AdminLogin from "@/pages/admin/Login";
+import AdminSettings from "@/pages/admin/Settings";
+import AdminAppSettings from "@/pages/admin/AppSettings";
+import AdminCities from "@/pages/admin/Cities";
+import AdminPolicies from "@/pages/admin/Policies";
 
 function Router() {
   return (
@@ -67,6 +71,26 @@ function Router() {
       <Route path="/admin/admins">
         <ProtectedRoute requiredRole="admin">
           <AdminAdmins />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/settings">
+        <ProtectedRoute requiredRole="admin">
+          <AdminSettings />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/app-settings">
+        <ProtectedRoute requiredRole="admin">
+          <AdminAppSettings />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/cities">
+        <ProtectedRoute requiredRole="admin">
+          <AdminCities />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/policies">
+        <ProtectedRoute requiredRole="admin">
+          <AdminPolicies />
         </ProtectedRoute>
       </Route>
       <Route path="/admin">

@@ -101,6 +101,7 @@ export interface IStorage {
   getAllAdmins(): Promise<Admin[]>;
   createAdmin(admin: InsertAdmin): Promise<Admin>;
   deleteAdmin(id: number): Promise<void>;
+  updateAdminPassword(id: number, password: string): Promise<void>;
   
   // Banners
   getBanner(id: number): Promise<Banner | undefined>;
@@ -316,6 +317,10 @@ export class DatabaseStorage implements IStorage {
 
   async deleteAdmin(id: number): Promise<void> {
     await db.delete(admins).where(eq(admins.id, id));
+  }
+
+  async updateAdminPassword(id: number, password: string): Promise<void> {
+    await db.update(admins).set({ password }).where(eq(admins.id, id));
   }
 
   // ========== Banners ==========

@@ -627,6 +627,38 @@ export async function registerRoutes(
     }
   });
 
+  app.patch("/api/admin/password", requireAdmin, async (req, res) => {
+    try {
+      const { currentPassword, newPassword } = req.body;
+      
+      if (!currentPassword || !newPassword) {
+        return res.status(400).json({ error: "جميع الحقول مطلوبة" });
+      }
+      
+      if (newPassword.length < 6) {
+        return res.status(400).json({ error: "كلمة المرور الجديدة يجب أن تكون 6 أحرف على الأقل" });
+      }
+
+      const admin = await storage.getAdmin(req.session.userId!);
+      if (!admin) {
+        return res.status(404).json({ error: "لم يتم العثور على المسؤول" });
+      }
+
+      const isValidPassword = await bcrypt.compare(currentPassword, admin.password);
+      if (!isValidPassword) {
+        return res.status(401).json({ error: "كلمة المرور الحالية غير صحيحة" });
+      }
+
+      const hashedPassword = await bcrypt.hash(newPassword, 10);
+      await storage.updateAdminPassword(req.session.userId!, hashedPassword);
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Change password error:", error);
+      res.status(500).json({ error: "فشل تغيير كلمة المرور" });
+    }
+  });
+
   // ========== ADMIN BANNERS ROUTES ==========
   
   app.get("/api/admin/banners", requireAdmin, async (req, res) => {

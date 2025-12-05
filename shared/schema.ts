@@ -28,6 +28,9 @@ export const merchants = pgTable("merchants", {
     tiktok?: string;
     snapchat?: string;
   }>(),
+  bankName: text("bank_name"),
+  iban: text("iban"),
+  accountHolderName: text("account_holder_name"),
   balance: integer("balance").notNull().default(0),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });

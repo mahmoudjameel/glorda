@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import session from "express-session";
+import connectPgSimple from "connect-pg-simple";
 import bcrypt from "bcryptjs";
 import multer from "multer";
 import path from "path";
@@ -62,7 +63,9 @@ export async function registerRoutes(
   const isProduction = process.env.NODE_ENV === "production";
   const isReplit = !!process.env.REPL_SLUG;
   
-  app.use(session({
+  const PgSession = connectPgSimple(session);
+  
+  const sessionConfig: session.SessionOptions = {
     secret: process.env.SESSION_SECRET || "glorada-secret-key-change-in-production",
     resave: false,
     saveUninitialized: false,
@@ -72,7 +75,17 @@ export async function registerRoutes(
       maxAge: 1000 * 60 * 60 * 24 * 7,
       sameSite: isProduction || isReplit ? "none" : "lax",
     }
-  }));
+  };
+  
+  if (process.env.DATABASE_URL) {
+    sessionConfig.store = new PgSession({
+      conString: process.env.DATABASE_URL,
+      tableName: "session",
+      createTableIfMissing: true,
+    });
+  }
+  
+  app.use(session(sessionConfig));
 
   const requireMerchant = (req: any, res: any, next: any) => {
     if (!req.session.userId || req.session.userType !== "merchant") {

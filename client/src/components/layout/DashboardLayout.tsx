@@ -11,7 +11,8 @@ import {
   X,
   Wallet,
   Share2,
-  Shield
+  Shield,
+  ClipboardList
 } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -37,6 +38,7 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
 
   const adminLinks = [
     { href: "/admin", label: "نظرة عامة", icon: LayoutDashboard },
+    { href: "/admin/pending", label: "طلبات التسجيل", icon: ClipboardList },
     { href: "/admin/merchants", label: "التجار", icon: Store },
     { href: "/admin/withdrawals", label: "طلبات السحب", icon: Wallet },
     { href: "/admin/admins", label: "المسؤولين", icon: Shield },

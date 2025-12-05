@@ -24,12 +24,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ShoppingBag, Search, Loader2, Eye, User, Package, MapPin, Phone, Calendar, CreditCard } from "lucide-react";
+import { ShoppingBag, Search, Loader2, Eye, User, Package, MapPin, Phone, Calendar, CreditCard, MessageCircle } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { format } from "date-fns";
 import { ar } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
+import { useLocation } from "wouter";
 
 interface OrderWithDetails {
   id: number;
@@ -83,6 +84,11 @@ export default function MerchantOrders() {
   const [selectedOrder, setSelectedOrder] = useState<OrderWithDetails | null>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [, setLocation] = useLocation();
+
+  const handleMessageCustomer = (orderId: number, orderNumber: string) => {
+    setLocation(`/dashboard/messages?orderId=${orderId}&orderNumber=${orderNumber}`);
+  };
 
   const { data: orders = [], isLoading } = useQuery<OrderWithDetails[]>({
     queryKey: ["/api/merchant/orders"],
@@ -261,14 +267,26 @@ export default function MerchantOrders() {
                           {format(new Date(order.createdAt), "dd/MM/yyyy", { locale: ar })}
                         </TableCell>
                         <TableCell>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => setSelectedOrder(order)}
-                            data-testid={`button-view-order-${order.id}`}
-                          >
-                            <Eye className="w-4 h-4" />
-                          </Button>
+                          <div className="flex items-center gap-1">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => setSelectedOrder(order)}
+                              data-testid={`button-view-order-${order.id}`}
+                              title="عرض التفاصيل"
+                            >
+                              <Eye className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleMessageCustomer(order.id, order.orderNumber)}
+                              data-testid={`button-message-customer-${order.id}`}
+                              title="رسالة للعميل"
+                            >
+                              <MessageCircle className="w-4 h-4" />
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))}

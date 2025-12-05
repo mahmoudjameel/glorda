@@ -11,6 +11,7 @@ import { useState, useEffect, useRef } from "react";
 import { format } from "date-fns";
 import { ar } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
+import { useSearch, useLocation } from "wouter";
 
 interface Conversation {
   id: number;
@@ -50,6 +51,8 @@ export default function MerchantMessages() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const searchString = useSearch();
+  const [, setLocation] = useLocation();
 
   const { data: conversations = [], isLoading } = useQuery<Conversation[]>({
     queryKey: ["/api/merchant/conversations"],
@@ -59,6 +62,20 @@ export default function MerchantMessages() {
       return res.json();
     }
   });
+
+  useEffect(() => {
+    if (conversations.length > 0 && searchString) {
+      const params = new URLSearchParams(searchString);
+      const orderId = params.get("orderId");
+      if (orderId) {
+        const conversation = conversations.find(c => c.id === parseInt(orderId));
+        if (conversation) {
+          setSelectedConversation(conversation);
+          setLocation("/dashboard/messages", { replace: true });
+        }
+      }
+    }
+  }, [conversations, searchString, setLocation]);
 
   const { data: messages = [], isLoading: isLoadingMessages } = useQuery<Message[]>({
     queryKey: ["/api/merchant/orders", selectedConversation?.id, "messages"],

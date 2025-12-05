@@ -22,9 +22,6 @@ const formSchema = z.object({
   storeType: z.enum(["company", "institution", "individual"], {
     required_error: "يرجى اختيار نوع المتجر",
   }),
-  category: z.enum(["gifts", "flowers", "all"], {
-    required_error: "يرجى اختيار فئة المتجر",
-  }),
   city: z.string().min(2, "المدينة مطلوبة"),
   registrationNumber: z.string().min(1, "رقم السجل / الوثيقة مطلوب"),
   deliveryMethod: z.enum(["representative", "pickup", "all"], {
@@ -262,28 +259,6 @@ export default function Register() {
                 </div>
 
                 <div className="grid md:grid-cols-2 gap-6">
-                  <FormField
-                    control={form.control}
-                    name="category"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>فئة المتجر</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
-                          <FormControl>
-                            <SelectTrigger data-testid="select-category">
-                              <SelectValue placeholder="اختر الفئة" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent dir="rtl">
-                            <SelectItem value="gifts">هدايا</SelectItem>
-                            <SelectItem value="flowers">ورود</SelectItem>
-                            <SelectItem value="all">الكل (عام)</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
                   <FormField
                     control={form.control}
                     name="city"

@@ -47,8 +47,7 @@ export default function MerchantProducts() {
     description: "",
     price: "",
     stock: "",
-    productType: "gifts",
-    category: ""
+    productType: "gifts"
   });
 
   const productTypeLabels: Record<string, string> = {
@@ -171,7 +170,7 @@ export default function MerchantProducts() {
   });
 
   const resetForm = () => {
-    setFormData({ name: "", description: "", price: "", stock: "", productType: "gifts", category: "" });
+    setFormData({ name: "", description: "", price: "", stock: "", productType: "gifts" });
     setImages([]);
   };
 
@@ -183,7 +182,7 @@ export default function MerchantProducts() {
       price: parseInt(formData.price) * 100,
       stock: parseInt(formData.stock),
       productType: formData.productType,
-      category: formData.category,
+      category: formData.productType,
       images: images,
       status: parseInt(formData.stock) > 0 ? "active" : "out_of_stock"
     };
@@ -202,16 +201,14 @@ export default function MerchantProducts() {
       description: product.description || "",
       price: String(product.price / 100),
       stock: String(product.stock),
-      productType: product.productType || "gifts",
-      category: product.category
+      productType: product.productType || "gifts"
     });
     setImages(product.images || []);
     setIsEditOpen(true);
   };
 
   const filteredProducts = products.filter(p => 
-    p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    p.category.toLowerCase().includes(searchQuery.toLowerCase())
+    p.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   return (
@@ -299,17 +296,6 @@ export default function MerchantProducts() {
                         <SelectItem value="flowers">ورد</SelectItem>
                       </SelectContent>
                     </Select>
-                  </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="category">التصنيف</Label>
-                    <Input 
-                      id="category" 
-                      placeholder="باقات، صناديق..."
-                      value={formData.category}
-                      onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                      required
-                      data-testid="input-product-category"
-                    />
                   </div>
                   <div className="grid gap-2">
                     <Label>صور المنتج ({images.length}/{MAX_IMAGES})</Label>
@@ -404,7 +390,6 @@ export default function MerchantProducts() {
                   <TableHead className="w-[100px] text-right">المعرف</TableHead>
                   <TableHead className="text-right">الاسم</TableHead>
                   <TableHead className="text-right">النوع</TableHead>
-                  <TableHead className="text-right">التصنيف</TableHead>
                   <TableHead className="text-right">الحالة</TableHead>
                   <TableHead className="text-right">السعر</TableHead>
                   <TableHead className="text-right">المخزون</TableHead>
@@ -421,7 +406,6 @@ export default function MerchantProducts() {
                         {productTypeLabels[product.productType] || product.productType}
                       </Badge>
                     </TableCell>
-                    <TableCell>{product.category}</TableCell>
                     <TableCell>
                       <Badge 
                         variant={
@@ -532,15 +516,6 @@ export default function MerchantProducts() {
                       <SelectItem value="flowers">ورد</SelectItem>
                     </SelectContent>
                   </Select>
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="edit-category">التصنيف</Label>
-                  <Input 
-                    id="edit-category"
-                    value={formData.category}
-                    onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                    required
-                  />
                 </div>
                 <div className="grid gap-2">
                   <Label>صور المنتج ({images.length}/{MAX_IMAGES})</Label>

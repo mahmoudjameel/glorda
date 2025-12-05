@@ -523,13 +523,21 @@ export default function AppSettings() {
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label>الأيقونة (اختياري)</Label>
+                        <Label>رابط الأيقونة (اختياري)</Label>
                         <Input
-                          placeholder="اسم الأيقونة أو إيموجي"
+                          placeholder="https://example.com/icon.png"
                           value={categoryForm.icon}
                           onChange={(e) => setCategoryForm(prev => ({ ...prev, icon: e.target.value }))}
+                          className="font-mono text-left"
+                          dir="ltr"
                           data-testid="input-category-icon"
                         />
+                        {categoryForm.icon && (
+                          <div className="flex items-center gap-2 p-2 border rounded bg-muted/20">
+                            <img src={categoryForm.icon} alt="أيقونة" className="w-8 h-8 object-contain" />
+                            <span className="text-xs text-muted-foreground">معاينة الأيقونة</span>
+                          </div>
+                        )}
                       </div>
                       <div className="flex items-center gap-2">
                         <Switch

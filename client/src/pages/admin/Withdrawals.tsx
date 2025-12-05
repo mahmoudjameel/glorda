@@ -386,16 +386,29 @@ export default function AdminWithdrawals() {
           
           {selectedWithdrawal && (
             <div className="space-y-6">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-3 gap-4">
                 <div className="space-y-1">
                   <p className="text-sm text-muted-foreground">المبلغ المطلوب</p>
                   <p className="text-2xl font-bold text-primary">{formatCurrency(selectedWithdrawal.amount)}</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-sm text-muted-foreground">رصيد المحفظة</p>
+                  <p className={`text-2xl font-bold ${(selectedWithdrawal.merchant?.balance || 0) >= Math.abs(selectedWithdrawal.amount) ? 'text-emerald-600' : 'text-red-600'}`}>
+                    {formatCurrency(selectedWithdrawal.merchant?.balance || 0)}
+                  </p>
                 </div>
                 <div className="space-y-1">
                   <p className="text-sm text-muted-foreground">الحالة</p>
                   <div>{getStatusBadge(selectedWithdrawal.status)}</div>
                 </div>
               </div>
+
+              {(selectedWithdrawal.merchant?.balance || 0) < Math.abs(selectedWithdrawal.amount) && selectedWithdrawal.status === "pending" && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-red-700 text-sm flex items-center gap-2">
+                  <XCircle className="w-4 h-4" />
+                  تحذير: رصيد المحفظة أقل من المبلغ المطلوب للسحب
+                </div>
+              )}
 
               <div className="border rounded-lg p-4 space-y-3 bg-muted/20">
                 <h4 className="font-semibold flex items-center gap-2">

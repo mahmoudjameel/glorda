@@ -6,13 +6,16 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Link, useLocation } from "wouter";
-import { Store, Plus, Trash2, ShieldCheck, Loader2 } from "lucide-react";
+import { Store, Plus, Trash2, ShieldCheck, Loader2, ChevronsUpDown, Check } from "lucide-react";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import logoUrl from "@assets/شعار_غلوردا_1764881546720.jpg";
 import { saudiCities } from "@/constants/saudiCities";
+import { cn } from "@/lib/utils";
 
 const formSchema = z.object({
   ownerName: z.string().min(2, "اسم المالك مطلوب"),
@@ -263,22 +266,55 @@ export default function Register() {
                   control={form.control}
                   name="city"
                   render={({ field }) => (
-                    <FormItem>
+                    <FormItem className="flex flex-col">
                       <FormLabel>المدينة</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
-                        <FormControl>
-                          <SelectTrigger data-testid="select-city">
-                            <SelectValue placeholder="اختر المدينة" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent dir="rtl" className="max-h-[300px]">
-                          {saudiCities.map((city) => (
-                            <SelectItem key={city.nameAr} value={city.nameAr}>
-                              {city.nameAr} - {city.nameEn}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <FormControl>
+                            <Button
+                              variant="outline"
+                              role="combobox"
+                              className={cn(
+                                "w-full justify-between",
+                                !field.value && "text-muted-foreground"
+                              )}
+                              data-testid="select-city"
+                            >
+                              {field.value
+                                ? saudiCities.find((city) => city.nameAr === field.value)?.nameAr + " - " + saudiCities.find((city) => city.nameAr === field.value)?.nameEn
+                                : "اختر المدينة"}
+                              <ChevronsUpDown className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+                            </Button>
+                          </FormControl>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-full p-0" align="start" dir="rtl">
+                          <Command dir="rtl">
+                            <CommandInput placeholder="ابحث عن مدينة..." className="text-right" />
+                            <CommandList>
+                              <CommandEmpty>لم يتم العثور على مدينة</CommandEmpty>
+                              <CommandGroup className="max-h-[300px] overflow-y-auto">
+                                {saudiCities.map((city) => (
+                                  <CommandItem
+                                    value={city.nameAr + " " + city.nameEn}
+                                    key={city.nameAr}
+                                    onSelect={() => {
+                                      field.onChange(city.nameAr);
+                                    }}
+                                  >
+                                    <Check
+                                      className={cn(
+                                        "ml-2 h-4 w-4",
+                                        city.nameAr === field.value ? "opacity-100" : "opacity-0"
+                                      )}
+                                    />
+                                    {city.nameAr} - {city.nameEn}
+                                  </CommandItem>
+                                ))}
+                              </CommandGroup>
+                            </CommandList>
+                          </Command>
+                        </PopoverContent>
+                      </Popover>
                       <FormMessage />
                     </FormItem>
                   )}

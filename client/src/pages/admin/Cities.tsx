@@ -22,12 +22,14 @@ import {
   DialogTrigger,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { MapPin, Plus, Trash2, Loader2, Edit } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { MapPin, Plus, Trash2, Loader2, Edit, ChevronsUpDown, Check } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { saudiCities } from "@/constants/saudiCities";
+import { cn } from "@/lib/utils";
 
 interface City {
   id: number;
@@ -180,30 +182,55 @@ export default function AdminCities() {
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="space-y-2">
                   <Label>اختر المدينة</Label>
-                  <Select
-                    value={formData.name}
-                    onValueChange={(value) => {
-                      const selectedCity = saudiCities.find(c => c.nameAr === value);
-                      if (selectedCity) {
-                        setFormData(prev => ({
-                          ...prev,
-                          name: selectedCity.nameAr,
-                          nameEn: selectedCity.nameEn
-                        }));
-                      }
-                    }}
-                  >
-                    <SelectTrigger data-testid="select-city">
-                      <SelectValue placeholder="اختر مدينة من القائمة" />
-                    </SelectTrigger>
-                    <SelectContent dir="rtl" className="max-h-[300px]">
-                      {saudiCities.map((city) => (
-                        <SelectItem key={city.nameAr} value={city.nameAr}>
-                          {city.nameAr} - {city.nameEn}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        role="combobox"
+                        className={cn(
+                          "w-full justify-between",
+                          !formData.name && "text-muted-foreground"
+                        )}
+                        data-testid="select-city"
+                      >
+                        {formData.name
+                          ? formData.name + " - " + formData.nameEn
+                          : "اختر مدينة من القائمة"}
+                        <ChevronsUpDown className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-full p-0" align="start" dir="rtl">
+                      <Command dir="rtl">
+                        <CommandInput placeholder="ابحث عن مدينة..." className="text-right" />
+                        <CommandList>
+                          <CommandEmpty>لم يتم العثور على مدينة</CommandEmpty>
+                          <CommandGroup className="max-h-[300px] overflow-y-auto">
+                            {saudiCities.map((city) => (
+                              <CommandItem
+                                value={city.nameAr + " " + city.nameEn}
+                                key={city.nameAr}
+                                onSelect={() => {
+                                  setFormData(prev => ({
+                                    ...prev,
+                                    name: city.nameAr,
+                                    nameEn: city.nameEn
+                                  }));
+                                }}
+                              >
+                                <Check
+                                  className={cn(
+                                    "ml-2 h-4 w-4",
+                                    city.nameAr === formData.name ? "opacity-100" : "opacity-0"
+                                  )}
+                                />
+                                {city.nameAr} - {city.nameEn}
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
                 </div>
                 {formData.name && (
                   <div className="p-3 rounded-lg bg-muted/50 border space-y-1">

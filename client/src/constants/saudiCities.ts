@@ -3,7 +3,7 @@ export interface SaudiCity {
   nameEn: string;
 }
 
-export const saudiCities: SaudiCity[] = [
+const unsortedCities: SaudiCity[] = [
   { nameAr: "الرياض", nameEn: "Riyadh" },
   { nameAr: "جدة", nameEn: "Jeddah" },
   { nameAr: "مكة المكرمة", nameEn: "Makkah" },
@@ -109,5 +109,9 @@ export const saudiCities: SaudiCity[] = [
   { nameAr: "بلجرشي", nameEn: "Baljurashi" },
   { nameAr: "غامد الزناد", nameEn: "Ghamid Az-Zinad" },
 ];
+
+export const saudiCities: SaudiCity[] = unsortedCities.sort((a, b) => 
+  a.nameAr.localeCompare(b.nameAr, 'ar')
+);
 
 export const cityNamesAr = saudiCities.map(city => city.nameAr);

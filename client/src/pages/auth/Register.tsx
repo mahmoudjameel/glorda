@@ -33,6 +33,9 @@ const formSchema = z.object({
     name: z.string().min(1, "اسم الفرع مطلوب"),
     mapLink: z.string().url("رابط قوقل ماب غير صالح"),
   })).optional(),
+  bankName: z.string().min(2, "اسم البنك مطلوب"),
+  iban: z.string().min(15, "رقم الآيبان غير صالح").max(34, "رقم الآيبان غير صالح"),
+  accountHolderName: z.string().min(2, "اسم صاحب الحساب مطلوب"),
   password: z.string().min(6, "كلمة المرور يجب أن تكون 6 أحرف على الأقل"),
   confirmPassword: z.string()
 }).refine((data) => data.password === data.confirmPassword, {
@@ -63,6 +66,9 @@ export default function Register() {
       city: "",
       registrationNumber: "",
       branches: [],
+      bankName: "",
+      iban: "",
+      accountHolderName: "",
       password: "",
       confirmPassword: "",
     },
@@ -433,6 +439,57 @@ export default function Register() {
                       )}
                     </div>
                   )}
+                </div>
+
+                <div className="rounded-lg border border-border bg-card p-6 shadow-sm">
+                  <div className="mb-6">
+                    <h4 className="text-lg font-semibold text-foreground flex items-center gap-2">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-primary"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/></svg>
+                      البيانات البنكية
+                    </h4>
+                    <p className="text-sm text-muted-foreground mt-1">لتحويل أرباحك من المبيعات</p>
+                  </div>
+                  <div className="grid md:grid-cols-2 gap-6">
+                    <FormField
+                      control={form.control}
+                      name="bankName"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>اسم البنك</FormLabel>
+                          <FormControl>
+                            <Input placeholder="مثال: البنك الأهلي" {...field} data-testid="input-bank-name" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="accountHolderName"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>اسم صاحب الحساب</FormLabel>
+                          <FormControl>
+                            <Input placeholder="الاسم كما يظهر في الحساب البنكي" {...field} data-testid="input-account-holder" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="iban"
+                      render={({ field }) => (
+                        <FormItem className="md:col-span-2">
+                          <FormLabel>رقم الآيبان (IBAN)</FormLabel>
+                          <FormControl>
+                            <Input placeholder="SA0000000000000000000000" {...field} className="font-mono text-left" dir="ltr" data-testid="input-iban" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
                 </div>
 
                 <div className="grid md:grid-cols-2 gap-6">

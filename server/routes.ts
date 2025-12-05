@@ -359,9 +359,44 @@ export async function registerRoutes(
   app.get("/api/merchant/orders", requireMerchant, async (req, res) => {
     try {
       const orders = await storage.getOrdersByMerchant(req.session.userId!);
-      res.json(orders);
+      const ordersWithDetails = await Promise.all(
+        orders.map(async (order) => {
+          const customer = await storage.getCustomer(order.customerId);
+          const product = await storage.getProduct(order.productId);
+          return {
+            ...order,
+            customer: customer ? { id: customer.id, name: customer.name, mobile: customer.mobile, city: customer.city } : null,
+            product: product ? { id: product.id, name: product.name, price: product.price, images: product.images } : null,
+          };
+        })
+      );
+      res.json(ordersWithDetails);
     } catch (error) {
       res.status(500).json({ error: "فشل جلب الطلبات" });
+    }
+  });
+
+  // Get merchant conversations (orders with messages)
+  app.get("/api/merchant/conversations", requireMerchant, async (req, res) => {
+    try {
+      const orders = await storage.getOrdersByMerchant(req.session.userId!);
+      const conversationsWithDetails = await Promise.all(
+        orders.map(async (order) => {
+          const customer = await storage.getCustomer(order.customerId);
+          const product = await storage.getProduct(order.productId);
+          const messages = await storage.getMessagesByOrder(order.id);
+          return {
+            ...order,
+            customer: customer ? { id: customer.id, name: customer.name, mobile: customer.mobile } : null,
+            product: product ? { id: product.id, name: product.name } : null,
+            messagesCount: messages.length,
+            lastMessage: messages.length > 0 ? messages[messages.length - 1] : null,
+          };
+        })
+      );
+      res.json(conversationsWithDetails);
+    } catch (error) {
+      res.status(500).json({ error: "فشل جلب المحادثات" });
     }
   });
 
@@ -530,7 +565,20 @@ export async function registerRoutes(
   app.get("/api/admin/orders", requireAdmin, async (req, res) => {
     try {
       const orders = await storage.getAllOrders();
-      res.json(orders);
+      const ordersWithDetails = await Promise.all(
+        orders.map(async (order) => {
+          const customer = await storage.getCustomer(order.customerId);
+          const merchant = await storage.getMerchant(order.merchantId);
+          const product = await storage.getProduct(order.productId);
+          return {
+            ...order,
+            customer: customer ? { id: customer.id, name: customer.name, mobile: customer.mobile, city: customer.city } : null,
+            merchant: merchant ? { id: merchant.id, storeName: merchant.storeName, ownerName: merchant.ownerName } : null,
+            product: product ? { id: product.id, name: product.name, price: product.price, images: product.images } : null,
+          };
+        })
+      );
+      res.json(ordersWithDetails);
     } catch (error) {
       res.status(500).json({ error: "فشل جلب الطلبات" });
     }

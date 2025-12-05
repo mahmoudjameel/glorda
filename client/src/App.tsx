@@ -13,6 +13,8 @@ import Register from "@/pages/auth/Register";
 // Merchant Pages
 import MerchantDashboard from "@/pages/merchant/Dashboard";
 import MerchantProducts from "@/pages/merchant/Products";
+import MerchantOrders from "@/pages/merchant/Orders";
+import MerchantMessages from "@/pages/merchant/Messages";
 import MerchantWallet from "@/pages/merchant/Wallet";
 import MerchantSocials from "@/pages/merchant/Socials";
 import MerchantSettings from "@/pages/merchant/Settings";
@@ -28,6 +30,8 @@ import AdminAppSettings from "@/pages/admin/AppSettings";
 import AdminCities from "@/pages/admin/Cities";
 import AdminPolicies from "@/pages/admin/Policies";
 import AdminWithdrawals from "@/pages/admin/Withdrawals";
+import AdminCustomers from "@/pages/admin/Customers";
+import AdminOrders from "@/pages/admin/Orders";
 
 function Router() {
   return (
@@ -40,6 +44,16 @@ function Router() {
       <Route path="/dashboard/products">
         <ProtectedRoute requiredRole="merchant">
           <MerchantProducts />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/dashboard/orders">
+        <ProtectedRoute requiredRole="merchant">
+          <MerchantOrders />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/dashboard/messages">
+        <ProtectedRoute requiredRole="merchant">
+          <MerchantMessages />
         </ProtectedRoute>
       </Route>
       <Route path="/dashboard/wallet">
@@ -103,6 +117,16 @@ function Router() {
       <Route path="/admin/withdrawals">
         <ProtectedRoute requiredRole="admin">
           <AdminWithdrawals />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/customers">
+        <ProtectedRoute requiredRole="admin">
+          <AdminCustomers />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/orders">
+        <ProtectedRoute requiredRole="admin">
+          <AdminOrders />
         </ProtectedRoute>
       </Route>
       <Route path="/admin">

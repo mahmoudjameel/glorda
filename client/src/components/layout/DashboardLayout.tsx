@@ -15,7 +15,9 @@ import {
   ClipboardList,
   Smartphone,
   MapPin,
-  FileText
+  FileText,
+  ShoppingBag,
+  MessageCircle
 } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -34,6 +36,8 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
   const merchantLinks = [
     { href: "/dashboard", label: "لوحة التحكم", icon: LayoutDashboard },
     { href: "/dashboard/products", label: "المنتجات", icon: Package },
+    { href: "/dashboard/orders", label: "الطلبات", icon: ShoppingBag },
+    { href: "/dashboard/messages", label: "الرسائل", icon: MessageCircle },
     { href: "/dashboard/wallet", label: "المحفظة", icon: Wallet },
     { href: "/dashboard/socials", label: "التواصل الاجتماعي", icon: Share2 },
     { href: "/dashboard/settings", label: "إعدادات المتجر", icon: Settings },
@@ -43,6 +47,8 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
     { href: "/admin", label: "نظرة عامة", icon: LayoutDashboard },
     { href: "/admin/pending", label: "طلبات التسجيل", icon: ClipboardList },
     { href: "/admin/merchants", label: "التجار", icon: Store },
+    { href: "/admin/customers", label: "العملاء", icon: Users },
+    { href: "/admin/orders", label: "الطلبات", icon: ShoppingBag },
     { href: "/admin/withdrawals", label: "المحافظ والسحب", icon: Wallet },
     { href: "/admin/app-settings", label: "إعدادات التطبيق", icon: Smartphone },
     { href: "/admin/cities", label: "المدن", icon: MapPin },

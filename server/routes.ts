@@ -63,6 +63,14 @@ export async function registerRoutes(
   const isProduction = process.env.NODE_ENV === "production";
   const isReplit = !!process.env.REPL_SLUG;
   
+  if (isProduction && !process.env.SESSION_SECRET) {
+    console.warn("WARNING: SESSION_SECRET is not set. Using default secret is NOT secure for production!");
+  }
+  
+  if (isProduction && !process.env.DATABASE_URL) {
+    throw new Error("DATABASE_URL is required in production mode");
+  }
+  
   const PgSession = connectPgSimple(session);
   
   const sessionConfig: session.SessionOptions = {
@@ -83,6 +91,8 @@ export async function registerRoutes(
       tableName: "session",
       createTableIfMissing: true,
     });
+  } else {
+    console.warn("WARNING: Using in-memory session store. Sessions will be lost on restart!");
   }
   
   app.use(session(sessionConfig));

@@ -26,6 +26,7 @@ import AdminSettings from "@/pages/admin/Settings";
 import AdminAppSettings from "@/pages/admin/AppSettings";
 import AdminCities from "@/pages/admin/Cities";
 import AdminPolicies from "@/pages/admin/Policies";
+import AdminWithdrawals from "@/pages/admin/Withdrawals";
 
 function Router() {
   return (
@@ -91,6 +92,11 @@ function Router() {
       <Route path="/admin/policies">
         <ProtectedRoute requiredRole="admin">
           <AdminPolicies />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/withdrawals">
+        <ProtectedRoute requiredRole="admin">
+          <AdminWithdrawals />
         </ProtectedRoute>
       </Route>
       <Route path="/admin">

@@ -43,6 +43,7 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
     { href: "/admin", label: "نظرة عامة", icon: LayoutDashboard },
     { href: "/admin/pending", label: "طلبات التسجيل", icon: ClipboardList },
     { href: "/admin/merchants", label: "التجار", icon: Store },
+    { href: "/admin/withdrawals", label: "المحافظ والسحب", icon: Wallet },
     { href: "/admin/app-settings", label: "إعدادات التطبيق", icon: Smartphone },
     { href: "/admin/cities", label: "المدن", icon: MapPin },
     { href: "/admin/policies", label: "السياسات والشروط", icon: FileText },

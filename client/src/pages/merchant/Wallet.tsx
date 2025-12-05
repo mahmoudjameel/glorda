@@ -217,13 +217,19 @@ export default function MerchantWallet() {
                   </div>
                   <div className="space-y-2">
                     <Label>الحساب البنكي</Label>
-                    <div className="p-3 border rounded-md bg-muted/50 flex items-center gap-3">
-                      <CreditCard className="w-5 h-5 text-muted-foreground" />
-                      <div className="flex-1">
-                        <p className="text-sm font-medium">SA56 8000 0000 0000 1234</p>
-                        <p className="text-xs text-muted-foreground">Al Rajhi Bank</p>
+                    {profile?.bankName && profile?.iban ? (
+                      <div className="p-3 border rounded-md bg-muted/50 flex items-center gap-3">
+                        <CreditCard className="w-5 h-5 text-muted-foreground" />
+                        <div className="flex-1">
+                          <p className="text-sm font-medium font-mono" dir="ltr">{profile.iban}</p>
+                          <p className="text-xs text-muted-foreground">{profile.bankName} - {profile.accountHolderName}</p>
+                        </div>
                       </div>
-                    </div>
+                    ) : (
+                      <div className="p-3 border rounded-md bg-amber-50 border-amber-200 text-amber-700 text-sm">
+                        لم يتم إضافة بيانات الحساب البنكي بعد. يرجى التواصل مع الإدارة لتحديث البيانات.
+                      </div>
+                    )}
                   </div>
                   <Button 
                     className="w-full mt-2" 

@@ -47,13 +47,30 @@ export default function MerchantProducts() {
     description: "",
     price: "",
     stock: "",
-    productType: "gifts"
+    productType: "gifts",
+    category: "",
+    promoBadge: ""
   });
 
   const productTypeLabels: Record<string, string> = {
     gifts: "هدايا",
     flowers: "ورد"
   };
+
+  const categoryOptions = [
+    { value: "الكل", label: "الكل" },
+    { value: "ورد مع هدايا", label: "ورد مع هدايا" },
+    { value: "نباتات", label: "نباتات" },
+    { value: "مزهريات", label: "مزهريات" },
+    { value: "باقات", label: "باقات" },
+  ];
+
+  const promoBadgeOptions = [
+    { value: "", label: "بدون عنوان ترويجي" },
+    { value: "عرض خاص", label: "عرض خاص" },
+    { value: "توصيل مجاني", label: "توصيل مجاني" },
+    { value: "الأكثر مبيعاً", label: "الأكثر مبيعاً" },
+  ];
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -170,7 +187,7 @@ export default function MerchantProducts() {
   });
 
   const resetForm = () => {
-    setFormData({ name: "", description: "", price: "", stock: "", productType: "gifts" });
+    setFormData({ name: "", description: "", price: "", stock: "", productType: "gifts", category: "", promoBadge: "" });
     setImages([]);
   };
 
@@ -182,7 +199,8 @@ export default function MerchantProducts() {
       price: parseInt(formData.price) * 100,
       stock: parseInt(formData.stock),
       productType: formData.productType,
-      category: formData.productType,
+      category: formData.category || formData.productType,
+      promoBadge: formData.promoBadge || null,
       images: images,
       status: parseInt(formData.stock) > 0 ? "active" : "out_of_stock"
     };
@@ -201,7 +219,9 @@ export default function MerchantProducts() {
       description: product.description || "",
       price: String(product.price / 100),
       stock: String(product.stock),
-      productType: product.productType || "gifts"
+      productType: product.productType || "gifts",
+      category: product.category || "",
+      promoBadge: product.promoBadge || ""
     });
     setImages(product.images || []);
     setIsEditOpen(true);
@@ -283,17 +303,38 @@ export default function MerchantProducts() {
                     </div>
                   </div>
                   <div className="grid gap-2">
-                    <Label htmlFor="productType">نوع المنتج</Label>
+                    <Label htmlFor="category">فئة المنتج</Label>
                     <Select
-                      value={formData.productType}
-                      onValueChange={(value) => setFormData({ ...formData, productType: value })}
+                      value={formData.category}
+                      onValueChange={(value) => setFormData({ ...formData, category: value })}
                     >
-                      <SelectTrigger id="productType" data-testid="select-product-type">
-                        <SelectValue placeholder="اختر نوع المنتج" />
+                      <SelectTrigger id="category" data-testid="select-product-category">
+                        <SelectValue placeholder="اختر فئة المنتج" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="gifts">هدايا</SelectItem>
-                        <SelectItem value="flowers">ورد</SelectItem>
+                        {categoryOptions.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="promoBadge">العنوان الترويجي</Label>
+                    <Select
+                      value={formData.promoBadge}
+                      onValueChange={(value) => setFormData({ ...formData, promoBadge: value })}
+                    >
+                      <SelectTrigger id="promoBadge" data-testid="select-promo-badge">
+                        <SelectValue placeholder="اختر عنوان ترويجي (اختياري)" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {promoBadgeOptions.map((option) => (
+                          <SelectItem key={option.value || "none"} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>
@@ -503,17 +544,38 @@ export default function MerchantProducts() {
                   </div>
                 </div>
                 <div className="grid gap-2">
-                  <Label htmlFor="edit-productType">نوع المنتج</Label>
+                  <Label htmlFor="edit-category">فئة المنتج</Label>
                   <Select
-                    value={formData.productType}
-                    onValueChange={(value) => setFormData({ ...formData, productType: value })}
+                    value={formData.category}
+                    onValueChange={(value) => setFormData({ ...formData, category: value })}
                   >
-                    <SelectTrigger id="edit-productType">
-                      <SelectValue placeholder="اختر نوع المنتج" />
+                    <SelectTrigger id="edit-category">
+                      <SelectValue placeholder="اختر فئة المنتج" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="gifts">هدايا</SelectItem>
-                      <SelectItem value="flowers">ورد</SelectItem>
+                      {categoryOptions.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="edit-promoBadge">العنوان الترويجي</Label>
+                  <Select
+                    value={formData.promoBadge}
+                    onValueChange={(value) => setFormData({ ...formData, promoBadge: value })}
+                  >
+                    <SelectTrigger id="edit-promoBadge">
+                      <SelectValue placeholder="اختر عنوان ترويجي (اختياري)" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {promoBadgeOptions.map((option) => (
+                        <SelectItem key={option.value || "none"} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>

@@ -17,6 +17,7 @@ import ResetPassword from "@/pages/auth/ResetPassword";
 import MerchantDashboard from "@/pages/merchant/Dashboard";
 import MerchantProducts from "@/pages/merchant/Products";
 import MerchantOrders from "@/pages/merchant/Orders";
+import MerchantReviews from "@/pages/merchant/Reviews";
 import MerchantMessages from "@/pages/merchant/Messages";
 import MerchantWallet from "@/pages/merchant/Wallet";
 import MerchantSettings from "@/pages/merchant/Settings";
@@ -54,6 +55,11 @@ function Router() {
       <Route path="/dashboard/orders">
         <ProtectedRoute requiredRole="merchant">
           <MerchantOrders />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/dashboard/reviews">
+        <ProtectedRoute requiredRole="merchant">
+          <MerchantReviews />
         </ProtectedRoute>
       </Route>
       <Route path="/dashboard/messages">

@@ -60,6 +60,7 @@ export const products = pgTable("products", {
   stock: integer("stock").notNull().default(0),
   productType: text("product_type").notNull().default("gifts"),
   category: text("category").notNull(),
+  promoBadge: text("promo_badge"),
   images: jsonb("images").$type<string[]>(),
   status: text("status").notNull().default("active"),
   createdAt: timestamp("created_at").defaultNow().notNull(),

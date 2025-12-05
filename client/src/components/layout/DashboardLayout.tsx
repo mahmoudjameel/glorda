@@ -16,7 +16,8 @@ import {
   MapPin,
   FileText,
   ShoppingBag,
-  MessageCircle
+  MessageCircle,
+  Star
 } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -36,6 +37,7 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
     { href: "/dashboard", label: "لوحة التحكم", icon: LayoutDashboard },
     { href: "/dashboard/products", label: "المنتجات", icon: Package },
     { href: "/dashboard/orders", label: "الطلبات", icon: ShoppingBag },
+    { href: "/dashboard/reviews", label: "التقييمات", icon: Star },
     { href: "/dashboard/messages", label: "الرسائل", icon: MessageCircle },
     { href: "/dashboard/wallet", label: "المحفظة", icon: Wallet },
     { href: "/dashboard/settings", label: "إعدادات المتجر", icon: Settings },

@@ -12,7 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Store, Camera, Loader2, Save, User, Instagram, Facebook, Twitter, Globe, MapPin } from "lucide-react";
+import { Store, Camera, Loader2, Save, User, Instagram, Facebook, Twitter, Globe, MapPin, Wallet, Building2, CreditCard, UserCircle } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState, useRef, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
@@ -51,6 +51,9 @@ export default function MerchantSettings() {
     website: "",
     tiktok: ""
   });
+  const [bankName, setBankName] = useState("");
+  const [iban, setIban] = useState("");
+  const [accountHolderName, setAccountHolderName] = useState("");
 
   const { data: profile, isLoading } = useQuery<Merchant>({
     queryKey: ["/api/merchant/profile"],
@@ -77,6 +80,9 @@ export default function MerchantSettings() {
       setBio(profile.bio || "");
       setCity(profile.city || "");
       setStoreImage(profile.storeImage || null);
+      setBankName(profile.bankName || "");
+      setIban(profile.iban || "");
+      setAccountHolderName(profile.accountHolderName || "");
       if (profile.socialLinks) {
         setSocialLinks({
           instagram: (profile.socialLinks as SocialLinks).instagram || "",
@@ -97,6 +103,9 @@ export default function MerchantSettings() {
       storeImage?: string;
       city?: string;
       socialLinks?: SocialLinks;
+      bankName?: string;
+      iban?: string;
+      accountHolderName?: string;
     }) => {
       const res = await fetch("/api/merchant/profile", {
         method: "PATCH",
@@ -167,7 +176,10 @@ export default function MerchantSettings() {
       bio,
       city,
       storeImage: storeImage || undefined,
-      socialLinks: Object.keys(cleanLinks).length > 0 ? cleanLinks : undefined
+      socialLinks: Object.keys(cleanLinks).length > 0 ? cleanLinks : undefined,
+      bankName: bankName.trim() || undefined,
+      iban: iban.trim() || undefined,
+      accountHolderName: accountHolderName.trim() || undefined
     });
   };
 
@@ -376,6 +388,65 @@ export default function MerchantSettings() {
                 value={socialLinks.tiktok}
                 onChange={(e) => setSocialLinks(prev => ({ ...prev, tiktok: e.target.value }))}
                 data-testid="input-tiktok"
+              />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Wallet className="w-5 h-5" />
+              بيانات المحفظة البنكية
+            </CardTitle>
+            <CardDescription>
+              أدخل بياناتك البنكية لاستلام أرباحك عند طلب السحب
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="bankName" className="flex items-center gap-2">
+                <Building2 className="w-4 h-4 text-muted-foreground" />
+                اسم البنك
+              </Label>
+              <Input
+                id="bankName"
+                value={bankName}
+                onChange={(e) => setBankName(e.target.value)}
+                placeholder="مثال: البنك الأهلي السعودي"
+                data-testid="input-bank-name"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="iban" className="flex items-center gap-2">
+                <CreditCard className="w-4 h-4 text-muted-foreground" />
+                رقم الآيبان (IBAN)
+              </Label>
+              <Input
+                id="iban"
+                value={iban}
+                onChange={(e) => setIban(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''))}
+                placeholder="SA0000000000000000000000"
+                className="font-mono text-left"
+                dir="ltr"
+                maxLength={24}
+                data-testid="input-iban"
+              />
+              <p className="text-xs text-muted-foreground">رقم الآيبان السعودي يتكون من 24 حرف ورقم</p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="accountHolderName" className="flex items-center gap-2">
+                <UserCircle className="w-4 h-4 text-muted-foreground" />
+                اسم المستفيد (صاحب الحساب)
+              </Label>
+              <Input
+                id="accountHolderName"
+                value={accountHolderName}
+                onChange={(e) => setAccountHolderName(e.target.value)}
+                placeholder="الاسم كما هو مسجل في البنك"
+                data-testid="input-account-holder"
               />
             </div>
           </CardContent>

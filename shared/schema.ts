@@ -54,6 +54,7 @@ export const products = pgTable("products", {
   description: text("description"),
   price: integer("price").notNull(),
   stock: integer("stock").notNull().default(0),
+  productType: text("product_type").notNull().default("gifts"),
   category: text("category").notNull(),
   images: jsonb("images").$type<string[]>(),
   status: text("status").notNull().default("active"),

@@ -23,6 +23,7 @@ import { Plus, Search, MoreHorizontal, Edit, Trash, Loader2, Package } from "luc
 import { Badge } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
@@ -41,8 +42,14 @@ export default function MerchantProducts() {
     description: "",
     price: "",
     stock: "",
+    productType: "gifts",
     category: ""
   });
+
+  const productTypeLabels: Record<string, string> = {
+    gifts: "هدايا",
+    flowers: "ورد"
+  };
 
   const { data: products = [], isLoading } = useQuery<Product[]>({
     queryKey: ["/api/merchant/products"],
@@ -112,7 +119,7 @@ export default function MerchantProducts() {
   });
 
   const resetForm = () => {
-    setFormData({ name: "", description: "", price: "", stock: "", category: "" });
+    setFormData({ name: "", description: "", price: "", stock: "", productType: "gifts", category: "" });
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -122,6 +129,7 @@ export default function MerchantProducts() {
       description: formData.description,
       price: parseInt(formData.price) * 100,
       stock: parseInt(formData.stock),
+      productType: formData.productType,
       category: formData.category,
       status: parseInt(formData.stock) > 0 ? "active" : "out_of_stock"
     };
@@ -140,6 +148,7 @@ export default function MerchantProducts() {
       description: product.description || "",
       price: String(product.price / 100),
       stock: String(product.stock),
+      productType: product.productType || "gifts",
       category: product.category
     });
     setIsEditOpen(true);
@@ -222,10 +231,25 @@ export default function MerchantProducts() {
                     </div>
                   </div>
                   <div className="grid gap-2">
+                    <Label htmlFor="productType">نوع المنتج</Label>
+                    <Select
+                      value={formData.productType}
+                      onValueChange={(value) => setFormData({ ...formData, productType: value })}
+                    >
+                      <SelectTrigger id="productType" data-testid="select-product-type">
+                        <SelectValue placeholder="اختر نوع المنتج" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="gifts">هدايا</SelectItem>
+                        <SelectItem value="flowers">ورد</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="grid gap-2">
                     <Label htmlFor="category">التصنيف</Label>
                     <Input 
                       id="category" 
-                      placeholder="هدايا، ورود..."
+                      placeholder="باقات، صناديق..."
                       value={formData.category}
                       onChange={(e) => setFormData({ ...formData, category: e.target.value })}
                       required
@@ -271,6 +295,7 @@ export default function MerchantProducts() {
                 <TableRow>
                   <TableHead className="w-[100px] text-right">المعرف</TableHead>
                   <TableHead className="text-right">الاسم</TableHead>
+                  <TableHead className="text-right">النوع</TableHead>
                   <TableHead className="text-right">التصنيف</TableHead>
                   <TableHead className="text-right">الحالة</TableHead>
                   <TableHead className="text-right">السعر</TableHead>
@@ -283,6 +308,11 @@ export default function MerchantProducts() {
                   <TableRow key={product.id} data-testid={`row-product-${product.id}`}>
                     <TableCell className="font-medium font-mono text-muted-foreground text-xs">#{product.id}</TableCell>
                     <TableCell className="font-medium">{product.name}</TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className={product.productType === 'flowers' ? 'border-pink-300 text-pink-600' : 'border-amber-300 text-amber-600'}>
+                        {productTypeLabels[product.productType] || product.productType}
+                      </Badge>
+                    </TableCell>
                     <TableCell>{product.category}</TableCell>
                     <TableCell>
                       <Badge 
@@ -379,6 +409,21 @@ export default function MerchantProducts() {
                       required
                     />
                   </div>
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="edit-productType">نوع المنتج</Label>
+                  <Select
+                    value={formData.productType}
+                    onValueChange={(value) => setFormData({ ...formData, productType: value })}
+                  >
+                    <SelectTrigger id="edit-productType">
+                      <SelectValue placeholder="اختر نوع المنتج" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="gifts">هدايا</SelectItem>
+                      <SelectItem value="flowers">ورد</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="grid gap-2">
                   <Label htmlFor="edit-category">التصنيف</Label>

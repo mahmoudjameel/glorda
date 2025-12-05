@@ -30,12 +30,7 @@ function Router() {
       <Route path="/" component={Login} />
       <Route path="/register" component={Register} />
 
-      {/* Merchant Routes - Protected */}
-      <Route path="/dashboard">
-        <ProtectedRoute requiredRole="merchant">
-          <MerchantDashboard />
-        </ProtectedRoute>
-      </Route>
+      {/* Merchant Routes - Protected (specific routes first) */}
       <Route path="/dashboard/products">
         <ProtectedRoute requiredRole="merchant">
           <MerchantProducts />
@@ -51,14 +46,14 @@ function Router() {
           <MerchantSocials />
         </ProtectedRoute>
       </Route>
-      
-      {/* Admin Routes - Protected */}
-      <Route path="/admin/login" component={AdminLogin} />
-      <Route path="/admin">
-        <ProtectedRoute requiredRole="admin">
-          <AdminDashboard />
+      <Route path="/dashboard">
+        <ProtectedRoute requiredRole="merchant">
+          <MerchantDashboard />
         </ProtectedRoute>
       </Route>
+      
+      {/* Admin Routes - Protected (specific routes first) */}
+      <Route path="/admin/login" component={AdminLogin} />
       <Route path="/admin/pending">
         <ProtectedRoute requiredRole="admin">
           <AdminPendingMerchants />
@@ -72,6 +67,11 @@ function Router() {
       <Route path="/admin/admins">
         <ProtectedRoute requiredRole="admin">
           <AdminAdmins />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin">
+        <ProtectedRoute requiredRole="admin">
+          <AdminDashboard />
         </ProtectedRoute>
       </Route>
 

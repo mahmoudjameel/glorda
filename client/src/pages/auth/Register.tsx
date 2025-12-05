@@ -10,7 +10,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Link, useLocation } from "wouter";
-import { Store, Plus, Trash2, ShieldCheck, Loader2, ChevronsUpDown, Check } from "lucide-react";
+import { Store, Plus, Trash2, Loader2, ChevronsUpDown, Check, Eye, EyeOff } from "lucide-react";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import logoUrl from "@assets/شعار_غلوردا_1764881546720.jpg";
@@ -57,6 +57,8 @@ export default function Register() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -127,13 +129,6 @@ export default function Register() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-muted/30 p-4 py-10" dir="rtl">
-      <Link href="/admin/login">
-        <Button variant="outline" className="fixed top-4 left-4 gap-2 hidden md:flex" data-testid="link-admin-login">
-          <ShieldCheck className="w-4 h-4" />
-          دخول الإدارة
-        </Button>
-      </Link>
-
       <div className="w-full max-w-3xl space-y-8">
         <div className="text-center space-y-4">
           <div className="flex justify-center">
@@ -537,7 +532,25 @@ export default function Register() {
                       <FormItem>
                         <FormLabel>كلمة المرور</FormLabel>
                         <FormControl>
-                          <Input type="password" placeholder="••••••••" {...field} data-testid="input-password" />
+                          <div className="relative">
+                            <Input 
+                              type={showPassword ? "text" : "password"} 
+                              placeholder="••••••••" 
+                              {...field} 
+                              className="pl-10"
+                              data-testid="input-password" 
+                            />
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="absolute left-1 top-1/2 -translate-y-1/2 h-7 w-7"
+                              onClick={() => setShowPassword(!showPassword)}
+                              data-testid="button-toggle-password"
+                            >
+                              {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                            </Button>
+                          </div>
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -550,7 +563,25 @@ export default function Register() {
                       <FormItem>
                         <FormLabel>تأكيد الكلمة</FormLabel>
                         <FormControl>
-                          <Input type="password" placeholder="••••••••" {...field} data-testid="input-confirm-password" />
+                          <div className="relative">
+                            <Input 
+                              type={showConfirmPassword ? "text" : "password"} 
+                              placeholder="••••••••" 
+                              {...field} 
+                              className="pl-10"
+                              data-testid="input-confirm-password" 
+                            />
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="absolute left-1 top-1/2 -translate-y-1/2 h-7 w-7"
+                              onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                              data-testid="button-toggle-confirm-password"
+                            >
+                              {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                            </Button>
+                          </div>
                         </FormControl>
                         <FormMessage />
                       </FormItem>

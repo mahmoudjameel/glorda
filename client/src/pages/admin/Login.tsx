@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useLocation } from "wouter";
-import { ShieldCheck, Loader2, Lock } from "lucide-react";
+import { ShieldCheck, Loader2, Eye, EyeOff } from "lucide-react";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
@@ -20,6 +20,7 @@ const formSchema = z.object({
 export default function AdminLogin() {
   const [, setLocation] = useLocation();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const { toast } = useToast();
   const { refetch } = useAuth();
 
@@ -113,8 +114,23 @@ export default function AdminLogin() {
                       <FormLabel>كلمة المرور</FormLabel>
                       <FormControl>
                         <div className="relative">
-                          <Input type="password" placeholder="••••••••" {...field} className="pl-10" data-testid="input-admin-password" />
-                          <Lock className="w-4 h-4 text-muted-foreground absolute left-3 top-3" />
+                          <Input 
+                            type={showPassword ? "text" : "password"} 
+                            placeholder="••••••••" 
+                            {...field} 
+                            className="pl-10" 
+                            data-testid="input-admin-password" 
+                          />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="absolute left-1 top-1/2 -translate-y-1/2 h-7 w-7"
+                            onClick={() => setShowPassword(!showPassword)}
+                            data-testid="button-toggle-password"
+                          >
+                            {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                          </Button>
                         </div>
                       </FormControl>
                       <FormMessage />

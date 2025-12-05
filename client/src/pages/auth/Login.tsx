@@ -73,13 +73,6 @@ export default function Login() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-muted/30 p-4" dir="rtl">
-      <Link href="/admin/login">
-        <Button variant="outline" className="fixed top-4 left-4 gap-2 hidden md:flex bg-background/50 backdrop-blur" data-testid="link-admin-login">
-          <ShieldCheck className="w-4 h-4" />
-          دخول الإدارة
-        </Button>
-      </Link>
-
       <div className="w-full max-w-md space-y-8">
         <div className="text-center space-y-4">
           <div className="flex justify-center">
@@ -131,11 +124,19 @@ export default function Login() {
                 </Button>
               </form>
             </Form>
-            <div className="mt-6 text-center text-sm text-muted-foreground space-y-2">
+            <div className="mt-6 text-center text-sm text-muted-foreground space-y-3">
               <div>
                 ليس لديك حساب؟{" "}
                 <Link href="/register" className="text-primary hover:underline font-medium" data-testid="link-register">
                   سجل الآن كتاجر
+                </Link>
+              </div>
+              <div className="pt-3 border-t">
+                <Link href="/admin/login">
+                  <Button variant="ghost" size="sm" className="gap-2 text-muted-foreground hover:text-foreground" data-testid="link-admin-login">
+                    <ShieldCheck className="w-4 h-4" />
+                    دخول الإدارة
+                  </Button>
                 </Link>
               </div>
             </div>

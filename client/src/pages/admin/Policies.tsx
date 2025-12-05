@@ -4,7 +4,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { FileText, Shield, BookOpen, Loader2, Save } from "lucide-react";
+import { FileText, Shield, BookOpen, Loader2, Save, Smartphone, Store } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState, useEffect } from "react";
@@ -21,9 +21,15 @@ export default function AdminPolicies() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   
-  const [privacyPolicy, setPrivacyPolicy] = useState("");
-  const [termsConditions, setTermsConditions] = useState("");
-  const [aboutUs, setAboutUs] = useState("");
+  // Customer App Policies
+  const [customerPrivacyPolicy, setCustomerPrivacyPolicy] = useState("");
+  const [customerTermsConditions, setCustomerTermsConditions] = useState("");
+  const [customerAboutUs, setCustomerAboutUs] = useState("");
+  
+  // Merchant Panel Policies
+  const [merchantPrivacyPolicy, setMerchantPrivacyPolicy] = useState("");
+  const [merchantTermsConditions, setMerchantTermsConditions] = useState("");
+  const [merchantAboutUs, setMerchantAboutUs] = useState("");
 
   const { data: settings = [], isLoading } = useQuery<AppSetting[]>({
     queryKey: ["/api/admin/settings"],
@@ -36,13 +42,23 @@ export default function AdminPolicies() {
 
   useEffect(() => {
     if (settings.length > 0) {
-      const privacy = settings.find(s => s.key === "privacy_policy");
-      const terms = settings.find(s => s.key === "terms_conditions");
-      const about = settings.find(s => s.key === "about_us");
+      // Customer policies (existing keys for backward compatibility)
+      const custPrivacy = settings.find(s => s.key === "privacy_policy");
+      const custTerms = settings.find(s => s.key === "terms_conditions");
+      const custAbout = settings.find(s => s.key === "about_us");
       
-      if (privacy?.value) setPrivacyPolicy(privacy.value);
-      if (terms?.value) setTermsConditions(terms.value);
-      if (about?.value) setAboutUs(about.value);
+      if (custPrivacy?.value) setCustomerPrivacyPolicy(custPrivacy.value);
+      if (custTerms?.value) setCustomerTermsConditions(custTerms.value);
+      if (custAbout?.value) setCustomerAboutUs(custAbout.value);
+      
+      // Merchant policies (new keys)
+      const merchPrivacy = settings.find(s => s.key === "merchant_privacy_policy");
+      const merchTerms = settings.find(s => s.key === "merchant_terms_conditions");
+      const merchAbout = settings.find(s => s.key === "merchant_about_us");
+      
+      if (merchPrivacy?.value) setMerchantPrivacyPolicy(merchPrivacy.value);
+      if (merchTerms?.value) setMerchantTermsConditions(merchTerms.value);
+      if (merchAbout?.value) setMerchantAboutUs(merchAbout.value);
     }
   }, [settings]);
 
@@ -66,18 +82,6 @@ export default function AdminPolicies() {
     }
   });
 
-  const handleSavePrivacy = () => {
-    saveMutation.mutate({ key: "privacy_policy", value: privacyPolicy });
-  };
-
-  const handleSaveTerms = () => {
-    saveMutation.mutate({ key: "terms_conditions", value: termsConditions });
-  };
-
-  const handleSaveAbout = () => {
-    saveMutation.mutate({ key: "about_us", value: aboutUs });
-  };
-
   if (isLoading) {
     return (
       <DashboardLayout role="admin">
@@ -93,128 +97,269 @@ export default function AdminPolicies() {
       <div className="space-y-8">
         <div>
           <h2 className="text-3xl font-bold tracking-tight font-display">السياسات والشروط</h2>
-          <p className="text-muted-foreground mt-2">إدارة سياسة الخصوصية والشروط والأحكام ومعلومات التطبيق</p>
+          <p className="text-muted-foreground mt-2">إدارة سياسة الخصوصية والشروط والأحكام للعملاء والتجار</p>
         </div>
 
-        <Tabs defaultValue="privacy" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3 max-w-xl">
-            <TabsTrigger value="privacy" className="gap-2">
-              <Shield className="w-4 h-4" />
-              سياسة الخصوصية
+        <Tabs defaultValue="customers" className="space-y-6">
+          <TabsList className="grid w-full grid-cols-2 max-w-md">
+            <TabsTrigger value="customers" className="gap-2">
+              <Smartphone className="w-4 h-4" />
+              تطبيق العملاء
             </TabsTrigger>
-            <TabsTrigger value="terms" className="gap-2">
-              <FileText className="w-4 h-4" />
-              الشروط والأحكام
-            </TabsTrigger>
-            <TabsTrigger value="about" className="gap-2">
-              <BookOpen className="w-4 h-4" />
-              عن التطبيق
+            <TabsTrigger value="merchants" className="gap-2">
+              <Store className="w-4 h-4" />
+              لوحة التجار
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="privacy">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Shield className="w-5 h-5" />
+          {/* Customer App Policies */}
+          <TabsContent value="customers">
+            <Tabs defaultValue="privacy" className="space-y-6">
+              <TabsList className="grid w-full grid-cols-3 max-w-xl">
+                <TabsTrigger value="privacy" className="gap-2">
+                  <Shield className="w-4 h-4" />
                   سياسة الخصوصية
-                </CardTitle>
-                <CardDescription>
-                  سياسة الخصوصية المعروضة في صفحة "حسابي" في التطبيق
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label>محتوى سياسة الخصوصية</Label>
-                  <Textarea
-                    placeholder="اكتب سياسة الخصوصية هنا..."
-                    value={privacyPolicy}
-                    onChange={(e) => setPrivacyPolicy(e.target.value)}
-                    className="min-h-[300px] font-sans"
-                    data-testid="textarea-privacy"
-                  />
-                </div>
-                <Button 
-                  onClick={handleSavePrivacy} 
-                  disabled={saveMutation.isPending}
-                  className="gap-2"
-                  data-testid="button-save-privacy"
-                >
-                  {saveMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                  حفظ التغييرات
-                </Button>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="terms">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <FileText className="w-5 h-5" />
+                </TabsTrigger>
+                <TabsTrigger value="terms" className="gap-2">
+                  <FileText className="w-4 h-4" />
                   الشروط والأحكام
-                </CardTitle>
-                <CardDescription>
-                  الشروط والأحكام المعروضة في صفحة "حسابي" في التطبيق
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label>محتوى الشروط والأحكام</Label>
-                  <Textarea
-                    placeholder="اكتب الشروط والأحكام هنا..."
-                    value={termsConditions}
-                    onChange={(e) => setTermsConditions(e.target.value)}
-                    className="min-h-[300px] font-sans"
-                    data-testid="textarea-terms"
-                  />
-                </div>
-                <Button 
-                  onClick={handleSaveTerms} 
-                  disabled={saveMutation.isPending}
-                  className="gap-2"
-                  data-testid="button-save-terms"
-                >
-                  {saveMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                  حفظ التغييرات
-                </Button>
-              </CardContent>
-            </Card>
+                </TabsTrigger>
+                <TabsTrigger value="about" className="gap-2">
+                  <BookOpen className="w-4 h-4" />
+                  عن التطبيق
+                </TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="privacy">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Shield className="w-5 h-5" />
+                      سياسة الخصوصية - تطبيق العملاء
+                    </CardTitle>
+                    <CardDescription>
+                      سياسة الخصوصية المعروضة للعملاء في التطبيق
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="space-y-2">
+                      <Label>محتوى سياسة الخصوصية</Label>
+                      <Textarea
+                        placeholder="اكتب سياسة الخصوصية هنا..."
+                        value={customerPrivacyPolicy}
+                        onChange={(e) => setCustomerPrivacyPolicy(e.target.value)}
+                        className="min-h-[300px] font-sans"
+                        data-testid="textarea-customer-privacy"
+                      />
+                    </div>
+                    <Button 
+                      onClick={() => saveMutation.mutate({ key: "privacy_policy", value: customerPrivacyPolicy })}
+                      disabled={saveMutation.isPending}
+                      className="gap-2"
+                      data-testid="button-save-customer-privacy"
+                    >
+                      {saveMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                      حفظ التغييرات
+                    </Button>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="terms">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <FileText className="w-5 h-5" />
+                      الشروط والأحكام - تطبيق العملاء
+                    </CardTitle>
+                    <CardDescription>
+                      الشروط والأحكام المعروضة للعملاء في التطبيق
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="space-y-2">
+                      <Label>محتوى الشروط والأحكام</Label>
+                      <Textarea
+                        placeholder="اكتب الشروط والأحكام هنا..."
+                        value={customerTermsConditions}
+                        onChange={(e) => setCustomerTermsConditions(e.target.value)}
+                        className="min-h-[300px] font-sans"
+                        data-testid="textarea-customer-terms"
+                      />
+                    </div>
+                    <Button 
+                      onClick={() => saveMutation.mutate({ key: "terms_conditions", value: customerTermsConditions })}
+                      disabled={saveMutation.isPending}
+                      className="gap-2"
+                      data-testid="button-save-customer-terms"
+                    >
+                      {saveMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                      حفظ التغييرات
+                    </Button>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="about">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <BookOpen className="w-5 h-5" />
+                      عن التطبيق - تطبيق العملاء
+                    </CardTitle>
+                    <CardDescription>
+                      معلومات عن التطبيق المعروضة للعملاء
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="space-y-2">
+                      <Label>محتوى صفحة عن التطبيق</Label>
+                      <Textarea
+                        placeholder="اكتب معلومات عن التطبيق هنا..."
+                        value={customerAboutUs}
+                        onChange={(e) => setCustomerAboutUs(e.target.value)}
+                        className="min-h-[300px] font-sans"
+                        data-testid="textarea-customer-about"
+                      />
+                    </div>
+                    <Button 
+                      onClick={() => saveMutation.mutate({ key: "about_us", value: customerAboutUs })}
+                      disabled={saveMutation.isPending}
+                      className="gap-2"
+                      data-testid="button-save-customer-about"
+                    >
+                      {saveMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                      حفظ التغييرات
+                    </Button>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+            </Tabs>
           </TabsContent>
 
-          <TabsContent value="about">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <BookOpen className="w-5 h-5" />
-                  عن التطبيق
-                </CardTitle>
-                <CardDescription>
-                  معلومات عن التطبيق المعروضة في صفحة "حسابي" في التطبيق
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label>محتوى صفحة عن التطبيق</Label>
-                  <Textarea
-                    placeholder="اكتب معلومات عن التطبيق هنا..."
-                    value={aboutUs}
-                    onChange={(e) => setAboutUs(e.target.value)}
-                    className="min-h-[300px] font-sans"
-                    data-testid="textarea-about"
-                  />
-                </div>
-                <Button 
-                  onClick={handleSaveAbout} 
-                  disabled={saveMutation.isPending}
-                  className="gap-2"
-                  data-testid="button-save-about"
-                >
-                  {saveMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                  حفظ التغييرات
-                </Button>
-              </CardContent>
-            </Card>
+          {/* Merchant Panel Policies */}
+          <TabsContent value="merchants">
+            <Tabs defaultValue="privacy" className="space-y-6">
+              <TabsList className="grid w-full grid-cols-3 max-w-xl">
+                <TabsTrigger value="privacy" className="gap-2">
+                  <Shield className="w-4 h-4" />
+                  سياسة الخصوصية
+                </TabsTrigger>
+                <TabsTrigger value="terms" className="gap-2">
+                  <FileText className="w-4 h-4" />
+                  الشروط والأحكام
+                </TabsTrigger>
+                <TabsTrigger value="about" className="gap-2">
+                  <BookOpen className="w-4 h-4" />
+                  عن المنصة
+                </TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="privacy">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Shield className="w-5 h-5" />
+                      سياسة الخصوصية - لوحة التجار
+                    </CardTitle>
+                    <CardDescription>
+                      سياسة الخصوصية المعروضة للتجار عند التسجيل وتسجيل الدخول
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="space-y-2">
+                      <Label>محتوى سياسة الخصوصية</Label>
+                      <Textarea
+                        placeholder="اكتب سياسة الخصوصية للتجار هنا..."
+                        value={merchantPrivacyPolicy}
+                        onChange={(e) => setMerchantPrivacyPolicy(e.target.value)}
+                        className="min-h-[300px] font-sans"
+                        data-testid="textarea-merchant-privacy"
+                      />
+                    </div>
+                    <Button 
+                      onClick={() => saveMutation.mutate({ key: "merchant_privacy_policy", value: merchantPrivacyPolicy })}
+                      disabled={saveMutation.isPending}
+                      className="gap-2"
+                      data-testid="button-save-merchant-privacy"
+                    >
+                      {saveMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                      حفظ التغييرات
+                    </Button>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="terms">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <FileText className="w-5 h-5" />
+                      الشروط والأحكام - لوحة التجار
+                    </CardTitle>
+                    <CardDescription>
+                      الشروط والأحكام التي يجب على التجار الموافقة عليها عند التسجيل وتسجيل الدخول
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="space-y-2">
+                      <Label>محتوى الشروط والأحكام</Label>
+                      <Textarea
+                        placeholder="اكتب الشروط والأحكام للتجار هنا..."
+                        value={merchantTermsConditions}
+                        onChange={(e) => setMerchantTermsConditions(e.target.value)}
+                        className="min-h-[300px] font-sans"
+                        data-testid="textarea-merchant-terms"
+                      />
+                    </div>
+                    <Button 
+                      onClick={() => saveMutation.mutate({ key: "merchant_terms_conditions", value: merchantTermsConditions })}
+                      disabled={saveMutation.isPending}
+                      className="gap-2"
+                      data-testid="button-save-merchant-terms"
+                    >
+                      {saveMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                      حفظ التغييرات
+                    </Button>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="about">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <BookOpen className="w-5 h-5" />
+                      عن المنصة - لوحة التجار
+                    </CardTitle>
+                    <CardDescription>
+                      معلومات عن المنصة المعروضة للتجار
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="space-y-2">
+                      <Label>محتوى صفحة عن المنصة</Label>
+                      <Textarea
+                        placeholder="اكتب معلومات عن المنصة للتجار هنا..."
+                        value={merchantAboutUs}
+                        onChange={(e) => setMerchantAboutUs(e.target.value)}
+                        className="min-h-[300px] font-sans"
+                        data-testid="textarea-merchant-about"
+                      />
+                    </div>
+                    <Button 
+                      onClick={() => saveMutation.mutate({ key: "merchant_about_us", value: merchantAboutUs })}
+                      disabled={saveMutation.isPending}
+                      className="gap-2"
+                      data-testid="button-save-merchant-about"
+                    >
+                      {saveMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                      حفظ التغييرات
+                    </Button>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+            </Tabs>
           </TabsContent>
         </Tabs>
       </div>

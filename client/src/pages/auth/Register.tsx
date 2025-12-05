@@ -9,10 +9,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Link, useLocation } from "wouter";
-import { Store, Plus, Trash2, Loader2, ChevronsUpDown, Check, Eye, EyeOff } from "lucide-react";
-import { useState } from "react";
+import { Store, Plus, Trash2, Loader2, ChevronsUpDown, Check, Eye, EyeOff, FileText } from "lucide-react";
+import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
+import { useQuery } from "@tanstack/react-query";
 import logoUrl from "@assets/شعار_غلوردا_1764881546720.jpg";
 import { saudiCities } from "@/constants/saudiCities";
 import { cn } from "@/lib/utils";
@@ -39,7 +43,10 @@ const formSchema = z.object({
   iban: z.string().min(15, "رقم الآيبان غير صالح").max(34, "رقم الآيبان غير صالح"),
   accountHolderName: z.string().min(2, "اسم صاحب الحساب مطلوب"),
   password: z.string().min(6, "كلمة المرور يجب أن تكون 6 أحرف على الأقل"),
-  confirmPassword: z.string()
+  confirmPassword: z.string(),
+  acceptTerms: z.boolean().refine(val => val === true, {
+    message: "يجب الموافقة على الشروط والأحكام",
+  }),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "كلمات المرور غير متطابقة",
   path: ["confirmPassword"],
@@ -59,6 +66,16 @@ export default function Register() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [showTermsDialog, setShowTermsDialog] = useState(false);
+
+  const { data: termsData } = useQuery({
+    queryKey: ["/api/public/settings/merchant_terms_conditions"],
+    queryFn: async () => {
+      const res = await fetch("/api/public/settings/merchant_terms_conditions");
+      if (!res.ok) return { value: "" };
+      return res.json();
+    }
+  });
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -76,6 +93,7 @@ export default function Register() {
       accountHolderName: "",
       password: "",
       confirmPassword: "",
+      acceptTerms: false,
     },
   });
 
@@ -90,7 +108,7 @@ export default function Register() {
     setIsSubmitting(true);
     
     try {
-      const { confirmPassword, ...registerData } = values;
+      const { confirmPassword, acceptTerms, ...registerData } = values;
       
       const response = await fetch("/api/auth/register", {
         method: "POST",
@@ -589,6 +607,37 @@ export default function Register() {
                   />
                 </div>
 
+                <FormField
+                  control={form.control}
+                  name="acceptTerms"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-row items-start space-x-3 space-x-reverse space-y-0 rounded-md border p-4 bg-muted/30">
+                      <FormControl>
+                        <Checkbox
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                          data-testid="checkbox-accept-terms"
+                        />
+                      </FormControl>
+                      <div className="space-y-1 leading-none">
+                        <FormLabel className="cursor-pointer">
+                          أوافق على{" "}
+                          <Button
+                            type="button"
+                            variant="link"
+                            className="p-0 h-auto text-primary underline"
+                            onClick={() => setShowTermsDialog(true)}
+                            data-testid="button-read-terms"
+                          >
+                            الشروط والأحكام
+                          </Button>
+                        </FormLabel>
+                        <FormMessage />
+                      </div>
+                    </FormItem>
+                  )}
+                />
+
                 <Button type="submit" className="w-full h-14 text-lg font-display rounded-xl bg-primary hover:bg-primary/90 shadow-lg shadow-primary/25 transition-all duration-200 mt-4" disabled={isSubmitting} data-testid="button-submit">
                   {isSubmitting ? (
                     <>
@@ -609,6 +658,27 @@ export default function Register() {
             </div>
           </CardContent>
         </Card>
+
+        <Dialog open={showTermsDialog} onOpenChange={setShowTermsDialog}>
+          <DialogContent className="max-w-2xl max-h-[80vh]" dir="rtl">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <FileText className="w-5 h-5" />
+                الشروط والأحكام
+              </DialogTitle>
+            </DialogHeader>
+            <ScrollArea className="h-[60vh] pr-4">
+              <div className="prose prose-sm max-w-none text-right whitespace-pre-wrap">
+                {termsData?.value || "لم يتم إضافة الشروط والأحكام بعد."}
+              </div>
+            </ScrollArea>
+            <div className="flex justify-end pt-4 border-t">
+              <Button onClick={() => setShowTermsDialog(false)} data-testid="button-close-terms">
+                إغلاق
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );

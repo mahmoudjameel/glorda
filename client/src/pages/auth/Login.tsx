@@ -5,11 +5,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Link, useLocation } from "wouter";
-import { Store, ShieldCheck, Loader2, Eye, EyeOff } from "lucide-react";
+import { Store, ShieldCheck, Loader2, Eye, EyeOff, FileText } from "lucide-react";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
+import { useQuery } from "@tanstack/react-query";
 import logoUrl from "@assets/شعار_غلوردا_1764881546720.jpg";
 
 const formSchema = z.object({
@@ -21,8 +24,18 @@ export default function Login() {
   const [, setLocation] = useLocation();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [showTermsDialog, setShowTermsDialog] = useState(false);
   const { toast } = useToast();
   const { refetch } = useAuth();
+
+  const { data: termsData } = useQuery({
+    queryKey: ["/api/public/settings/merchant_terms_conditions"],
+    queryFn: async () => {
+      const res = await fetch("/api/public/settings/merchant_terms_conditions");
+      if (!res.ok) return { value: "" };
+      return res.json();
+    }
+  });
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -158,6 +171,18 @@ export default function Login() {
                   سجل الآن كتاجر
                 </Link>
               </div>
+              <div>
+                <Button
+                  type="button"
+                  variant="link"
+                  className="text-muted-foreground hover:text-primary text-sm p-0 h-auto"
+                  onClick={() => setShowTermsDialog(true)}
+                  data-testid="button-view-terms"
+                >
+                  <FileText className="w-3 h-3 ml-1" />
+                  الشروط والأحكام
+                </Button>
+              </div>
               <div className="pt-3 border-t">
                 <Link href="/admin/login">
                   <Button variant="ghost" size="sm" className="gap-2 text-muted-foreground hover:text-foreground" data-testid="link-admin-login">
@@ -169,6 +194,27 @@ export default function Login() {
             </div>
           </CardContent>
         </Card>
+
+        <Dialog open={showTermsDialog} onOpenChange={setShowTermsDialog}>
+          <DialogContent className="max-w-2xl max-h-[80vh]" dir="rtl">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <FileText className="w-5 h-5" />
+                الشروط والأحكام
+              </DialogTitle>
+            </DialogHeader>
+            <ScrollArea className="h-[60vh] pr-4">
+              <div className="prose prose-sm max-w-none text-right whitespace-pre-wrap">
+                {termsData?.value || "لم يتم إضافة الشروط والأحكام بعد."}
+              </div>
+            </ScrollArea>
+            <div className="flex justify-end pt-4 border-t">
+              <Button onClick={() => setShowTermsDialog(false)} data-testid="button-close-terms">
+                إغلاق
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );

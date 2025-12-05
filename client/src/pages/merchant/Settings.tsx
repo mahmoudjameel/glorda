@@ -12,7 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Store, Camera, Loader2, Save, User, Instagram, Facebook, Twitter, Globe, MapPin, Wallet, Building2, CreditCard, UserCircle } from "lucide-react";
+import { Store, Camera, Loader2, Save, User, Instagram, Facebook, Twitter, Globe, MapPin, Wallet, Building2, CreditCard, UserCircle, Mail, Phone, ShoppingBag } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState, useRef, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
@@ -54,6 +54,10 @@ export default function MerchantSettings() {
   const [bankName, setBankName] = useState("");
   const [iban, setIban] = useState("");
   const [accountHolderName, setAccountHolderName] = useState("");
+  const [ownerName, setOwnerName] = useState("");
+  const [email, setEmail] = useState("");
+  const [mobile, setMobile] = useState("");
+  const [storeType, setStoreType] = useState("");
 
   const { data: profile, isLoading } = useQuery<Merchant>({
     queryKey: ["/api/merchant/profile"],
@@ -83,6 +87,10 @@ export default function MerchantSettings() {
       setBankName(profile.bankName || "");
       setIban(profile.iban || "");
       setAccountHolderName(profile.accountHolderName || "");
+      setOwnerName(profile.ownerName || "");
+      setEmail(profile.email || "");
+      setMobile(profile.mobile || "");
+      setStoreType(profile.storeType || "");
       if (profile.socialLinks) {
         setSocialLinks({
           instagram: (profile.socialLinks as SocialLinks).instagram || "",
@@ -106,6 +114,10 @@ export default function MerchantSettings() {
       bankName?: string;
       iban?: string;
       accountHolderName?: string;
+      ownerName?: string;
+      email?: string;
+      mobile?: string;
+      storeType?: string;
     }) => {
       const res = await fetch("/api/merchant/profile", {
         method: "PATCH",
@@ -179,7 +191,11 @@ export default function MerchantSettings() {
       socialLinks: Object.keys(cleanLinks).length > 0 ? cleanLinks : undefined,
       bankName: bankName.trim() || undefined,
       iban: iban.trim() || undefined,
-      accountHolderName: accountHolderName.trim() || undefined
+      accountHolderName: accountHolderName.trim() || undefined,
+      ownerName: ownerName.trim() || undefined,
+      email: email.trim() || undefined,
+      mobile: mobile.trim() || undefined,
+      storeType: storeType.trim() || undefined
     });
   };
 
@@ -454,31 +470,83 @@ export default function MerchantSettings() {
 
         <Card>
           <CardHeader>
-            <CardTitle>معلومات الحساب</CardTitle>
-            <CardDescription>معلومات إضافية عن حسابك (للقراءة فقط)</CardDescription>
+            <CardTitle className="flex items-center gap-2">
+              <User className="w-5 h-5" />
+              معلومات الحساب
+            </CardTitle>
+            <CardDescription>تعديل بيانات حسابك الشخصية</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid md:grid-cols-2 gap-4">
-              <div className="space-y-1">
-                <p className="text-sm text-muted-foreground">اسم المالك</p>
-                <p className="font-medium">{profile?.ownerName}</p>
-              </div>
-              <div className="space-y-1">
-                <p className="text-sm text-muted-foreground">البريد الإلكتروني</p>
-                <p className="font-medium font-mono text-sm">{profile?.email}</p>
-              </div>
-              <div className="space-y-1">
-                <p className="text-sm text-muted-foreground">رقم الجوال</p>
-                <p className="font-medium font-mono" dir="ltr">{profile?.mobile}</p>
-              </div>
-              <div className="space-y-1">
-                <p className="text-sm text-muted-foreground">نوع المتجر</p>
-                <p className="font-medium">{profile?.storeType}</p>
-              </div>
+            <div className="space-y-2">
+              <Label htmlFor="ownerName" className="flex items-center gap-2">
+                <User className="w-4 h-4 text-muted-foreground" />
+                اسم المالك
+              </Label>
+              <Input
+                id="ownerName"
+                value={ownerName}
+                onChange={(e) => setOwnerName(e.target.value)}
+                placeholder="الاسم الكامل"
+                data-testid="input-owner-name"
+              />
             </div>
-            <p className="text-xs text-muted-foreground pt-2 border-t">
-              لتعديل هذه المعلومات، يرجى التواصل مع إدارة المنصة
-            </p>
+
+            <div className="space-y-2">
+              <Label htmlFor="email" className="flex items-center gap-2">
+                <Mail className="w-4 h-4 text-muted-foreground" />
+                البريد الإلكتروني
+              </Label>
+              <Input
+                id="email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="name@example.com"
+                className="font-mono text-left"
+                dir="ltr"
+                data-testid="input-email"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="mobile" className="flex items-center gap-2">
+                <Phone className="w-4 h-4 text-muted-foreground" />
+                رقم الجوال
+              </Label>
+              <Input
+                id="mobile"
+                value={mobile}
+                onChange={(e) => setMobile(e.target.value)}
+                placeholder="05xxxxxxxx"
+                className="font-mono text-left"
+                dir="ltr"
+                data-testid="input-mobile"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="storeType" className="flex items-center gap-2">
+                <ShoppingBag className="w-4 h-4 text-muted-foreground" />
+                نوع المتجر
+              </Label>
+              <Select value={storeType} onValueChange={setStoreType}>
+                <SelectTrigger data-testid="select-store-type">
+                  <SelectValue placeholder="اختر نوع المتجر" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ملابس">ملابس</SelectItem>
+                  <SelectItem value="إلكترونيات">إلكترونيات</SelectItem>
+                  <SelectItem value="أغذية">أغذية</SelectItem>
+                  <SelectItem value="مستحضرات تجميل">مستحضرات تجميل</SelectItem>
+                  <SelectItem value="أثاث">أثاث</SelectItem>
+                  <SelectItem value="هدايا">هدايا</SelectItem>
+                  <SelectItem value="رياضة">رياضة</SelectItem>
+                  <SelectItem value="كتب">كتب</SelectItem>
+                  <SelectItem value="خدمات">خدمات</SelectItem>
+                  <SelectItem value="أخرى">أخرى</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </CardContent>
         </Card>
 

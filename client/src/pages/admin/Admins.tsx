@@ -15,6 +15,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
   DialogTrigger,
   DialogFooter,
 } from "@/components/ui/dialog";
@@ -126,6 +127,7 @@ export default function AdminAdmins() {
             <DialogContent>
               <DialogHeader>
                 <DialogTitle>إضافة مسؤول جديد</DialogTitle>
+                <DialogDescription>أدخل بيانات المسؤول الجديد للوصول إلى لوحة التحكم</DialogDescription>
               </DialogHeader>
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="space-y-2">

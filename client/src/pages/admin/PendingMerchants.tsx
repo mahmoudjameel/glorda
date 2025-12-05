@@ -6,6 +6,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
@@ -224,6 +225,7 @@ export default function PendingMerchants() {
                 <Store className="w-5 h-5" />
                 تفاصيل طلب التسجيل
               </DialogTitle>
+              <DialogDescription>مراجعة بيانات المتجر قبل الموافقة أو الرفض</DialogDescription>
             </DialogHeader>
             {selectedMerchant && (
               <div className="space-y-6">
@@ -329,6 +331,7 @@ export default function PendingMerchants() {
           <DialogContent>
             <DialogHeader>
               <DialogTitle className="text-destructive">رفض طلب التسجيل</DialogTitle>
+              <DialogDescription>تأكيد رفض طلب تسجيل المتجر</DialogDescription>
             </DialogHeader>
             {selectedMerchant && (
               <div className="space-y-4">

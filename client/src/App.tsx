@@ -4,6 +4,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
+import { AuthProvider, ProtectedRoute } from "@/hooks/useAuth";
 
 // Auth Pages
 import Login from "@/pages/auth/Login";
@@ -29,18 +30,50 @@ function Router() {
       <Route path="/" component={Login} />
       <Route path="/register" component={Register} />
 
-      {/* Merchant Routes */}
-      <Route path="/dashboard" component={MerchantDashboard} />
-      <Route path="/dashboard/products" component={MerchantProducts} />
-      <Route path="/dashboard/wallet" component={MerchantWallet} />
-      <Route path="/dashboard/socials" component={MerchantSocials} />
+      {/* Merchant Routes - Protected */}
+      <Route path="/dashboard">
+        <ProtectedRoute requiredRole="merchant">
+          <MerchantDashboard />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/dashboard/products">
+        <ProtectedRoute requiredRole="merchant">
+          <MerchantProducts />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/dashboard/wallet">
+        <ProtectedRoute requiredRole="merchant">
+          <MerchantWallet />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/dashboard/socials">
+        <ProtectedRoute requiredRole="merchant">
+          <MerchantSocials />
+        </ProtectedRoute>
+      </Route>
       
-      {/* Admin Routes */}
+      {/* Admin Routes - Protected */}
       <Route path="/admin/login" component={AdminLogin} />
-      <Route path="/admin" component={AdminDashboard} />
-      <Route path="/admin/pending" component={AdminPendingMerchants} />
-      <Route path="/admin/merchants" component={AdminMerchants} />
-      <Route path="/admin/admins" component={AdminAdmins} />
+      <Route path="/admin">
+        <ProtectedRoute requiredRole="admin">
+          <AdminDashboard />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/pending">
+        <ProtectedRoute requiredRole="admin">
+          <AdminPendingMerchants />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/merchants">
+        <ProtectedRoute requiredRole="admin">
+          <AdminMerchants />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/admins">
+        <ProtectedRoute requiredRole="admin">
+          <AdminAdmins />
+        </ProtectedRoute>
+      </Route>
 
       {/* Fallback */}
       <Route component={NotFound} />
@@ -51,10 +84,12 @@ function Router() {
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <Toaster />
-        <Router />
-      </TooltipProvider>
+      <AuthProvider>
+        <TooltipProvider>
+          <Toaster />
+          <Router />
+        </TooltipProvider>
+      </AuthProvider>
     </QueryClientProvider>
   );
 }

@@ -22,6 +22,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from "@/components/ui/dialog";
 
 const storeTypeLabels: Record<string, string> = {
@@ -230,6 +231,7 @@ export default function AdminMerchants() {
           <DialogContent className="max-w-2xl">
             <DialogHeader>
               <DialogTitle>تفاصيل المتجر</DialogTitle>
+              <DialogDescription>معلومات كاملة عن المتجر والمالك</DialogDescription>
             </DialogHeader>
             {selectedMerchant && (
               <div className="space-y-4">

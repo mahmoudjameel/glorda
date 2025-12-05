@@ -19,21 +19,26 @@ import {
   DialogTitle, 
   DialogTrigger 
 } from "@/components/ui/dialog";
-import { Plus, Search, MoreHorizontal, Edit, Trash, Loader2, Package } from "lucide-react";
+import { Plus, Search, MoreHorizontal, Edit, Trash, Loader2, Package, Upload, X, ImageIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useToast } from "@/hooks/use-toast";
 import type { Product } from "@shared/schema";
+
+const MAX_IMAGES = 5;
 
 export default function MerchantProducts() {
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [images, setImages] = useState<string[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -49,6 +54,50 @@ export default function MerchantProducts() {
   const productTypeLabels: Record<string, string> = {
     gifts: "هدايا",
     flowers: "ورد"
+  };
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    const remainingSlots = MAX_IMAGES - images.length;
+    if (files.length > remainingSlots) {
+      toast({ variant: "destructive", title: `يمكنك إضافة ${remainingSlots} صور فقط` });
+      return;
+    }
+
+    setIsUploading(true);
+    const formData = new FormData();
+    for (let i = 0; i < files.length; i++) {
+      formData.append("images", files[i]);
+    }
+
+    try {
+      const res = await fetch("/api/merchant/products/upload-images", {
+        method: "POST",
+        body: formData
+      });
+
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || "فشل رفع الصور");
+      }
+
+      const data = await res.json();
+      setImages(prev => [...prev, ...data.images]);
+      toast({ title: "تم رفع الصور بنجاح" });
+    } catch (error: any) {
+      toast({ variant: "destructive", title: error.message || "فشل رفع الصور" });
+    } finally {
+      setIsUploading(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    }
+  };
+
+  const removeImage = (index: number) => {
+    setImages(prev => prev.filter((_, i) => i !== index));
   };
 
   const { data: products = [], isLoading } = useQuery<Product[]>({
@@ -120,6 +169,7 @@ export default function MerchantProducts() {
 
   const resetForm = () => {
     setFormData({ name: "", description: "", price: "", stock: "", productType: "gifts", category: "" });
+    setImages([]);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -131,6 +181,7 @@ export default function MerchantProducts() {
       stock: parseInt(formData.stock),
       productType: formData.productType,
       category: formData.category,
+      images: images,
       status: parseInt(formData.stock) > 0 ? "active" : "out_of_stock"
     };
 
@@ -151,6 +202,7 @@ export default function MerchantProducts() {
       productType: product.productType || "gifts",
       category: product.category
     });
+    setImages(product.images || []);
     setIsEditOpen(true);
   };
 
@@ -256,9 +308,62 @@ export default function MerchantProducts() {
                       data-testid="input-product-category"
                     />
                   </div>
+                  <div className="grid gap-2">
+                    <Label>صور المنتج ({images.length}/{MAX_IMAGES})</Label>
+                    <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-4">
+                      {images.length > 0 && (
+                        <div className="grid grid-cols-5 gap-2 mb-3">
+                          {images.map((img, index) => (
+                            <div key={index} className="relative group">
+                              <img 
+                                src={img} 
+                                alt={`صورة ${index + 1}`}
+                                className="w-full h-16 object-cover rounded border"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => removeImage(index)}
+                                className="absolute -top-1 -right-1 bg-destructive text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                              >
+                                <X className="w-3 h-3" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {images.length < MAX_IMAGES && (
+                        <div className="flex flex-col items-center gap-2">
+                          <input
+                            ref={fileInputRef}
+                            type="file"
+                            accept="image/*"
+                            multiple
+                            onChange={handleImageUpload}
+                            className="hidden"
+                            id="product-images"
+                            data-testid="input-product-images"
+                          />
+                          <label
+                            htmlFor="product-images"
+                            className="cursor-pointer flex flex-col items-center gap-1 text-muted-foreground hover:text-foreground transition-colors"
+                          >
+                            {isUploading ? (
+                              <Loader2 className="w-8 h-8 animate-spin" />
+                            ) : (
+                              <>
+                                <Upload className="w-8 h-8" />
+                                <span className="text-xs">اضغط لرفع الصور</span>
+                              </>
+                            )}
+                          </label>
+                        </div>
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground">يمكنك رفع من 1 إلى 5 صور (JPEG, PNG, GIF, WebP)</p>
+                  </div>
                 </div>
                 <DialogFooter>
-                  <Button type="submit" disabled={createMutation.isPending} data-testid="button-save-product">
+                  <Button type="submit" disabled={createMutation.isPending || isUploading} data-testid="button-save-product">
                     {createMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : "حفظ المنتج"}
                   </Button>
                 </DialogFooter>
@@ -434,9 +539,60 @@ export default function MerchantProducts() {
                     required
                   />
                 </div>
+                <div className="grid gap-2">
+                  <Label>صور المنتج ({images.length}/{MAX_IMAGES})</Label>
+                  <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-4">
+                    {images.length > 0 && (
+                      <div className="grid grid-cols-5 gap-2 mb-3">
+                        {images.map((img, index) => (
+                          <div key={index} className="relative group">
+                            <img 
+                              src={img} 
+                              alt={`صورة ${index + 1}`}
+                              className="w-full h-16 object-cover rounded border"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => removeImage(index)}
+                              className="absolute -top-1 -right-1 bg-destructive text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {images.length < MAX_IMAGES && (
+                      <div className="flex flex-col items-center gap-2">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          multiple
+                          onChange={handleImageUpload}
+                          className="hidden"
+                          id="edit-product-images"
+                        />
+                        <label
+                          htmlFor="edit-product-images"
+                          className="cursor-pointer flex flex-col items-center gap-1 text-muted-foreground hover:text-foreground transition-colors"
+                        >
+                          {isUploading ? (
+                            <Loader2 className="w-8 h-8 animate-spin" />
+                          ) : (
+                            <>
+                              <Upload className="w-8 h-8" />
+                              <span className="text-xs">اضغط لرفع الصور</span>
+                            </>
+                          )}
+                        </label>
+                      </div>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground">يمكنك رفع من 1 إلى 5 صور (JPEG, PNG, GIF, WebP)</p>
+                </div>
               </div>
               <DialogFooter>
-                <Button type="submit" disabled={updateMutation.isPending}>
+                <Button type="submit" disabled={updateMutation.isPending || isUploading}>
                   {updateMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : "حفظ التغييرات"}
                 </Button>
               </DialogFooter>

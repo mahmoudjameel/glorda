@@ -61,7 +61,9 @@ export const products = pgTable("products", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
-export const insertProductSchema = createInsertSchema(products).omit({
+export const insertProductSchema = createInsertSchema(products, {
+  images: z.array(z.string()).optional().default([]),
+}).omit({
   id: true,
   createdAt: true,
 });

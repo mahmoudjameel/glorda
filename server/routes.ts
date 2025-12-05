@@ -3,6 +3,9 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import session from "express-session";
 import bcrypt from "bcryptjs";
+import multer from "multer";
+import path from "path";
+import fs from "fs";
 import { 
   insertMerchantSchema, 
   insertProductSchema, 
@@ -14,6 +17,35 @@ import {
 } from "@shared/schema";
 import { z } from "zod";
 import { fromZodError } from "zod-validation-error";
+
+// Configure multer for product image uploads
+const uploadsDir = path.join(process.cwd(), "uploads", "products");
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
+
+const productImageStorage = multer.diskStorage({
+  destination: (_req, _file, cb) => {
+    cb(null, uploadsDir);
+  },
+  filename: (_req, file, cb) => {
+    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
+    cb(null, uniqueSuffix + path.extname(file.originalname));
+  }
+});
+
+const productImageUpload = multer({
+  storage: productImageStorage,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
+  fileFilter: (_req, file, cb) => {
+    const allowedTypes = ["image/jpeg", "image/png", "image/gif", "image/webp"];
+    if (allowedTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error("نوع الملف غير مدعوم. يرجى رفع صورة بصيغة JPEG, PNG, GIF أو WebP"));
+    }
+  }
+});
 
 declare module "express-session" {
   interface SessionData {
@@ -300,6 +332,27 @@ export async function registerRoutes(
       res.status(500).json({ error: "فشل حذف المنتج" });
     }
   });
+
+  // ========== PRODUCT IMAGE UPLOAD ==========
+  
+  app.post("/api/merchant/products/upload-images", requireMerchant, productImageUpload.array("images", 5), (req, res) => {
+    try {
+      const files = req.files as Express.Multer.File[];
+      if (!files || files.length === 0) {
+        return res.status(400).json({ error: "لم يتم رفع أي صور" });
+      }
+
+      const imageUrls = files.map(file => `/uploads/products/${file.filename}`);
+      res.json({ success: true, images: imageUrls });
+    } catch (error) {
+      console.error("Upload error:", error);
+      res.status(500).json({ error: "فشل رفع الصور" });
+    }
+  });
+
+  // Serve uploaded files
+  const express = await import("express");
+  app.use("/uploads", express.default.static(path.join(process.cwd(), "uploads")));
 
   // ========== MERCHANT ORDERS ROUTES ==========
   

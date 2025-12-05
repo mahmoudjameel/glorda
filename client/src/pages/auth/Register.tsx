@@ -288,10 +288,10 @@ export default function Register() {
                             <CommandList>
                               <CommandEmpty>لم يتم العثور على مدينة</CommandEmpty>
                               <CommandGroup className="max-h-[300px] overflow-y-auto">
-                                {saudiCities.map((city) => (
+                                {saudiCities.map((city, index) => (
                                   <CommandItem
                                     value={city.nameAr + " " + city.nameEn}
-                                    key={city.nameAr}
+                                    key={`${city.nameAr}-${city.nameEn}-${index}`}
                                     onSelect={() => {
                                       field.onChange(city.nameAr);
                                     }}

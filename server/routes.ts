@@ -145,8 +145,14 @@ export async function registerRoutes(
       req.session.userId = merchant.id;
       req.session.userType = "merchant";
 
-      const { password: _, ...merchantData } = merchant;
-      res.json({ success: true, merchant: merchantData });
+      req.session.save((err) => {
+        if (err) {
+          console.error("Session save error:", err);
+          return res.status(500).json({ error: "خطأ في حفظ الجلسة" });
+        }
+        const { password: _, ...merchantData } = merchant;
+        res.json({ success: true, merchant: merchantData });
+      });
     } catch (error) {
       console.error("Login error:", error);
       res.status(500).json({ error: "فشل تسجيل الدخول" });
@@ -174,8 +180,14 @@ export async function registerRoutes(
       req.session.userId = admin.id;
       req.session.userType = "admin";
 
-      const { password: _, ...adminData } = admin;
-      res.json({ success: true, admin: adminData });
+      req.session.save((err) => {
+        if (err) {
+          console.error("Session save error:", err);
+          return res.status(500).json({ error: "خطأ في حفظ الجلسة" });
+        }
+        const { password: _, ...adminData } = admin;
+        res.json({ success: true, admin: adminData });
+      });
     } catch (error) {
       console.error("Admin login error:", error);
       res.status(500).json({ error: "فشل تسجيل الدخول" });

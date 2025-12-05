@@ -12,7 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Store, Camera, Loader2, Save, User, Instagram, Facebook, Twitter, Globe, MapPin, Wallet, Building2, CreditCard, UserCircle, Mail, Phone, ShoppingBag } from "lucide-react";
+import { Store, Camera, Loader2, Save, User, Instagram, Facebook, Twitter, Globe, MapPin, Wallet, Building2, CreditCard, UserCircle, Mail, Phone } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState, useRef, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
@@ -57,7 +57,6 @@ export default function MerchantSettings() {
   const [ownerName, setOwnerName] = useState("");
   const [email, setEmail] = useState("");
   const [mobile, setMobile] = useState("");
-  const [storeType, setStoreType] = useState("");
 
   const { data: profile, isLoading } = useQuery<Merchant>({
     queryKey: ["/api/merchant/profile"],
@@ -90,7 +89,6 @@ export default function MerchantSettings() {
       setOwnerName(profile.ownerName || "");
       setEmail(profile.email || "");
       setMobile(profile.mobile || "");
-      setStoreType(profile.storeType || "");
       if (profile.socialLinks) {
         setSocialLinks({
           instagram: (profile.socialLinks as SocialLinks).instagram || "",
@@ -117,7 +115,6 @@ export default function MerchantSettings() {
       ownerName?: string;
       email?: string;
       mobile?: string;
-      storeType?: string;
     }) => {
       const res = await fetch("/api/merchant/profile", {
         method: "PATCH",
@@ -194,8 +191,7 @@ export default function MerchantSettings() {
       accountHolderName: accountHolderName.trim() || undefined,
       ownerName: ownerName.trim() || undefined,
       email: email.trim() || undefined,
-      mobile: mobile.trim() || undefined,
-      storeType: storeType.trim() || undefined
+      mobile: mobile.trim() || undefined
     });
   };
 
@@ -524,29 +520,6 @@ export default function MerchantSettings() {
               />
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="storeType" className="flex items-center gap-2">
-                <ShoppingBag className="w-4 h-4 text-muted-foreground" />
-                نوع المتجر
-              </Label>
-              <Select value={storeType} onValueChange={setStoreType}>
-                <SelectTrigger data-testid="select-store-type">
-                  <SelectValue placeholder="اختر نوع المتجر" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="ملابس">ملابس</SelectItem>
-                  <SelectItem value="إلكترونيات">إلكترونيات</SelectItem>
-                  <SelectItem value="أغذية">أغذية</SelectItem>
-                  <SelectItem value="مستحضرات تجميل">مستحضرات تجميل</SelectItem>
-                  <SelectItem value="أثاث">أثاث</SelectItem>
-                  <SelectItem value="هدايا">هدايا</SelectItem>
-                  <SelectItem value="رياضة">رياضة</SelectItem>
-                  <SelectItem value="كتب">كتب</SelectItem>
-                  <SelectItem value="خدمات">خدمات</SelectItem>
-                  <SelectItem value="أخرى">أخرى</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
           </CardContent>
         </Card>
 

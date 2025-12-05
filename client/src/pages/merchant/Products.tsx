@@ -66,7 +66,7 @@ export default function MerchantProducts() {
   ];
 
   const promoBadgeOptions = [
-    { value: "", label: "بدون عنوان ترويجي" },
+    { value: "none", label: "بدون عنوان ترويجي" },
     { value: "عرض خاص", label: "عرض خاص" },
     { value: "توصيل مجاني", label: "توصيل مجاني" },
     { value: "الأكثر مبيعاً", label: "الأكثر مبيعاً" },

@@ -143,6 +143,12 @@ export default function Login() {
                 <Button type="submit" className="w-full h-12 text-base font-display rounded-xl bg-primary hover:bg-primary/90 shadow-lg shadow-primary/25 transition-all duration-200" disabled={isSubmitting} data-testid="button-submit">
                   {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin" /> : "تسجيل الدخول"}
                 </Button>
+                
+                <div className="text-center">
+                  <Link href="/forgot-password" className="text-sm text-muted-foreground hover:text-primary transition-colors" data-testid="link-forgot-password">
+                    نسيت كلمة المرور؟
+                  </Link>
+                </div>
               </form>
             </Form>
             <div className="mt-6 text-center text-sm text-muted-foreground space-y-3">

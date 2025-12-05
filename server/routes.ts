@@ -206,6 +206,115 @@ export async function registerRoutes(
     });
   });
 
+  // Password Reset - OTP Storage (in-memory for simplicity)
+  const otpStore = new Map<string, { otp: string; expires: number; token?: string }>();
+
+  app.post("/api/auth/forgot-password", async (req, res) => {
+    try {
+      const { email } = req.body;
+      
+      if (!email) {
+        return res.status(400).json({ error: "البريد الإلكتروني مطلوب" });
+      }
+
+      const merchant = await storage.getMerchantByEmail(email);
+      if (!merchant) {
+        // Don't reveal if email exists or not for security
+        return res.json({ success: true, message: "إذا كان البريد مسجلاً، سيتم إرسال رمز التحقق" });
+      }
+
+      // Generate 6-digit OTP
+      const otp = Math.floor(100000 + Math.random() * 900000).toString();
+      const expires = Date.now() + 10 * 60 * 1000; // 10 minutes
+
+      otpStore.set(email, { otp, expires });
+
+      // Log OTP for testing (in production, send via email)
+      console.log(`[OTP] Password reset code for ${email}: ${otp}`);
+
+      res.json({ success: true, message: "تم إرسال رمز التحقق" });
+    } catch (error) {
+      console.error("Forgot password error:", error);
+      res.status(500).json({ error: "حدث خطأ" });
+    }
+  });
+
+  app.post("/api/auth/verify-otp", async (req, res) => {
+    try {
+      const { email, otp } = req.body;
+      
+      if (!email || !otp) {
+        return res.status(400).json({ error: "البريد الإلكتروني ورمز التحقق مطلوبان" });
+      }
+
+      const stored = otpStore.get(email);
+      
+      if (!stored) {
+        return res.status(400).json({ error: "رمز التحقق غير صالح أو منتهي" });
+      }
+
+      if (Date.now() > stored.expires) {
+        otpStore.delete(email);
+        return res.status(400).json({ error: "رمز التحقق منتهي الصلاحية" });
+      }
+
+      if (stored.otp !== otp) {
+        return res.status(400).json({ error: "رمز التحقق غير صحيح" });
+      }
+
+      // Generate reset token
+      const token = Math.random().toString(36).substring(2) + Date.now().toString(36);
+      stored.token = token;
+      stored.expires = Date.now() + 15 * 60 * 1000; // 15 minutes for password reset
+      otpStore.set(email, stored);
+
+      res.json({ success: true, token });
+    } catch (error) {
+      console.error("Verify OTP error:", error);
+      res.status(500).json({ error: "حدث خطأ" });
+    }
+  });
+
+  app.post("/api/auth/reset-password", async (req, res) => {
+    try {
+      const { email, token, password } = req.body;
+      
+      if (!email || !token || !password) {
+        return res.status(400).json({ error: "جميع الحقول مطلوبة" });
+      }
+
+      if (password.length < 6) {
+        return res.status(400).json({ error: "كلمة المرور يجب أن تكون 6 أحرف على الأقل" });
+      }
+
+      const stored = otpStore.get(email);
+      
+      if (!stored || stored.token !== token) {
+        return res.status(400).json({ error: "رابط غير صالح" });
+      }
+
+      if (Date.now() > stored.expires) {
+        otpStore.delete(email);
+        return res.status(400).json({ error: "انتهت صلاحية الرابط" });
+      }
+
+      const merchant = await storage.getMerchantByEmail(email);
+      if (!merchant) {
+        return res.status(400).json({ error: "الحساب غير موجود" });
+      }
+
+      const hashedPassword = await bcrypt.hash(password, 10);
+      await storage.updateMerchant(merchant.id, { password: hashedPassword });
+
+      otpStore.delete(email);
+
+      res.json({ success: true, message: "تم إعادة تعيين كلمة المرور بنجاح" });
+    } catch (error) {
+      console.error("Reset password error:", error);
+      res.status(500).json({ error: "فشل إعادة تعيين كلمة المرور" });
+    }
+  });
+
   app.get("/api/auth/me", async (req, res) => {
     try {
       if (!req.session.userId) {

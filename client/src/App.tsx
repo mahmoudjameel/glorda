@@ -9,6 +9,9 @@ import { AuthProvider, ProtectedRoute } from "@/hooks/useAuth";
 // Auth Pages
 import Login from "@/pages/auth/Login";
 import Register from "@/pages/auth/Register";
+import ForgotPassword from "@/pages/auth/ForgotPassword";
+import VerifyOTP from "@/pages/auth/VerifyOTP";
+import ResetPassword from "@/pages/auth/ResetPassword";
 
 // Merchant Pages
 import MerchantDashboard from "@/pages/merchant/Dashboard";
@@ -38,6 +41,9 @@ function Router() {
       {/* Auth Routes */}
       <Route path="/" component={Login} />
       <Route path="/register" component={Register} />
+      <Route path="/forgot-password" component={ForgotPassword} />
+      <Route path="/verify-otp" component={VerifyOTP} />
+      <Route path="/reset-password" component={ResetPassword} />
 
       {/* Merchant Routes - Protected (specific routes first) */}
       <Route path="/dashboard/products">

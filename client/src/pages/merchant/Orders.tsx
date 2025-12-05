@@ -63,20 +63,24 @@ interface OrderWithDetails {
 
 const statusMap: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
   pending: { label: "قيد الانتظار", variant: "secondary" },
-  processing: { label: "قيد المعالجة", variant: "default" },
+  processing: { label: "قيد التجهيز", variant: "default" },
   shipped: { label: "تم الشحن", variant: "default" },
   delivered: { label: "تم التسليم", variant: "default" },
   completed: { label: "مكتمل", variant: "default" },
   cancelled: { label: "ملغي", variant: "destructive" },
+  rescheduled: { label: "إعادة جدولة", variant: "outline" },
+  not_received: { label: "عدم استلام الطلب", variant: "destructive" },
 };
 
 const statusOptions = [
   { value: "pending", label: "قيد الانتظار" },
-  { value: "processing", label: "قيد المعالجة" },
+  { value: "processing", label: "قيد التجهيز" },
   { value: "shipped", label: "تم الشحن" },
   { value: "delivered", label: "تم التسليم" },
   { value: "completed", label: "مكتمل" },
   { value: "cancelled", label: "ملغي" },
+  { value: "rescheduled", label: "إعادة جدولة" },
+  { value: "not_received", label: "عدم استلام الطلب" },
 ];
 
 export default function MerchantOrders() {
@@ -148,7 +152,7 @@ export default function MerchantOrders() {
           <Card>
             <CardContent className="pt-6">
               <div className="text-2xl font-bold">{orders.filter(o => o.status === "processing").length}</div>
-              <p className="text-xs text-muted-foreground">قيد المعالجة</p>
+              <p className="text-xs text-muted-foreground">قيد التجهيز</p>
             </CardContent>
           </Card>
           <Card>

@@ -59,11 +59,13 @@ interface OrderWithDetails {
 
 const statusMap: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
   pending: { label: "قيد الانتظار", variant: "secondary" },
-  processing: { label: "قيد المعالجة", variant: "default" },
+  processing: { label: "قيد التجهيز", variant: "default" },
   shipped: { label: "تم الشحن", variant: "default" },
   delivered: { label: "تم التسليم", variant: "default" },
   completed: { label: "مكتمل", variant: "default" },
   cancelled: { label: "ملغي", variant: "destructive" },
+  rescheduled: { label: "إعادة جدولة", variant: "outline" },
+  not_received: { label: "عدم استلام الطلب", variant: "destructive" },
 };
 
 export default function AdminOrders() {

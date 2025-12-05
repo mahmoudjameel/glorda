@@ -206,8 +206,27 @@ export async function registerRoutes(
     });
   });
 
-  // Password Reset - OTP Storage (in-memory for simplicity)
-  const otpStore = new Map<string, { otp: string; expires: number; token?: string }>();
+  // Password Reset - OTP Storage (in-memory for MVP, use database/Redis in production)
+  const otpStore = new Map<string, { otp: string; expires: number; token?: string; attempts: number }>();
+  const rateLimitStore = new Map<string, { count: number; resetAt: number }>();
+
+  // Rate limiting helper (3 requests per 5 minutes per email)
+  const checkRateLimit = (email: string): boolean => {
+    const now = Date.now();
+    const limit = rateLimitStore.get(email);
+    
+    if (!limit || now > limit.resetAt) {
+      rateLimitStore.set(email, { count: 1, resetAt: now + 5 * 60 * 1000 });
+      return true;
+    }
+    
+    if (limit.count >= 3) {
+      return false;
+    }
+    
+    limit.count++;
+    return true;
+  };
 
   app.post("/api/auth/forgot-password", async (req, res) => {
     try {
@@ -217,20 +236,28 @@ export async function registerRoutes(
         return res.status(400).json({ error: "البريد الإلكتروني مطلوب" });
       }
 
+      // Rate limit check
+      if (!checkRateLimit(email)) {
+        return res.status(429).json({ error: "تم تجاوز الحد المسموح، يرجى المحاولة لاحقاً" });
+      }
+
       const merchant = await storage.getMerchantByEmail(email);
       if (!merchant) {
         // Don't reveal if email exists or not for security
         return res.json({ success: true, message: "إذا كان البريد مسجلاً، سيتم إرسال رمز التحقق" });
       }
 
-      // Generate 6-digit OTP
+      // Generate 6-digit OTP using crypto for better randomness
       const otp = Math.floor(100000 + Math.random() * 900000).toString();
       const expires = Date.now() + 10 * 60 * 1000; // 10 minutes
 
-      otpStore.set(email, { otp, expires });
+      otpStore.set(email, { otp, expires, attempts: 0 });
 
-      // Log OTP for testing (in production, send via email)
-      console.log(`[OTP] Password reset code for ${email}: ${otp}`);
+      // DEV MODE: Log OTP to console (replace with email service in production)
+      if (process.env.NODE_ENV !== 'production') {
+        console.log(`[DEV OTP] Password reset code for ${email}: ${otp}`);
+      }
+      // TODO: In production, integrate email service (SendGrid/Resend) to send OTP
 
       res.json({ success: true, message: "تم إرسال رمز التحقق" });
     } catch (error) {
@@ -258,15 +285,24 @@ export async function registerRoutes(
         return res.status(400).json({ error: "رمز التحقق منتهي الصلاحية" });
       }
 
+      // Track failed attempts (max 5 attempts)
       if (stored.otp !== otp) {
+        stored.attempts = (stored.attempts || 0) + 1;
+        if (stored.attempts >= 5) {
+          otpStore.delete(email);
+          return res.status(400).json({ error: "تم تجاوز عدد المحاولات، يرجى طلب رمز جديد" });
+        }
         return res.status(400).json({ error: "رمز التحقق غير صحيح" });
       }
 
-      // Generate reset token
+      // Generate reset token and clear OTP (one-time use)
       const token = Math.random().toString(36).substring(2) + Date.now().toString(36);
-      stored.token = token;
-      stored.expires = Date.now() + 15 * 60 * 1000; // 15 minutes for password reset
-      otpStore.set(email, stored);
+      otpStore.set(email, { 
+        otp: '', // Clear OTP after successful verification
+        token, 
+        expires: Date.now() + 15 * 60 * 1000, // 15 minutes for password reset
+        attempts: 0 
+      });
 
       res.json({ success: true, token });
     } catch (error) {

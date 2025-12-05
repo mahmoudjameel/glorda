@@ -5,11 +5,33 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Store, Camera, Loader2, Save, User } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Store, Camera, Loader2, Save, User, Instagram, Facebook, Twitter, Globe, MapPin } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState, useRef, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import type { Merchant } from "@shared/schema";
+
+interface City {
+  id: number;
+  name: string;
+  nameEn: string | null;
+  isActive: boolean;
+}
+
+interface SocialLinks {
+  instagram?: string;
+  twitter?: string;
+  facebook?: string;
+  website?: string;
+  tiktok?: string;
+}
 
 export default function MerchantSettings() {
   const { toast } = useToast();
@@ -19,8 +41,16 @@ export default function MerchantSettings() {
   const [storeName, setStoreName] = useState("");
   const [username, setUsername] = useState("");
   const [bio, setBio] = useState("");
+  const [city, setCity] = useState("");
   const [storeImage, setStoreImage] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [socialLinks, setSocialLinks] = useState<SocialLinks>({
+    instagram: "",
+    twitter: "",
+    facebook: "",
+    website: "",
+    tiktok: ""
+  });
 
   const { data: profile, isLoading } = useQuery<Merchant>({
     queryKey: ["/api/merchant/profile"],
@@ -31,17 +61,43 @@ export default function MerchantSettings() {
     }
   });
 
+  const { data: cities = [] } = useQuery<City[]>({
+    queryKey: ["/api/public/cities"],
+    queryFn: async () => {
+      const res = await fetch("/api/public/cities");
+      if (!res.ok) throw new Error("Failed to fetch cities");
+      return res.json();
+    }
+  });
+
   useEffect(() => {
     if (profile) {
       setStoreName(profile.storeName || "");
       setUsername(profile.username || "");
       setBio(profile.bio || "");
+      setCity(profile.city || "");
       setStoreImage(profile.storeImage || null);
+      if (profile.socialLinks) {
+        setSocialLinks({
+          instagram: (profile.socialLinks as SocialLinks).instagram || "",
+          twitter: (profile.socialLinks as SocialLinks).twitter || "",
+          facebook: (profile.socialLinks as SocialLinks).facebook || "",
+          website: (profile.socialLinks as SocialLinks).website || "",
+          tiktok: (profile.socialLinks as SocialLinks).tiktok || ""
+        });
+      }
     }
   }, [profile]);
 
   const updateProfileMutation = useMutation({
-    mutationFn: async (data: { storeName?: string; username?: string; bio?: string; storeImage?: string }) => {
+    mutationFn: async (data: { 
+      storeName?: string; 
+      username?: string; 
+      bio?: string; 
+      storeImage?: string;
+      city?: string;
+      socialLinks?: SocialLinks;
+    }) => {
       const res = await fetch("/api/merchant/profile", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -98,11 +154,20 @@ export default function MerchantSettings() {
   };
 
   const handleSave = () => {
+    const cleanLinks: SocialLinks = {};
+    if (socialLinks.instagram?.trim()) cleanLinks.instagram = socialLinks.instagram.trim();
+    if (socialLinks.twitter?.trim()) cleanLinks.twitter = socialLinks.twitter.trim();
+    if (socialLinks.facebook?.trim()) cleanLinks.facebook = socialLinks.facebook.trim();
+    if (socialLinks.website?.trim()) cleanLinks.website = socialLinks.website.trim();
+    if (socialLinks.tiktok?.trim()) cleanLinks.tiktok = socialLinks.tiktok.trim();
+
     updateProfileMutation.mutate({
       storeName,
       username,
       bio,
-      storeImage: storeImage || undefined
+      city,
+      storeImage: storeImage || undefined,
+      socialLinks: Object.keys(cleanLinks).length > 0 ? cleanLinks : undefined
     });
   };
 
@@ -200,6 +265,25 @@ export default function MerchantSettings() {
               </div>
 
               <div className="space-y-2">
+                <Label htmlFor="city" className="flex items-center gap-2">
+                  <MapPin className="w-4 h-4" />
+                  المدينة
+                </Label>
+                <Select value={city} onValueChange={setCity}>
+                  <SelectTrigger data-testid="select-city">
+                    <SelectValue placeholder="اختر المدينة" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {cities.map((c) => (
+                      <SelectItem key={c.id} value={c.name} data-testid={`option-city-${c.id}`}>
+                        {c.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
                 <Label htmlFor="bio">نبذة عن المتجر</Label>
                 <Textarea
                   id="bio"
@@ -213,27 +297,94 @@ export default function MerchantSettings() {
                 <p className="text-xs text-muted-foreground">{bio.length}/500 حرف</p>
               </div>
             </div>
+          </CardContent>
+        </Card>
 
-            <Button
-              onClick={handleSave}
-              disabled={updateProfileMutation.isPending}
-              className="w-full"
-              data-testid="button-save"
-            >
-              {updateProfileMutation.isPending ? (
-                <Loader2 className="w-4 h-4 animate-spin ml-2" />
-              ) : (
-                <Save className="w-4 h-4 ml-2" />
-              )}
-              حفظ التغييرات
-            </Button>
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Globe className="w-5 h-5" />
+              وسائل التواصل الاجتماعي
+            </CardTitle>
+            <CardDescription>
+              أدخل روابط حساباتك في المنصات المختلفة لتظهر للعملاء في التطبيق
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2">
+                <Instagram className="w-4 h-4 text-pink-600" /> انستقرام
+              </Label>
+              <Input 
+                placeholder="https://instagram.com/your-store" 
+                dir="ltr"
+                value={socialLinks.instagram}
+                onChange={(e) => setSocialLinks(prev => ({ ...prev, instagram: e.target.value }))}
+                data-testid="input-instagram"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2">
+                <Twitter className="w-4 h-4 text-sky-500" /> تويتر (X)
+              </Label>
+              <Input 
+                placeholder="https://twitter.com/your-store" 
+                dir="ltr"
+                value={socialLinks.twitter}
+                onChange={(e) => setSocialLinks(prev => ({ ...prev, twitter: e.target.value }))}
+                data-testid="input-twitter"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2">
+                <Facebook className="w-4 h-4 text-blue-600" /> فيسبوك
+              </Label>
+              <Input 
+                placeholder="https://facebook.com/your-store" 
+                dir="ltr"
+                value={socialLinks.facebook}
+                onChange={(e) => setSocialLinks(prev => ({ ...prev, facebook: e.target.value }))}
+                data-testid="input-facebook"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2">
+                <Globe className="w-4 h-4 text-gray-600" /> الموقع الإلكتروني
+              </Label>
+              <Input 
+                placeholder="https://your-store.com" 
+                dir="ltr"
+                value={socialLinks.website}
+                onChange={(e) => setSocialLinks(prev => ({ ...prev, website: e.target.value }))}
+                data-testid="input-website"
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2">
+                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z"/>
+                </svg>
+                تيك توك
+              </Label>
+              <Input 
+                placeholder="https://tiktok.com/@your-store" 
+                dir="ltr"
+                value={socialLinks.tiktok}
+                onChange={(e) => setSocialLinks(prev => ({ ...prev, tiktok: e.target.value }))}
+                data-testid="input-tiktok"
+              />
+            </div>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
             <CardTitle>معلومات الحساب</CardTitle>
-            <CardDescription>معلومات إضافية عن حسابك</CardDescription>
+            <CardDescription>معلومات إضافية عن حسابك (للقراءة فقط)</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid md:grid-cols-2 gap-4">
@@ -250,8 +401,8 @@ export default function MerchantSettings() {
                 <p className="font-medium font-mono" dir="ltr">{profile?.mobile}</p>
               </div>
               <div className="space-y-1">
-                <p className="text-sm text-muted-foreground">المدينة</p>
-                <p className="font-medium">{profile?.city}</p>
+                <p className="text-sm text-muted-foreground">نوع المتجر</p>
+                <p className="font-medium">{profile?.storeType}</p>
               </div>
             </div>
             <p className="text-xs text-muted-foreground pt-2 border-t">
@@ -259,6 +410,21 @@ export default function MerchantSettings() {
             </p>
           </CardContent>
         </Card>
+
+        <Button
+          onClick={handleSave}
+          disabled={updateProfileMutation.isPending}
+          className="w-full"
+          size="lg"
+          data-testid="button-save"
+        >
+          {updateProfileMutation.isPending ? (
+            <Loader2 className="w-4 h-4 animate-spin ml-2" />
+          ) : (
+            <Save className="w-4 h-4 ml-2" />
+          )}
+          حفظ جميع التغييرات
+        </Button>
       </div>
     </DashboardLayout>
   );

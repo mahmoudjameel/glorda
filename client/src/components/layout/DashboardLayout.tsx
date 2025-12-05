@@ -10,7 +10,6 @@ import {
   Menu,
   X,
   Wallet,
-  Share2,
   Shield,
   ClipboardList,
   Smartphone,
@@ -39,7 +38,6 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
     { href: "/dashboard/orders", label: "الطلبات", icon: ShoppingBag },
     { href: "/dashboard/messages", label: "الرسائل", icon: MessageCircle },
     { href: "/dashboard/wallet", label: "المحفظة", icon: Wallet },
-    { href: "/dashboard/socials", label: "التواصل الاجتماعي", icon: Share2 },
     { href: "/dashboard/settings", label: "إعدادات المتجر", icon: Settings },
   ];
 

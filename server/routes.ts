@@ -233,8 +233,8 @@ export async function registerRoutes(
 
   app.patch("/api/merchant/profile", requireMerchant, async (req, res) => {
     try {
-      const { storeName, username, bio, storeImage, socialLinks } = req.body;
-      await storage.updateMerchant(req.session.userId!, { storeName, username, bio, storeImage, socialLinks });
+      const { storeName, username, bio, storeImage, socialLinks, city } = req.body;
+      await storage.updateMerchant(req.session.userId!, { storeName, username, bio, storeImage, socialLinks, city });
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ error: "فشل تحديث بيانات المتجر" });

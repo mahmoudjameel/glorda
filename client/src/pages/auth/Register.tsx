@@ -12,6 +12,7 @@ import { Store, Plus, Trash2, ShieldCheck, Loader2 } from "lucide-react";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import logoUrl from "@assets/شعار_غلوردا_1764881546720.jpg";
+import { saudiCities } from "@/constants/saudiCities";
 
 const formSchema = z.object({
   ownerName: z.string().min(2, "اسم المالك مطلوب"),
@@ -258,21 +259,30 @@ export default function Register() {
                   />
                 </div>
 
-                <div className="grid md:grid-cols-2 gap-6">
-                  <FormField
-                    control={form.control}
-                    name="city"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>المدينة</FormLabel>
+                <FormField
+                  control={form.control}
+                  name="city"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>المدينة</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
                         <FormControl>
-                          <Input placeholder="الرياض، جدة..." {...field} data-testid="input-city" />
+                          <SelectTrigger data-testid="select-city">
+                            <SelectValue placeholder="اختر المدينة" />
+                          </SelectTrigger>
                         </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
+                        <SelectContent dir="rtl" className="max-h-[300px]">
+                          {saudiCities.map((city) => (
+                            <SelectItem key={city.nameAr} value={city.nameAr}>
+                              {city.nameAr} - {city.nameEn}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
                 <div className="space-y-6">
                   <FormField

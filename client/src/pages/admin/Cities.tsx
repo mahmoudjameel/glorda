@@ -22,10 +22,12 @@ import {
   DialogTrigger,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { MapPin, Plus, Trash2, Loader2, Edit } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
+import { saudiCities } from "@/constants/saudiCities";
 
 interface City {
   id: number;
@@ -177,25 +179,38 @@ export default function AdminCities() {
               </DialogHeader>
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="name">اسم المدينة (عربي)</Label>
-                  <Input
-                    id="name"
-                    placeholder="مثال: الرياض"
+                  <Label>اختر المدينة</Label>
+                  <Select
                     value={formData.name}
-                    onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                    data-testid="input-city-name"
-                  />
+                    onValueChange={(value) => {
+                      const selectedCity = saudiCities.find(c => c.nameAr === value);
+                      if (selectedCity) {
+                        setFormData(prev => ({
+                          ...prev,
+                          name: selectedCity.nameAr,
+                          nameEn: selectedCity.nameEn
+                        }));
+                      }
+                    }}
+                  >
+                    <SelectTrigger data-testid="select-city">
+                      <SelectValue placeholder="اختر مدينة من القائمة" />
+                    </SelectTrigger>
+                    <SelectContent dir="rtl" className="max-h-[300px]">
+                      {saudiCities.map((city) => (
+                        <SelectItem key={city.nameAr} value={city.nameAr}>
+                          {city.nameAr} - {city.nameEn}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="nameEn">اسم المدينة (إنجليزي) - اختياري</Label>
-                  <Input
-                    id="nameEn"
-                    placeholder="مثال: Riyadh"
-                    value={formData.nameEn}
-                    onChange={(e) => setFormData(prev => ({ ...prev, nameEn: e.target.value }))}
-                    data-testid="input-city-name-en"
-                  />
-                </div>
+                {formData.name && (
+                  <div className="p-3 rounded-lg bg-muted/50 border space-y-1">
+                    <p className="text-sm"><span className="text-muted-foreground">العربي:</span> {formData.name}</p>
+                    <p className="text-sm"><span className="text-muted-foreground">الإنجليزي:</span> {formData.nameEn}</p>
+                  </div>
+                )}
                 <div className="space-y-2">
                   <Label htmlFor="sortOrder">ترتيب العرض</Label>
                   <Input

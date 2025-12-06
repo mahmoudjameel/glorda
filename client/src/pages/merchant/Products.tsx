@@ -29,6 +29,13 @@ import { useState, useRef } from "react";
 import { useToast } from "@/hooks/use-toast";
 import type { Product } from "@shared/schema";
 
+interface Category {
+  id: number;
+  name: string;
+  nameEn: string | null;
+  isActive: boolean;
+}
+
 const MAX_IMAGES = 5;
 
 export default function MerchantProducts() {
@@ -57,13 +64,14 @@ export default function MerchantProducts() {
     flowers: "ورد"
   };
 
-  const categoryOptions = [
-    { value: "الكل", label: "الكل" },
-    { value: "ورد مع هدايا", label: "ورد مع هدايا" },
-    { value: "نباتات", label: "نباتات" },
-    { value: "مزهريات", label: "مزهريات" },
-    { value: "باقات", label: "باقات" },
-  ];
+  const { data: categories = [] } = useQuery<Category[]>({
+    queryKey: ["/api/public/categories"],
+    queryFn: async () => {
+      const res = await fetch("/api/public/categories");
+      if (!res.ok) throw new Error("Failed to fetch categories");
+      return res.json();
+    }
+  });
 
   const promoBadgeOptions = [
     { value: "none", label: "بدون عنوان ترويجي" },
@@ -312,9 +320,9 @@ export default function MerchantProducts() {
                         <SelectValue placeholder="اختر فئة المنتج" />
                       </SelectTrigger>
                       <SelectContent>
-                        {categoryOptions.map((option) => (
-                          <SelectItem key={option.value} value={option.value}>
-                            {option.label}
+                        {categories.map((cat) => (
+                          <SelectItem key={cat.id} value={cat.name}>
+                            {cat.name}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -553,9 +561,9 @@ export default function MerchantProducts() {
                       <SelectValue placeholder="اختر فئة المنتج" />
                     </SelectTrigger>
                     <SelectContent>
-                      {categoryOptions.map((option) => (
-                        <SelectItem key={option.value} value={option.value}>
-                          {option.label}
+                      {categories.map((cat) => (
+                        <SelectItem key={cat.id} value={cat.name}>
+                          {cat.name}
                         </SelectItem>
                       ))}
                     </SelectContent>

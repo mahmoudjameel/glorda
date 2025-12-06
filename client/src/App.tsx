@@ -21,7 +21,6 @@ import MerchantReviews from "@/pages/merchant/Reviews";
 import MerchantMessages from "@/pages/merchant/Messages";
 import MerchantWallet from "@/pages/merchant/Wallet";
 import MerchantSettings from "@/pages/merchant/Settings";
-import MerchantTerms from "@/pages/merchant/Terms";
 
 // Admin Pages
 import AdminDashboard from "@/pages/admin/Dashboard";
@@ -76,11 +75,6 @@ function Router() {
       <Route path="/dashboard/settings">
         <ProtectedRoute requiredRole="merchant">
           <MerchantSettings />
-        </ProtectedRoute>
-      </Route>
-      <Route path="/dashboard/terms">
-        <ProtectedRoute requiredRole="merchant">
-          <MerchantTerms />
         </ProtectedRoute>
       </Route>
       <Route path="/dashboard">

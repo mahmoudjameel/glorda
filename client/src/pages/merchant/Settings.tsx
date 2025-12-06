@@ -12,8 +12,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Store, Camera, Loader2, Save, User, Instagram, Facebook, Twitter, Globe, MapPin, Wallet, Building2, CreditCard, UserCircle, Mail, Phone, FileText, Shield, BookOpen } from "lucide-react";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Store, Camera, Loader2, Save, User, Instagram, Facebook, Twitter, Globe, MapPin, Wallet, Building2, CreditCard, UserCircle, Mail, Phone, FileText, ChevronLeft } from "lucide-react";
+import { Link } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState, useRef, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
@@ -75,39 +75,6 @@ export default function MerchantSettings() {
       if (!res.ok) throw new Error("Failed to fetch cities");
       return res.json();
     }
-  });
-
-  const { data: termsData } = useQuery<{ key: string; value: string | null }>({
-    queryKey: ["/api/public/settings/merchant_terms_conditions"],
-    queryFn: async () => {
-      const res = await fetch("/api/public/settings/merchant_terms_conditions");
-      if (!res.ok) return { key: "merchant_terms_conditions", value: null };
-      return res.json();
-    },
-    staleTime: 0,
-    refetchOnMount: "always"
-  });
-
-  const { data: privacyData } = useQuery<{ key: string; value: string | null }>({
-    queryKey: ["/api/public/settings/merchant_privacy_policy"],
-    queryFn: async () => {
-      const res = await fetch("/api/public/settings/merchant_privacy_policy");
-      if (!res.ok) return { key: "merchant_privacy_policy", value: null };
-      return res.json();
-    },
-    staleTime: 0,
-    refetchOnMount: "always"
-  });
-
-  const { data: aboutData } = useQuery<{ key: string; value: string | null }>({
-    queryKey: ["/api/public/settings/merchant_about_us"],
-    queryFn: async () => {
-      const res = await fetch("/api/public/settings/merchant_about_us");
-      if (!res.ok) return { key: "merchant_about_us", value: null };
-      return res.json();
-    },
-    staleTime: 0,
-    refetchOnMount: "always"
   });
 
   useEffect(() => {
@@ -566,49 +533,20 @@ export default function MerchantSettings() {
             <CardDescription>اطلع على سياسات وشروط استخدام منصة غلوردا</CardDescription>
           </CardHeader>
           <CardContent>
-            <Tabs defaultValue="terms" className="space-y-4">
-              <TabsList className="grid w-full grid-cols-3">
-                <TabsTrigger value="terms" className="gap-1 text-xs sm:text-sm" data-testid="tab-terms">
-                  <FileText className="w-3 h-3 sm:w-4 sm:h-4" />
-                  <span className="hidden sm:inline">الشروط والأحكام</span>
-                  <span className="sm:hidden">الشروط</span>
-                </TabsTrigger>
-                <TabsTrigger value="privacy" className="gap-1 text-xs sm:text-sm" data-testid="tab-privacy">
-                  <Shield className="w-3 h-3 sm:w-4 sm:h-4" />
-                  <span className="hidden sm:inline">سياسة الخصوصية</span>
-                  <span className="sm:hidden">الخصوصية</span>
-                </TabsTrigger>
-                <TabsTrigger value="about" className="gap-1 text-xs sm:text-sm" data-testid="tab-about">
-                  <BookOpen className="w-3 h-3 sm:w-4 sm:h-4" />
-                  <span className="hidden sm:inline">من نحن</span>
-                  <span className="sm:hidden">من نحن</span>
-                </TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="terms">
-                <div className="bg-muted/30 rounded-lg p-4 border min-h-[200px]">
-                  <div className="prose prose-sm max-w-none text-foreground leading-relaxed whitespace-pre-wrap" data-testid="text-terms-content">
-                    {termsData?.value || "لا توجد شروط وأحكام متاحة حالياً."}
+            <Link href="/dashboard/terms">
+              <Button variant="outline" className="w-full justify-between h-14" data-testid="button-view-policies">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                    <FileText className="w-5 h-5 text-primary" />
+                  </div>
+                  <div className="text-right">
+                    <p className="font-medium">عرض السياسات والشروط</p>
+                    <p className="text-xs text-muted-foreground">الشروط والأحكام، سياسة الخصوصية، من نحن</p>
                   </div>
                 </div>
-              </TabsContent>
-
-              <TabsContent value="privacy">
-                <div className="bg-muted/30 rounded-lg p-4 border min-h-[200px]">
-                  <div className="prose prose-sm max-w-none text-foreground leading-relaxed whitespace-pre-wrap" data-testid="text-privacy-content">
-                    {privacyData?.value || "لا توجد سياسة خصوصية متاحة حالياً."}
-                  </div>
-                </div>
-              </TabsContent>
-
-              <TabsContent value="about">
-                <div className="bg-muted/30 rounded-lg p-4 border min-h-[200px]">
-                  <div className="prose prose-sm max-w-none text-foreground leading-relaxed whitespace-pre-wrap" data-testid="text-about-content">
-                    {aboutData?.value || "لا توجد معلومات متاحة حالياً."}
-                  </div>
-                </div>
-              </TabsContent>
-            </Tabs>
+                <ChevronLeft className="w-5 h-5 text-muted-foreground" />
+              </Button>
+            </Link>
           </CardContent>
         </Card>
 

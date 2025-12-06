@@ -41,6 +41,7 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
     { href: "/dashboard/messages", label: "الرسائل", icon: MessageCircle },
     { href: "/dashboard/wallet", label: "المحفظة", icon: Wallet },
     { href: "/dashboard/settings", label: "إعدادات المتجر", icon: Settings },
+    { href: "/dashboard/terms", label: "الشروط والأحكام", icon: FileText },
   ];
 
   const adminLinks = [

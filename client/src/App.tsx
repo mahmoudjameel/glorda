@@ -31,7 +31,6 @@ import AdminAdmins from "@/pages/admin/Admins";
 import AdminLogin from "@/pages/admin/Login";
 import AdminSettings from "@/pages/admin/Settings";
 import AdminAppSettings from "@/pages/admin/AppSettings";
-import AdminCities from "@/pages/admin/Cities";
 import AdminPolicies from "@/pages/admin/Policies";
 import AdminWithdrawals from "@/pages/admin/Withdrawals";
 import AdminCustomers from "@/pages/admin/Customers";
@@ -114,11 +113,6 @@ function Router() {
       <Route path="/admin/app-settings">
         <ProtectedRoute requiredRole="admin">
           <AdminAppSettings />
-        </ProtectedRoute>
-      </Route>
-      <Route path="/admin/cities">
-        <ProtectedRoute requiredRole="admin">
-          <AdminCities />
         </ProtectedRoute>
       </Route>
       <Route path="/admin/policies">

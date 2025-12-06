@@ -15,7 +15,12 @@ import {
   DialogTrigger,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { Image, Grid3X3, Plus, Trash2, Loader2, Edit, GripVertical } from "lucide-react";
+import { Image, Grid3X3, Plus, Trash2, Loader2, Edit, GripVertical, MapPin, ChevronsUpDown, Check } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { saudiCities } from "@/constants/saudiCities";
+import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState, useRef } from "react";
@@ -36,6 +41,15 @@ interface Category {
   nameEn: string | null;
   icon: string | null;
   image: string | null;
+  isActive: boolean;
+  sortOrder: number;
+  createdAt: string;
+}
+
+interface City {
+  id: number;
+  name: string;
+  nameEn: string | null;
   isActive: boolean;
   sortOrder: number;
   createdAt: string;
@@ -69,6 +83,15 @@ export default function AppSettings() {
     sortOrder: 0
   });
 
+  const [isAddCityOpen, setIsAddCityOpen] = useState(false);
+  const [editingCity, setEditingCity] = useState<City | null>(null);
+  const [cityForm, setCityForm] = useState({
+    name: "",
+    nameEn: "",
+    isActive: true,
+    sortOrder: 0
+  });
+
   const { data: banners = [], isLoading: loadingBanners } = useQuery<Banner[]>({
     queryKey: ["/api/admin/banners"],
     queryFn: async () => {
@@ -83,6 +106,15 @@ export default function AppSettings() {
     queryFn: async () => {
       const res = await fetch("/api/admin/categories", { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch categories");
+      return res.json();
+    }
+  });
+
+  const { data: cities = [], isLoading: loadingCities } = useQuery<City[]>({
+    queryKey: ["/api/admin/cities"],
+    queryFn: async () => {
+      const res = await fetch("/api/admin/cities", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch cities");
       return res.json();
     }
   });
@@ -251,12 +283,102 @@ export default function AppSettings() {
     }
   });
 
+  // City mutations
+  const createCityMutation = useMutation({
+    mutationFn: async (data: typeof cityForm) => {
+      const res = await fetch("/api/admin/cities", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(data)
+      });
+      if (!res.ok) throw new Error("Failed to create city");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/cities"] });
+      toast({ title: "تم إضافة المدينة بنجاح", className: "bg-emerald-50 border-emerald-200 text-emerald-800" });
+      setIsAddCityOpen(false);
+      resetCityForm();
+    },
+    onError: () => {
+      toast({ variant: "destructive", title: "فشل إضافة المدينة" });
+    }
+  });
+
+  const updateCityMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: number; data: Partial<typeof cityForm> }) => {
+      const res = await fetch(`/api/admin/cities/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(data)
+      });
+      if (!res.ok) throw new Error("Failed to update city");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/cities"] });
+      toast({ title: "تم تحديث المدينة بنجاح" });
+      setEditingCity(null);
+      resetCityForm();
+    },
+    onError: () => {
+      toast({ variant: "destructive", title: "فشل تحديث المدينة" });
+    }
+  });
+
+  const deleteCityMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const res = await fetch(`/api/admin/cities/${id}`, {
+        method: "DELETE",
+        credentials: "include"
+      });
+      if (!res.ok) throw new Error("Failed to delete city");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/cities"] });
+      toast({ title: "تم حذف المدينة" });
+    },
+    onError: () => {
+      toast({ variant: "destructive", title: "فشل حذف المدينة" });
+    }
+  });
+
   const resetBannerForm = () => {
     setBannerForm({ title: "", image: "", link: "", isActive: true, sortOrder: 0 });
   };
 
   const resetCategoryForm = () => {
     setCategoryForm({ name: "", nameEn: "", icon: "", image: "", isActive: true, sortOrder: 0 });
+  };
+
+  const resetCityForm = () => {
+    setCityForm({ name: "", nameEn: "", isActive: true, sortOrder: 0 });
+  };
+
+  const handleEditCity = (city: City) => {
+    setEditingCity(city);
+    setCityForm({
+      name: city.name,
+      nameEn: city.nameEn || "",
+      isActive: city.isActive,
+      sortOrder: city.sortOrder
+    });
+  };
+
+  const handleCitySubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!cityForm.name) {
+      toast({ variant: "destructive", title: "اسم المدينة مطلوب" });
+      return;
+    }
+    if (editingCity) {
+      updateCityMutation.mutate({ id: editingCity.id, data: cityForm });
+    } else {
+      createCityMutation.mutate(cityForm);
+    }
   };
 
   const handleEditBanner = (banner: Banner) => {
@@ -317,7 +439,7 @@ export default function AppSettings() {
         </div>
 
         <Tabs defaultValue="banners" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-2 max-w-md">
+          <TabsList className="grid w-full grid-cols-3 max-w-xl">
             <TabsTrigger value="banners" className="gap-2">
               <Image className="w-4 h-4" />
               البانرات
@@ -325,6 +447,10 @@ export default function AppSettings() {
             <TabsTrigger value="categories" className="gap-2">
               <Grid3X3 className="w-4 h-4" />
               الأقسام
+            </TabsTrigger>
+            <TabsTrigger value="cities" className="gap-2">
+              <MapPin className="w-4 h-4" />
+              المدن
             </TabsTrigger>
           </TabsList>
 
@@ -599,6 +725,186 @@ export default function AppSettings() {
                         </div>
                       </div>
                     ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="cities">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <MapPin className="w-5 h-5" />
+                    المدن
+                  </CardTitle>
+                  <CardDescription className="mt-2">
+                    المدن المتاحة للعملاء والتجار في التطبيق
+                  </CardDescription>
+                </div>
+                <Dialog open={isAddCityOpen || !!editingCity} onOpenChange={(open) => {
+                  if (!open) {
+                    setIsAddCityOpen(false);
+                    setEditingCity(null);
+                    resetCityForm();
+                  }
+                }}>
+                  <DialogTrigger asChild>
+                    <Button className="gap-2" onClick={() => setIsAddCityOpen(true)} data-testid="button-add-city">
+                      <Plus className="w-4 h-4" />
+                      إضافة مدينة
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>{editingCity ? "تعديل المدينة" : "إضافة مدينة جديدة"}</DialogTitle>
+                      <DialogDescription>
+                        {editingCity ? "قم بتعديل بيانات المدينة" : "أضف مدينة جديدة للتطبيق"}
+                      </DialogDescription>
+                    </DialogHeader>
+                    <form onSubmit={handleCitySubmit} className="space-y-4">
+                      <div className="space-y-2">
+                        <Label>اختر المدينة</Label>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button
+                              variant="outline"
+                              role="combobox"
+                              className={cn(
+                                "w-full justify-between",
+                                !cityForm.name && "text-muted-foreground"
+                              )}
+                              data-testid="select-city"
+                            >
+                              {cityForm.name
+                                ? cityForm.name + " - " + cityForm.nameEn
+                                : "اختر مدينة من القائمة"}
+                              <ChevronsUpDown className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-full p-0" align="start" dir="rtl">
+                            <Command dir="rtl">
+                              <CommandInput placeholder="ابحث عن مدينة..." className="text-right" />
+                              <CommandList>
+                                <CommandEmpty>لم يتم العثور على مدينة</CommandEmpty>
+                                <CommandGroup className="max-h-[300px] overflow-y-auto">
+                                  {saudiCities.map((city) => (
+                                    <CommandItem
+                                      value={city.nameAr + " " + city.nameEn}
+                                      key={city.nameAr}
+                                      onSelect={() => {
+                                        setCityForm(prev => ({
+                                          ...prev,
+                                          name: city.nameAr,
+                                          nameEn: city.nameEn
+                                        }));
+                                      }}
+                                    >
+                                      <Check
+                                        className={cn(
+                                          "ml-2 h-4 w-4",
+                                          city.nameAr === cityForm.name ? "opacity-100" : "opacity-0"
+                                        )}
+                                      />
+                                      {city.nameAr} - {city.nameEn}
+                                    </CommandItem>
+                                  ))}
+                                </CommandGroup>
+                              </CommandList>
+                            </Command>
+                          </PopoverContent>
+                        </Popover>
+                      </div>
+                      {cityForm.name && (
+                        <div className="p-3 rounded-lg bg-muted/50 border space-y-1">
+                          <p className="text-sm"><span className="text-muted-foreground">العربي:</span> {cityForm.name}</p>
+                          <p className="text-sm"><span className="text-muted-foreground">الإنجليزي:</span> {cityForm.nameEn}</p>
+                        </div>
+                      )}
+                      <div className="space-y-2">
+                        <Label htmlFor="citySortOrder">ترتيب العرض</Label>
+                        <Input
+                          id="citySortOrder"
+                          type="number"
+                          placeholder="0"
+                          value={cityForm.sortOrder}
+                          onChange={(e) => setCityForm(prev => ({ ...prev, sortOrder: parseInt(e.target.value) || 0 }))}
+                          data-testid="input-city-order"
+                        />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Switch
+                          checked={cityForm.isActive}
+                          onCheckedChange={(checked) => setCityForm(prev => ({ ...prev, isActive: checked }))}
+                        />
+                        <Label>نشط</Label>
+                      </div>
+                      <DialogFooter>
+                        <Button type="submit" disabled={createCityMutation.isPending || updateCityMutation.isPending} data-testid="button-submit-city">
+                          {(createCityMutation.isPending || updateCityMutation.isPending) && <Loader2 className="w-4 h-4 animate-spin ml-2" />}
+                          {editingCity ? "حفظ التعديلات" : "إضافة المدينة"}
+                        </Button>
+                      </DialogFooter>
+                    </form>
+                  </DialogContent>
+                </Dialog>
+              </CardHeader>
+              <CardContent>
+                {loadingCities ? (
+                  <div className="flex justify-center py-12">
+                    <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+                  </div>
+                ) : cities.length === 0 ? (
+                  <div className="text-center py-12 border rounded-lg bg-muted/20">
+                    <MapPin className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                    <h3 className="font-semibold text-lg">لا توجد مدن</h3>
+                    <p className="text-muted-foreground">قم بإضافة مدينة جديدة للبدء</p>
+                  </div>
+                ) : (
+                  <div className="rounded-md border">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="text-right">الاسم (عربي)</TableHead>
+                          <TableHead className="text-right">الاسم (إنجليزي)</TableHead>
+                          <TableHead className="text-right">الترتيب</TableHead>
+                          <TableHead className="text-right">الحالة</TableHead>
+                          <TableHead className="text-right">إجراءات</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {cities.map((city) => (
+                          <TableRow key={city.id} data-testid={`row-city-${city.id}`}>
+                            <TableCell className="font-medium">{city.name}</TableCell>
+                            <TableCell className="text-muted-foreground">{city.nameEn || "-"}</TableCell>
+                            <TableCell>{city.sortOrder}</TableCell>
+                            <TableCell>
+                              <Badge variant={city.isActive ? "default" : "secondary"}>
+                                {city.isActive ? "نشط" : "معطل"}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex gap-2">
+                                <Button variant="ghost" size="icon" onClick={() => handleEditCity(city)}>
+                                  <Edit className="w-4 h-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                                  onClick={() => deleteCityMutation.mutate(city.id)}
+                                  disabled={deleteCityMutation.isPending}
+                                  data-testid={`button-delete-city-${city.id}`}
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
                   </div>
                 )}
               </CardContent>

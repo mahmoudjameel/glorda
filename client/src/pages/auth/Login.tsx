@@ -34,7 +34,9 @@ export default function Login() {
       const res = await fetch("/api/public/settings/merchant_terms_conditions");
       if (!res.ok) return { value: "" };
       return res.json();
-    }
+    },
+    staleTime: 0,
+    refetchOnMount: "always"
   });
 
   const form = useForm<z.infer<typeof formSchema>>({

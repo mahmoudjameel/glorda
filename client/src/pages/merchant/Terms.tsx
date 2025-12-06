@@ -11,7 +11,9 @@ export default function MerchantTerms() {
       const res = await fetch("/api/public/settings/merchant_terms_conditions");
       if (!res.ok) throw new Error("Failed to fetch terms");
       return res.json();
-    }
+    },
+    staleTime: 0,
+    refetchOnMount: "always"
   });
 
   if (isLoading) {

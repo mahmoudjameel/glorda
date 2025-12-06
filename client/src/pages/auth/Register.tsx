@@ -18,8 +18,14 @@ import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery } from "@tanstack/react-query";
 import logoUrl from "@assets/شعار_غلوردا_1764881546720.jpg";
-import { saudiCities } from "@/constants/saudiCities";
 import { cn } from "@/lib/utils";
+
+interface City {
+  id: number;
+  name: string;
+  nameEn: string | null;
+  isActive: boolean;
+}
 
 const formSchema = z.object({
   ownerName: z.string().min(2, "اسم المالك مطلوب"),
@@ -77,6 +83,15 @@ export default function Register() {
     },
     staleTime: 0,
     refetchOnMount: "always"
+  });
+
+  const { data: cities = [] } = useQuery<City[]>({
+    queryKey: ["/api/public/cities"],
+    queryFn: async () => {
+      const res = await fetch("/api/public/cities");
+      if (!res.ok) throw new Error("Failed to fetch cities");
+      return res.json();
+    }
   });
 
   const form = useForm<z.infer<typeof formSchema>>({
@@ -296,7 +311,10 @@ export default function Register() {
                               data-testid="select-city"
                             >
                               {field.value
-                                ? saudiCities.find((city) => city.nameAr === field.value)?.nameAr + " - " + saudiCities.find((city) => city.nameAr === field.value)?.nameEn
+                                ? (() => {
+                                    const selectedCity = cities.find((c) => c.name === field.value);
+                                    return selectedCity ? `${selectedCity.name}${selectedCity.nameEn ? ` - ${selectedCity.nameEn}` : ""}` : field.value;
+                                  })()
                                 : "اختر المدينة"}
                               <ChevronsUpDown className="mr-2 h-4 w-4 shrink-0 opacity-50" />
                             </Button>
@@ -308,21 +326,21 @@ export default function Register() {
                             <CommandList>
                               <CommandEmpty>لم يتم العثور على مدينة</CommandEmpty>
                               <CommandGroup className="max-h-[300px] overflow-y-auto">
-                                {saudiCities.map((city, index) => (
+                                {cities.map((city) => (
                                   <CommandItem
-                                    value={city.nameAr + " " + city.nameEn}
-                                    key={`${city.nameAr}-${city.nameEn}-${index}`}
+                                    value={city.name + " " + (city.nameEn || "")}
+                                    key={city.id}
                                     onSelect={() => {
-                                      field.onChange(city.nameAr);
+                                      field.onChange(city.name);
                                     }}
                                   >
                                     <Check
                                       className={cn(
                                         "ml-2 h-4 w-4",
-                                        city.nameAr === field.value ? "opacity-100" : "opacity-0"
+                                        city.name === field.value ? "opacity-100" : "opacity-0"
                                       )}
                                     />
-                                    {city.nameAr} - {city.nameEn}
+                                    {city.name} {city.nameEn && `- ${city.nameEn}`}
                                   </CommandItem>
                                 ))}
                               </CommandGroup>

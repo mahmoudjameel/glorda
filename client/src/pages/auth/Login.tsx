@@ -6,9 +6,10 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Link, useLocation } from "wouter";
-import { Store, ShieldCheck, Loader2, Eye, EyeOff, FileText } from "lucide-react";
+import { Store, ShieldCheck, Loader2, Eye, EyeOff, FileText, Shield, BookOpen } from "lucide-react";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
@@ -32,6 +33,28 @@ export default function Login() {
     queryKey: ["/api/public/settings/merchant_terms_conditions"],
     queryFn: async () => {
       const res = await fetch("/api/public/settings/merchant_terms_conditions");
+      if (!res.ok) return { value: "" };
+      return res.json();
+    },
+    staleTime: 0,
+    refetchOnMount: "always"
+  });
+
+  const { data: privacyData } = useQuery({
+    queryKey: ["/api/public/settings/merchant_privacy_policy"],
+    queryFn: async () => {
+      const res = await fetch("/api/public/settings/merchant_privacy_policy");
+      if (!res.ok) return { value: "" };
+      return res.json();
+    },
+    staleTime: 0,
+    refetchOnMount: "always"
+  });
+
+  const { data: aboutData } = useQuery({
+    queryKey: ["/api/public/settings/merchant_about_us"],
+    queryFn: async () => {
+      const res = await fetch("/api/public/settings/merchant_about_us");
       if (!res.ok) return { value: "" };
       return res.json();
     },
@@ -182,7 +205,7 @@ export default function Login() {
                   data-testid="button-view-terms"
                 >
                   <FileText className="w-3 h-3 ml-1" />
-                  الشروط والأحكام
+                  السياسات والشروط
                 </Button>
               </div>
               <div className="pt-3 border-t">
@@ -198,18 +221,55 @@ export default function Login() {
         </Card>
 
         <Dialog open={showTermsDialog} onOpenChange={setShowTermsDialog}>
-          <DialogContent className="max-w-2xl max-h-[80vh]" dir="rtl">
+          <DialogContent className="max-w-2xl max-h-[85vh]" dir="rtl">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <FileText className="w-5 h-5" />
-                الشروط والأحكام
+                السياسات والشروط
               </DialogTitle>
             </DialogHeader>
-            <ScrollArea className="h-[60vh] pr-4">
-              <div className="prose prose-sm max-w-none text-right whitespace-pre-wrap">
-                {termsData?.value || "لم يتم إضافة الشروط والأحكام بعد."}
-              </div>
-            </ScrollArea>
+            <Tabs defaultValue="terms" className="space-y-4">
+              <TabsList className="grid w-full grid-cols-3">
+                <TabsTrigger value="terms" className="gap-1 text-xs sm:text-sm">
+                  <FileText className="w-3 h-3 sm:w-4 sm:h-4" />
+                  <span className="hidden sm:inline">الشروط والأحكام</span>
+                  <span className="sm:hidden">الشروط</span>
+                </TabsTrigger>
+                <TabsTrigger value="privacy" className="gap-1 text-xs sm:text-sm">
+                  <Shield className="w-3 h-3 sm:w-4 sm:h-4" />
+                  <span className="hidden sm:inline">سياسة الخصوصية</span>
+                  <span className="sm:hidden">الخصوصية</span>
+                </TabsTrigger>
+                <TabsTrigger value="about" className="gap-1 text-xs sm:text-sm">
+                  <BookOpen className="w-3 h-3 sm:w-4 sm:h-4" />
+                  من نحن
+                </TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="terms">
+                <ScrollArea className="h-[50vh] pr-4">
+                  <div className="prose prose-sm max-w-none text-right whitespace-pre-wrap">
+                    {termsData?.value || "لم يتم إضافة الشروط والأحكام بعد."}
+                  </div>
+                </ScrollArea>
+              </TabsContent>
+
+              <TabsContent value="privacy">
+                <ScrollArea className="h-[50vh] pr-4">
+                  <div className="prose prose-sm max-w-none text-right whitespace-pre-wrap">
+                    {privacyData?.value || "لم يتم إضافة سياسة الخصوصية بعد."}
+                  </div>
+                </ScrollArea>
+              </TabsContent>
+
+              <TabsContent value="about">
+                <ScrollArea className="h-[50vh] pr-4">
+                  <div className="prose prose-sm max-w-none text-right whitespace-pre-wrap">
+                    {aboutData?.value || "لم يتم إضافة معلومات عنا بعد."}
+                  </div>
+                </ScrollArea>
+              </TabsContent>
+            </Tabs>
             <div className="flex justify-end pt-4 border-t">
               <Button onClick={() => setShowTermsDialog(false)} data-testid="button-close-terms">
                 إغلاق

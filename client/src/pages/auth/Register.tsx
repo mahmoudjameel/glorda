@@ -38,6 +38,9 @@ const formSchema = z.object({
   storeType: z.enum(["company", "institution", "individual"], {
     required_error: "يرجى اختيار نوع المتجر",
   }),
+  category: z.enum(["flowers", "gifts", "all"], {
+    required_error: "يرجى اختيار تصنيف المتجر",
+  }),
   city: z.string().min(2, "المدينة مطلوبة"),
   registrationNumber: z.string().min(1, "رقم السجل / الوثيقة مطلوب"),
   deliveryMethod: z.enum(["representative", "pickup", "all"], {
@@ -140,6 +143,7 @@ export default function Register() {
       password: "",
       confirmPassword: "",
       acceptTerms: false,
+      category: "all",
     },
   });
 
@@ -337,28 +341,53 @@ export default function Register() {
                   />
                 </div>
 
-                <FormField
-                  control={form.control}
-                  name="storeType"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>نوع الكيان</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
-                        <FormControl>
-                          <SelectTrigger data-testid="select-store-type">
-                            <SelectValue placeholder="اختر نوع الكيان" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent dir="rtl">
-                          <SelectItem value="individual">فرد / عمل حر</SelectItem>
-                          <SelectItem value="institution">مؤسسة</SelectItem>
-                          <SelectItem value="company">شركة</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                <div className="grid md:grid-cols-2 gap-6">
+                  <FormField
+                    control={form.control}
+                    name="storeType"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>نوع الكيان</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <FormControl>
+                            <SelectTrigger data-testid="select-store-type">
+                              <SelectValue placeholder="اختر نوع الكيان" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent dir="rtl">
+                            <SelectItem value="individual">فرد / عمل حر</SelectItem>
+                            <SelectItem value="institution">مؤسسة</SelectItem>
+                            <SelectItem value="company">شركة</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="category"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>تصنيف المتجر</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <FormControl>
+                            <SelectTrigger data-testid="select-category">
+                              <SelectValue placeholder="اختر تصنيف المتجر" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent dir="rtl">
+                            <SelectItem value="flowers">ورود ومناسبات</SelectItem>
+                            <SelectItem value="gifts">هدايا</SelectItem>
+                            <SelectItem value="all">ورود وهدايا</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
 
                 {/* Documents section based on store type */}
                 {(storeType === "company" || storeType === "institution") && (

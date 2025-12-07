@@ -18,6 +18,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState, useRef, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import type { Merchant } from "@shared/schema";
+import { saudiBanks } from "@/constants/saudiBanks";
 
 interface City {
   id: number;
@@ -422,13 +423,18 @@ export default function MerchantSettings() {
                 <Building2 className="w-4 h-4 text-muted-foreground" />
                 اسم البنك
               </Label>
-              <Input
-                id="bankName"
-                value={bankName}
-                onChange={(e) => setBankName(e.target.value)}
-                placeholder="مثال: البنك الأهلي السعودي"
-                data-testid="input-bank-name"
-              />
+              <Select value={bankName} onValueChange={setBankName}>
+                <SelectTrigger id="bankName" data-testid="select-bank-name">
+                  <SelectValue placeholder="اختر البنك" />
+                </SelectTrigger>
+                <SelectContent>
+                  {saudiBanks.map((bank) => (
+                    <SelectItem key={bank.value} value={bank.value}>
+                      {bank.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="space-y-2">

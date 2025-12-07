@@ -20,6 +20,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useQuery } from "@tanstack/react-query";
 import logoUrl from "@assets/شعار_غلوردا_1764881546720.jpg";
 import { cn } from "@/lib/utils";
+import { saudiBanks } from "@/constants/saudiBanks";
 
 interface City {
   id: number;
@@ -240,11 +241,23 @@ export default function Register() {
                     name="username"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>اسم المستخدم</FormLabel>
+                        <FormLabel>اسم المستخدم (بالإنجليزي فقط)</FormLabel>
                         <FormControl>
-                          <Input placeholder="store_name" {...field} className="font-mono text-left" dir="ltr" data-testid="input-username" />
+                          <Input 
+                            placeholder="store_name" 
+                            {...field} 
+                            className="font-mono text-left" 
+                            dir="ltr" 
+                            data-testid="input-username"
+                            onChange={(e) => {
+                              const value = e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, '');
+                              field.onChange(value);
+                            }}
+                          />
                         </FormControl>
-                        <p className="text-xs text-muted-foreground">سيكون رابط متجرك: glorda.com/{field.value || "username"}</p>
+                        <p className="text-xs text-muted-foreground">
+                          أحرف إنجليزية صغيرة وأرقام و _ فقط • سيكون رابط متجرك: glorda.com/{field.value || "username"}
+                        </p>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -549,9 +562,20 @@ export default function Register() {
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>اسم البنك</FormLabel>
-                          <FormControl>
-                            <Input placeholder="مثال: البنك الأهلي" {...field} data-testid="input-bank-name" />
-                          </FormControl>
+                          <Select onValueChange={field.onChange} value={field.value}>
+                            <FormControl>
+                              <SelectTrigger data-testid="select-bank-name">
+                                <SelectValue placeholder="اختر البنك" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {saudiBanks.map((bank) => (
+                                <SelectItem key={bank.value} value={bank.value}>
+                                  {bank.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
                           <FormMessage />
                         </FormItem>
                       )}

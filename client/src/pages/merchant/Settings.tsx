@@ -54,6 +54,8 @@ export default function MerchantSettings() {
     tiktok: ""
   });
   const [bankName, setBankName] = useState("");
+  const [customBankName, setCustomBankName] = useState("");
+  const [isOtherBank, setIsOtherBank] = useState(false);
   const [iban, setIban] = useState("");
   const [accountHolderName, setAccountHolderName] = useState("");
   const [ownerName, setOwnerName] = useState("");
@@ -85,7 +87,15 @@ export default function MerchantSettings() {
       setBio(profile.bio || "");
       setCity(profile.city || "");
       setStoreImage(profile.storeImage || null);
-      setBankName(profile.bankName || "");
+      const savedBankName = profile.bankName || "";
+      const isCustomBank = savedBankName && !saudiBanks.some(b => b.value === savedBankName);
+      if (isCustomBank) {
+        setIsOtherBank(true);
+        setCustomBankName(savedBankName);
+        setBankName(savedBankName);
+      } else {
+        setBankName(savedBankName);
+      }
       setIban(profile.iban || "");
       setAccountHolderName(profile.accountHolderName || "");
       setOwnerName(profile.ownerName || "");
@@ -423,7 +433,19 @@ export default function MerchantSettings() {
                 <Building2 className="w-4 h-4 text-muted-foreground" />
                 اسم البنك
               </Label>
-              <Select value={bankName} onValueChange={setBankName}>
+              <Select 
+                value={isOtherBank ? "other" : bankName} 
+                onValueChange={(value) => {
+                  if (value === "other") {
+                    setIsOtherBank(true);
+                    setBankName("");
+                  } else {
+                    setIsOtherBank(false);
+                    setCustomBankName("");
+                    setBankName(value);
+                  }
+                }}
+              >
                 <SelectTrigger id="bankName" data-testid="select-bank-name">
                   <SelectValue placeholder="اختر البنك" />
                 </SelectTrigger>
@@ -435,6 +457,18 @@ export default function MerchantSettings() {
                   ))}
                 </SelectContent>
               </Select>
+              {isOtherBank && (
+                <Input
+                  placeholder="أدخل اسم البنك"
+                  value={customBankName}
+                  onChange={(e) => {
+                    setCustomBankName(e.target.value);
+                    setBankName(e.target.value);
+                  }}
+                  className="mt-2"
+                  data-testid="input-custom-bank-name"
+                />
+              )}
             </div>
 
             <div className="space-y-2">

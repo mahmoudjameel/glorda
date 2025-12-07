@@ -75,6 +75,8 @@ export default function Register() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [showTermsDialog, setShowTermsDialog] = useState(false);
+  const [customBankName, setCustomBankName] = useState("");
+  const [isOtherBank, setIsOtherBank] = useState(false);
 
   const { data: termsData } = useQuery({
     queryKey: ["/api/public/settings/merchant_terms_conditions"],
@@ -562,7 +564,19 @@ export default function Register() {
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>اسم البنك</FormLabel>
-                          <Select onValueChange={field.onChange} value={field.value}>
+                          <Select 
+                            onValueChange={(value) => {
+                              if (value === "other") {
+                                setIsOtherBank(true);
+                                field.onChange("");
+                              } else {
+                                setIsOtherBank(false);
+                                setCustomBankName("");
+                                field.onChange(value);
+                              }
+                            }} 
+                            value={isOtherBank ? "other" : field.value}
+                          >
                             <FormControl>
                               <SelectTrigger data-testid="select-bank-name">
                                 <SelectValue placeholder="اختر البنك" />
@@ -576,6 +590,18 @@ export default function Register() {
                               ))}
                             </SelectContent>
                           </Select>
+                          {isOtherBank && (
+                            <Input
+                              placeholder="أدخل اسم البنك"
+                              value={customBankName}
+                              onChange={(e) => {
+                                setCustomBankName(e.target.value);
+                                field.onChange(e.target.value);
+                              }}
+                              className="mt-2"
+                              data-testid="input-custom-bank-name"
+                            />
+                          )}
                           <FormMessage />
                         </FormItem>
                       )}

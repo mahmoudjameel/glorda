@@ -61,6 +61,15 @@ export default function MerchantSettings() {
   const [ownerName, setOwnerName] = useState("");
   const [email, setEmail] = useState("");
   const [mobile, setMobile] = useState("");
+  
+  // Document upload states
+  const [commercialRegFile, setCommercialRegFile] = useState<File | null>(null);
+  const [nationalIdFile, setNationalIdFile] = useState<File | null>(null);
+  const [freelanceCertFile, setFreelanceCertFile] = useState<File | null>(null);
+  const [isUploadingDocs, setIsUploadingDocs] = useState(false);
+  const commercialRegInputRef = useRef<HTMLInputElement>(null);
+  const nationalIdInputRef = useRef<HTMLInputElement>(null);
+  const freelanceCertInputRef = useRef<HTMLInputElement>(null);
 
   const { data: profile, isLoading } = useQuery<Merchant>({
     queryKey: ["/api/merchant/profile"],
@@ -205,6 +214,60 @@ export default function MerchantSettings() {
       email: email.trim() || undefined,
       mobile: mobile.trim() || undefined
     });
+  };
+
+  const handleDocumentUpload = async () => {
+    if (!profile) return;
+    
+    const hasNewFiles = commercialRegFile || nationalIdFile || freelanceCertFile;
+    if (!hasNewFiles) {
+      toast({ variant: "destructive", title: "لم يتم اختيار أي ملف" });
+      return;
+    }
+
+    setIsUploadingDocs(true);
+    const formData = new FormData();
+    
+    if (profile.storeType === "company" || profile.storeType === "institution") {
+      if (commercialRegFile) {
+        formData.append("commercialRegistrationDoc", commercialRegFile);
+      }
+    } else if (profile.storeType === "individual") {
+      if (nationalIdFile) {
+        formData.append("nationalIdImage", nationalIdFile);
+      }
+      if (freelanceCertFile) {
+        formData.append("freelanceCertificateImage", freelanceCertFile);
+      }
+    }
+
+    try {
+      const res = await fetch("/api/merchant/documents", {
+        method: "POST",
+        credentials: "include",
+        body: formData
+      });
+
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || "فشل رفع المستندات");
+      }
+      
+      queryClient.invalidateQueries({ queryKey: ["/api/merchant/profile"] });
+      toast({ title: "تم تحديث المستندات بنجاح" });
+      
+      // Clear file selections
+      setCommercialRegFile(null);
+      setNationalIdFile(null);
+      setFreelanceCertFile(null);
+      if (commercialRegInputRef.current) commercialRegInputRef.current.value = "";
+      if (nationalIdInputRef.current) nationalIdInputRef.current.value = "";
+      if (freelanceCertInputRef.current) freelanceCertInputRef.current.value = "";
+    } catch (error: any) {
+      toast({ variant: "destructive", title: "خطأ", description: error.message });
+    } finally {
+      setIsUploadingDocs(false);
+    }
   };
 
   if (isLoading) {
@@ -505,7 +568,7 @@ export default function MerchantSettings() {
           </CardContent>
         </Card>
 
-        {/* Documents Section - Read Only */}
+        {/* Documents Section - Editable */}
         {profile && (
           <Card>
             <CardHeader>
@@ -514,7 +577,7 @@ export default function MerchantSettings() {
                 المستندات الرسمية
               </CardTitle>
               <CardDescription>
-                المستندات التي تم رفعها عند التسجيل - لتعديل المستندات يرجى التواصل مع الإدارة
+                المستندات التي تم رفعها عند التسجيل - يمكنك تحديث المستندات من هنا
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -538,23 +601,35 @@ export default function MerchantSettings() {
                   
                   <div className="space-y-2">
                     <Label>صورة السجل التجاري</Label>
-                    {profile.commercialRegistrationDoc ? (
+                    {profile.commercialRegistrationDoc && (
                       <a 
                         href={profile.commercialRegistrationDoc} 
                         target="_blank" 
                         rel="noopener noreferrer"
-                        className="flex items-center gap-2 p-3 border rounded-lg bg-green-50 border-green-200 hover:bg-green-100 transition-colors"
+                        className="flex items-center gap-2 p-3 border rounded-lg bg-green-50 border-green-200 hover:bg-green-100 transition-colors mb-2"
                         data-testid="link-commercial-doc"
                       >
                         <FileText className="h-5 w-5 text-green-600" />
-                        <span className="text-sm text-green-700 flex-1">عرض السجل التجاري</span>
+                        <span className="text-sm text-green-700 flex-1">عرض السجل التجاري الحالي</span>
                         <ExternalLink className="h-4 w-4 text-green-600" />
                       </a>
-                    ) : (
-                      <div className="p-3 bg-muted rounded-lg text-muted-foreground text-sm">
-                        لم يتم رفع صورة السجل التجاري
-                      </div>
                     )}
+                    <div className="space-y-2">
+                      <Label className="text-sm text-muted-foreground">
+                        {profile.commercialRegistrationDoc ? "تحديث صورة السجل التجاري" : "رفع صورة السجل التجاري"}
+                      </Label>
+                      <Input
+                        ref={commercialRegInputRef}
+                        type="file"
+                        accept="image/*,.pdf"
+                        onChange={(e) => setCommercialRegFile(e.target.files?.[0] || null)}
+                        className="cursor-pointer"
+                        data-testid="input-commercial-doc"
+                      />
+                      {commercialRegFile && (
+                        <p className="text-sm text-green-600">تم اختيار: {commercialRegFile.name}</p>
+                      )}
+                    </div>
                   </div>
                 </>
               )}
@@ -574,47 +649,93 @@ export default function MerchantSettings() {
                   <div className="grid md:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label>صورة الهوية الوطنية</Label>
-                      {profile.nationalIdImage ? (
+                      {profile.nationalIdImage && (
                         <a 
                           href={profile.nationalIdImage} 
                           target="_blank" 
                           rel="noopener noreferrer"
-                          className="flex items-center gap-2 p-3 border rounded-lg bg-green-50 border-green-200 hover:bg-green-100 transition-colors"
+                          className="flex items-center gap-2 p-3 border rounded-lg bg-green-50 border-green-200 hover:bg-green-100 transition-colors mb-2"
                           data-testid="link-national-id"
                         >
                           <Image className="h-5 w-5 text-green-600" />
-                          <span className="text-sm text-green-700 flex-1">عرض الهوية</span>
+                          <span className="text-sm text-green-700 flex-1">عرض الهوية الحالية</span>
                           <ExternalLink className="h-4 w-4 text-green-600" />
                         </a>
-                      ) : (
-                        <div className="p-3 bg-muted rounded-lg text-muted-foreground text-sm">
-                          لم يتم رفع صورة الهوية
-                        </div>
                       )}
+                      <div className="space-y-2">
+                        <Label className="text-sm text-muted-foreground">
+                          {profile.nationalIdImage ? "تحديث صورة الهوية" : "رفع صورة الهوية"}
+                        </Label>
+                        <Input
+                          ref={nationalIdInputRef}
+                          type="file"
+                          accept="image/*,.pdf"
+                          onChange={(e) => setNationalIdFile(e.target.files?.[0] || null)}
+                          className="cursor-pointer"
+                          data-testid="input-national-id"
+                        />
+                        {nationalIdFile && (
+                          <p className="text-sm text-green-600">تم اختيار: {nationalIdFile.name}</p>
+                        )}
+                      </div>
                     </div>
                     
                     <div className="space-y-2">
                       <Label>شهادة العمل الحر</Label>
-                      {profile.freelanceCertificateImage ? (
+                      {profile.freelanceCertificateImage && (
                         <a 
                           href={profile.freelanceCertificateImage} 
                           target="_blank" 
                           rel="noopener noreferrer"
-                          className="flex items-center gap-2 p-3 border rounded-lg bg-green-50 border-green-200 hover:bg-green-100 transition-colors"
+                          className="flex items-center gap-2 p-3 border rounded-lg bg-green-50 border-green-200 hover:bg-green-100 transition-colors mb-2"
                           data-testid="link-freelance-cert"
                         >
                           <FileText className="h-5 w-5 text-green-600" />
-                          <span className="text-sm text-green-700 flex-1">عرض الشهادة</span>
+                          <span className="text-sm text-green-700 flex-1">عرض الشهادة الحالية</span>
                           <ExternalLink className="h-4 w-4 text-green-600" />
                         </a>
-                      ) : (
-                        <div className="p-3 bg-muted rounded-lg text-muted-foreground text-sm">
-                          لم يتم رفع شهادة العمل الحر
-                        </div>
                       )}
+                      <div className="space-y-2">
+                        <Label className="text-sm text-muted-foreground">
+                          {profile.freelanceCertificateImage ? "تحديث شهادة العمل الحر" : "رفع شهادة العمل الحر"}
+                        </Label>
+                        <Input
+                          ref={freelanceCertInputRef}
+                          type="file"
+                          accept="image/*,.pdf"
+                          onChange={(e) => setFreelanceCertFile(e.target.files?.[0] || null)}
+                          className="cursor-pointer"
+                          data-testid="input-freelance-cert"
+                        />
+                        {freelanceCertFile && (
+                          <p className="text-sm text-green-600">تم اختيار: {freelanceCertFile.name}</p>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </>
+              )}
+              
+              {/* Save Documents Button */}
+              {(commercialRegFile || nationalIdFile || freelanceCertFile) && (
+                <Button
+                  onClick={handleDocumentUpload}
+                  disabled={isUploadingDocs}
+                  className="w-full mt-4"
+                  data-testid="button-save-documents"
+                >
+                  {isUploadingDocs ? (
+                    <>
+                      <Loader2 className="w-4 h-4 ml-2 animate-spin" />
+                      جاري الحفظ...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="w-4 h-4 ml-2" />
+                      حفظ المستندات
+                    </>
+                  )}
+                </Button>
               )}
             </CardContent>
           </Card>

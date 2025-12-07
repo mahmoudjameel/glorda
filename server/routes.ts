@@ -489,6 +489,57 @@ export async function registerRoutes(
     }
   });
 
+  // Update merchant documents
+  const merchantDocUpload = documentUpload.fields([
+    { name: "commercialRegistrationDoc", maxCount: 1 },
+    { name: "nationalIdImage", maxCount: 1 },
+    { name: "freelanceCertificateImage", maxCount: 1 }
+  ]);
+
+  app.post("/api/merchant/documents", requireMerchant, merchantDocUpload, async (req, res) => {
+    try {
+      const merchant = await storage.getMerchant(req.session.userId!);
+      if (!merchant) {
+        return res.status(404).json({ error: "لم يتم العثور على التاجر" });
+      }
+
+      const files = req.files as { [fieldname: string]: Express.Multer.File[] };
+      const updateData: Record<string, string> = {};
+
+      // Validate document type matches store type and reject mismatched uploads
+      if (merchant.storeType === "company" || merchant.storeType === "institution") {
+        // Reject individual documents for company/institution
+        if (files.nationalIdImage || files.freelanceCertificateImage) {
+          return res.status(400).json({ error: "نوع المستند غير مطابق لنوع الكيان" });
+        }
+        if (files.commercialRegistrationDoc?.[0]) {
+          updateData.commercialRegistrationDoc = `/uploads/documents/${files.commercialRegistrationDoc[0].filename}`;
+        }
+      } else if (merchant.storeType === "individual") {
+        // Reject company documents for individual
+        if (files.commercialRegistrationDoc) {
+          return res.status(400).json({ error: "نوع المستند غير مطابق لنوع الكيان" });
+        }
+        if (files.nationalIdImage?.[0]) {
+          updateData.nationalIdImage = `/uploads/documents/${files.nationalIdImage[0].filename}`;
+        }
+        if (files.freelanceCertificateImage?.[0]) {
+          updateData.freelanceCertificateImage = `/uploads/documents/${files.freelanceCertificateImage[0].filename}`;
+        }
+      }
+
+      if (Object.keys(updateData).length === 0) {
+        return res.status(400).json({ error: "لم يتم رفع أي مستندات صالحة" });
+      }
+
+      await storage.updateMerchant(req.session.userId!, updateData);
+      res.json({ success: true, message: "تم تحديث المستندات بنجاح" });
+    } catch (error) {
+      console.error("Document update error:", error);
+      res.status(500).json({ error: "فشل تحديث المستندات" });
+    }
+  });
+
   app.get("/api/merchant/stats", requireMerchant, async (req, res) => {
     try {
       const merchantId = req.session.userId!;

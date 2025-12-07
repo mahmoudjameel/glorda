@@ -140,7 +140,6 @@ export default function Register() {
       password: "",
       confirmPassword: "",
       acceptTerms: false,
-      category: "all",
     },
   });
 
@@ -191,6 +190,9 @@ export default function Register() {
           }
         }
       });
+      
+      // Set default category value
+      formData.append("category", "all");
       
       // Add document files based on store type
       if (values.storeType === "company" || values.storeType === "institution") {
@@ -338,53 +340,28 @@ export default function Register() {
                   />
                 </div>
 
-                <div className="grid md:grid-cols-2 gap-6">
-                  <FormField
-                    control={form.control}
-                    name="storeType"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>نوع الكيان</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
-                          <FormControl>
-                            <SelectTrigger data-testid="select-store-type">
-                              <SelectValue placeholder="اختر نوع الكيان" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent dir="rtl">
-                            <SelectItem value="individual">فرد / عمل حر</SelectItem>
-                            <SelectItem value="institution">مؤسسة</SelectItem>
-                            <SelectItem value="company">شركة</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="category"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>تصنيف المتجر</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
-                          <FormControl>
-                            <SelectTrigger data-testid="select-category">
-                              <SelectValue placeholder="اختر تصنيف المتجر" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent dir="rtl">
-                            <SelectItem value="flowers">ورود ومناسبات</SelectItem>
-                            <SelectItem value="gifts">هدايا</SelectItem>
-                            <SelectItem value="all">ورود وهدايا</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
+                <FormField
+                  control={form.control}
+                  name="storeType"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>نوع الكيان</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                          <SelectTrigger data-testid="select-store-type">
+                            <SelectValue placeholder="اختر نوع الكيان" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent dir="rtl">
+                          <SelectItem value="individual">فرد / عمل حر</SelectItem>
+                          <SelectItem value="institution">مؤسسة</SelectItem>
+                          <SelectItem value="company">شركة</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
                 {/* Documents section based on store type */}
                 {(storeType === "company" || storeType === "institution") && (

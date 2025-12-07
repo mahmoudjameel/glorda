@@ -38,9 +38,6 @@ const formSchema = z.object({
   storeType: z.enum(["company", "institution", "individual"], {
     required_error: "يرجى اختيار نوع المتجر",
   }),
-  category: z.enum(["flowers", "gifts", "all"], {
-    required_error: "يرجى اختيار تصنيف المتجر",
-  }),
   city: z.string().min(2, "المدينة مطلوبة"),
   registrationNumber: z.string().min(1, "رقم السجل / الوثيقة مطلوب"),
   deliveryMethod: z.enum(["representative", "pickup", "all"], {

@@ -151,9 +151,6 @@ export default function AdminLogin() {
           <p className="text-xs text-muted-foreground">
             هذه الصفحة مخصصة للموظفين المصرح لهم فقط.
           </p>
-          <p className="text-xs text-muted-foreground mt-2">
-            بيانات الدخول الافتراضية: admin@glorda.com / admin123
-          </p>
         </div>
       </div>
     </div>

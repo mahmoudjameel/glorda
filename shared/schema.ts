@@ -271,3 +271,27 @@ export const insertAppSettingSchema = createInsertSchema(appSettings).omit({
 
 export type InsertAppSetting = z.infer<typeof insertAppSettingSchema>;
 export type AppSetting = typeof appSettings.$inferSelect;
+
+// ========== Notifications Table ==========
+export const notifications = pgTable("notifications", {
+  id: serial("id").primaryKey(),
+  recipientType: text("recipient_type").notNull(),
+  recipientId: integer("recipient_id"),
+  title: text("title").notNull(),
+  body: text("body").notNull(),
+  actionType: text("action_type").notNull(),
+  actionRef: jsonb("action_ref").$type<Record<string, any>>(),
+  isRead: boolean("is_read").notNull().default(false),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  readAt: timestamp("read_at"),
+});
+
+export const insertNotificationSchema = createInsertSchema(notifications).omit({
+  id: true,
+  createdAt: true,
+  isRead: true,
+  readAt: true,
+});
+
+export type InsertNotification = z.infer<typeof insertNotificationSchema>;
+export type Notification = typeof notifications.$inferSelect;

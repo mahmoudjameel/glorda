@@ -21,6 +21,7 @@ import {
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import NotificationBell from "@/components/NotificationBell";
 import logoUrl from "@assets/شعار_غلوردا_1764881546720.jpg";
 
 interface DashboardLayoutProps {
@@ -146,7 +147,7 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
           </Button>
 
           <div className="flex items-center gap-4 mr-auto">
-            {/* Add Header Actions here if needed */}
+            <NotificationBell role={role} />
           </div>
         </header>
 

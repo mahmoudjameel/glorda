@@ -14,6 +14,7 @@ import {
   categories,
   cities,
   appSettings,
+  notifications,
   type Merchant, 
   type InsertMerchant,
   type Product,
@@ -37,7 +38,9 @@ import {
   type City,
   type InsertCity,
   type AppSetting,
-  type InsertAppSetting
+  type InsertAppSetting,
+  type Notification,
+  type InsertNotification
 } from "@shared/schema";
 
 const { Pool } = pg;
@@ -89,6 +92,7 @@ export interface IStorage {
   createReview(review: InsertReview): Promise<Review>;
   
   // Transactions
+  getTransactionById(id: number): Promise<Transaction | undefined>;
   getTransactionsByMerchant(merchantId: number): Promise<Transaction[]>;
   getAllTransactions(): Promise<Transaction[]>;
   createTransaction(transaction: InsertTransaction): Promise<Transaction>;
@@ -131,6 +135,15 @@ export interface IStorage {
   getSetting(key: string): Promise<AppSetting | undefined>;
   getAllSettings(): Promise<AppSetting[]>;
   setSetting(key: string, value?: string, valueJson?: any): Promise<AppSetting>;
+  
+  // Notifications
+  createNotification(notification: InsertNotification): Promise<Notification>;
+  getNotificationsForMerchant(merchantId: number): Promise<Notification[]>;
+  getNotificationsForAdmin(): Promise<Notification[]>;
+  getUnreadCountForMerchant(merchantId: number): Promise<number>;
+  getUnreadCountForAdmin(): Promise<number>;
+  markNotificationRead(id: number): Promise<void>;
+  markAllNotificationsRead(recipientType: string, recipientId?: number): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -421,6 +434,76 @@ export class DatabaseStorage implements IStorage {
       return (await this.getSetting(key))!;
     }
     const result = await db.insert(appSettings).values({ key, value, valueJson }).returning();
+    return result[0];
+  }
+
+  // ========== Notifications ==========
+  async createNotification(notification: InsertNotification): Promise<Notification> {
+    const result = await db.insert(notifications).values(notification as any).returning();
+    return result[0];
+  }
+
+  async getNotificationsForMerchant(merchantId: number): Promise<Notification[]> {
+    return await db.select().from(notifications).where(
+      and(
+        eq(notifications.recipientType, "merchant"),
+        eq(notifications.recipientId, merchantId)
+      )
+    ).orderBy(desc(notifications.createdAt)).limit(50);
+  }
+
+  async getNotificationsForAdmin(): Promise<Notification[]> {
+    return await db.select().from(notifications).where(
+      eq(notifications.recipientType, "admin")
+    ).orderBy(desc(notifications.createdAt)).limit(50);
+  }
+
+  async getUnreadCountForMerchant(merchantId: number): Promise<number> {
+    const result = await db.select({ count: sql<number>`count(*)` }).from(notifications).where(
+      and(
+        eq(notifications.recipientType, "merchant"),
+        eq(notifications.recipientId, merchantId),
+        eq(notifications.isRead, false)
+      )
+    );
+    return Number(result[0]?.count || 0);
+  }
+
+  async getUnreadCountForAdmin(): Promise<number> {
+    const result = await db.select({ count: sql<number>`count(*)` }).from(notifications).where(
+      and(
+        eq(notifications.recipientType, "admin"),
+        eq(notifications.isRead, false)
+      )
+    );
+    return Number(result[0]?.count || 0);
+  }
+
+  async markNotificationRead(id: number): Promise<void> {
+    await db.update(notifications).set({ isRead: true, readAt: new Date() }).where(eq(notifications.id, id));
+  }
+
+  async markAllNotificationsRead(recipientType: string, recipientId?: number): Promise<void> {
+    if (recipientType === "admin") {
+      await db.update(notifications).set({ isRead: true, readAt: new Date() }).where(
+        and(
+          eq(notifications.recipientType, "admin"),
+          eq(notifications.isRead, false)
+        )
+      );
+    } else if (recipientId) {
+      await db.update(notifications).set({ isRead: true, readAt: new Date() }).where(
+        and(
+          eq(notifications.recipientType, recipientType),
+          eq(notifications.recipientId, recipientId),
+          eq(notifications.isRead, false)
+        )
+      );
+    }
+  }
+
+  async getTransactionById(id: number): Promise<Transaction | undefined> {
+    const result = await db.select().from(transactions).where(eq(transactions.id, id)).limit(1);
     return result[0];
   }
 }

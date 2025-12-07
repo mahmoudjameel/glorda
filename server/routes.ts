@@ -217,6 +217,17 @@ export async function registerRoutes(
         nationalIdImage,
         freelanceCertificateImage
       });
+      
+      // Notify admin about new merchant registration
+      await storage.createNotification({
+        recipientType: "admin",
+        recipientId: null,
+        title: "طلب تسجيل متجر جديد",
+        body: `تم استلام طلب تسجيل متجر جديد: ${merchant.storeName}`,
+        actionType: "registration_request",
+        actionRef: { merchantId: merchant.id } as Record<string, any>
+      });
+      
       const { password, ...merchantData } = merchant;
       
       res.json({ 
@@ -839,6 +850,16 @@ export async function registerRoutes(
         status: "pending",
         description: "طلب سحب رصيد",
       });
+      
+      // Notify admin about new withdrawal request
+      await storage.createNotification({
+        recipientType: "admin",
+        recipientId: null,
+        title: "طلب سحب جديد",
+        body: `طلب سحب بمبلغ ${amount} ريال من ${merchant.storeName}`,
+        actionType: "withdrawal_request",
+        actionRef: { transactionId: transaction.id, merchantId: merchant.id } as Record<string, any>
+      });
 
       res.json(transaction);
     } catch (error) {
@@ -868,6 +889,25 @@ export async function registerRoutes(
       }
 
       await storage.updateMerchantStatus(merchantId, status);
+      
+      // Notify merchant about status change
+      const statusMessages: Record<string, string> = {
+        active: "تم تفعيل متجرك بنجاح! يمكنك الآن إضافة المنتجات واستقبال الطلبات",
+        suspended: "تم إيقاف متجرك. يرجى التواصل مع الإدارة",
+        review: "طلب تسجيل متجرك قيد المراجعة"
+      };
+      
+      if (statusMessages[status]) {
+        await storage.createNotification({
+          recipientType: "merchant",
+          recipientId: merchantId,
+          title: status === "active" ? "تم تفعيل متجرك" : status === "suspended" ? "تم إيقاف متجرك" : "قيد المراجعة",
+          body: statusMessages[status],
+          actionType: "status_change",
+          actionRef: { status } as Record<string, any>
+        });
+      }
+      
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ error: "فشل تحديث حالة التاجر" });
@@ -938,7 +978,25 @@ export async function registerRoutes(
         return res.status(400).json({ error: "حالة غير صالحة" });
       }
 
+      // Get transaction to find merchant
+      const transaction = await storage.getTransactionById(transactionId);
+      
       await storage.updateTransactionStatus(transactionId, status);
+      
+      // Notify merchant about withdrawal status
+      if (transaction) {
+        await storage.createNotification({
+          recipientType: "merchant",
+          recipientId: transaction.merchantId,
+          title: status === "completed" ? "تم تحويل المبلغ" : "تم رفض طلب السحب",
+          body: status === "completed" 
+            ? `تم تحويل مبلغ ${Math.abs(transaction.amount)} ريال إلى حسابك البنكي`
+            : "تم رفض طلب السحب. يرجى التواصل مع الإدارة",
+          actionType: "withdrawal_update",
+          actionRef: { transactionId, status } as Record<string, any>
+        });
+      }
+      
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ error: "فشل تحديث طلب السحب" });
@@ -1220,6 +1278,82 @@ export async function registerRoutes(
       res.json(setting || { key: req.params.key, value: null });
     } catch (error) {
       res.status(500).json({ error: "فشل جلب الإعداد" });
+    }
+  });
+
+  // ========== NOTIFICATIONS ROUTES ==========
+  
+  // Merchant notifications
+  app.get("/api/merchant/notifications", requireMerchant, async (req, res) => {
+    try {
+      const notifications = await storage.getNotificationsForMerchant(req.session.userId!);
+      res.json(notifications);
+    } catch (error) {
+      res.status(500).json({ error: "فشل جلب الإشعارات" });
+    }
+  });
+
+  app.get("/api/merchant/notifications/unread-count", requireMerchant, async (req, res) => {
+    try {
+      const count = await storage.getUnreadCountForMerchant(req.session.userId!);
+      res.json({ count });
+    } catch (error) {
+      res.status(500).json({ error: "فشل جلب عدد الإشعارات" });
+    }
+  });
+
+  app.patch("/api/merchant/notifications/:id/read", requireMerchant, async (req, res) => {
+    try {
+      await storage.markNotificationRead(parseInt(req.params.id));
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "فشل تحديث الإشعار" });
+    }
+  });
+
+  app.post("/api/merchant/notifications/read-all", requireMerchant, async (req, res) => {
+    try {
+      await storage.markAllNotificationsRead("merchant", req.session.userId!);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "فشل تحديث الإشعارات" });
+    }
+  });
+
+  // Admin notifications
+  app.get("/api/admin/notifications", requireAdmin, async (req, res) => {
+    try {
+      const notifications = await storage.getNotificationsForAdmin();
+      res.json(notifications);
+    } catch (error) {
+      res.status(500).json({ error: "فشل جلب الإشعارات" });
+    }
+  });
+
+  app.get("/api/admin/notifications/unread-count", requireAdmin, async (req, res) => {
+    try {
+      const count = await storage.getUnreadCountForAdmin();
+      res.json({ count });
+    } catch (error) {
+      res.status(500).json({ error: "فشل جلب عدد الإشعارات" });
+    }
+  });
+
+  app.patch("/api/admin/notifications/:id/read", requireAdmin, async (req, res) => {
+    try {
+      await storage.markNotificationRead(parseInt(req.params.id));
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "فشل تحديث الإشعار" });
+    }
+  });
+
+  app.post("/api/admin/notifications/read-all", requireAdmin, async (req, res) => {
+    try {
+      await storage.markAllNotificationsRead("admin");
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "فشل تحديث الإشعارات" });
     }
   });
 

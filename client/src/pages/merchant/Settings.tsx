@@ -12,7 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Store, Camera, Loader2, Save, User, Instagram, Facebook, Twitter, Globe, MapPin, Wallet, Building2, CreditCard, UserCircle, Mail, Phone, FileText, ChevronLeft } from "lucide-react";
+import { Store, Camera, Loader2, Save, User, Instagram, Facebook, Twitter, Globe, MapPin, Wallet, Building2, CreditCard, UserCircle, Mail, Phone, FileText, ChevronLeft, Image, ExternalLink } from "lucide-react";
 import { Link } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState, useRef, useEffect } from "react";
@@ -504,6 +504,121 @@ export default function MerchantSettings() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Documents Section - Read Only */}
+        {profile && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <FileText className="w-5 h-5" />
+                المستندات الرسمية
+              </CardTitle>
+              <CardDescription>
+                المستندات التي تم رفعها عند التسجيل - لتعديل المستندات يرجى التواصل مع الإدارة
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2 text-muted-foreground">
+                  نوع الكيان: {profile.storeType === "company" ? "شركة" : profile.storeType === "institution" ? "مؤسسة" : "فرد / عمل حر"}
+                </Label>
+              </div>
+              
+              {(profile.storeType === "company" || profile.storeType === "institution") && (
+                <>
+                  <div className="space-y-2">
+                    <Label className="flex items-center gap-2">
+                      <FileText className="w-4 h-4 text-muted-foreground" />
+                      رقم السجل التجاري
+                    </Label>
+                    <div className="p-3 bg-muted rounded-lg font-mono text-left" dir="ltr">
+                      {profile.registrationNumber}
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label>صورة السجل التجاري</Label>
+                    {profile.commercialRegistrationDoc ? (
+                      <a 
+                        href={profile.commercialRegistrationDoc} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2 p-3 border rounded-lg bg-green-50 border-green-200 hover:bg-green-100 transition-colors"
+                        data-testid="link-commercial-doc"
+                      >
+                        <FileText className="h-5 w-5 text-green-600" />
+                        <span className="text-sm text-green-700 flex-1">عرض السجل التجاري</span>
+                        <ExternalLink className="h-4 w-4 text-green-600" />
+                      </a>
+                    ) : (
+                      <div className="p-3 bg-muted rounded-lg text-muted-foreground text-sm">
+                        لم يتم رفع صورة السجل التجاري
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+              
+              {profile.storeType === "individual" && (
+                <>
+                  <div className="space-y-2">
+                    <Label className="flex items-center gap-2">
+                      <FileText className="w-4 h-4 text-muted-foreground" />
+                      رقم وثيقة العمل الحر
+                    </Label>
+                    <div className="p-3 bg-muted rounded-lg font-mono text-left" dir="ltr">
+                      {profile.registrationNumber}
+                    </div>
+                  </div>
+                  
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>صورة الهوية الوطنية</Label>
+                      {profile.nationalIdImage ? (
+                        <a 
+                          href={profile.nationalIdImage} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-2 p-3 border rounded-lg bg-green-50 border-green-200 hover:bg-green-100 transition-colors"
+                          data-testid="link-national-id"
+                        >
+                          <Image className="h-5 w-5 text-green-600" />
+                          <span className="text-sm text-green-700 flex-1">عرض الهوية</span>
+                          <ExternalLink className="h-4 w-4 text-green-600" />
+                        </a>
+                      ) : (
+                        <div className="p-3 bg-muted rounded-lg text-muted-foreground text-sm">
+                          لم يتم رفع صورة الهوية
+                        </div>
+                      )}
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label>شهادة العمل الحر</Label>
+                      {profile.freelanceCertificateImage ? (
+                        <a 
+                          href={profile.freelanceCertificateImage} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-2 p-3 border rounded-lg bg-green-50 border-green-200 hover:bg-green-100 transition-colors"
+                          data-testid="link-freelance-cert"
+                        >
+                          <FileText className="h-5 w-5 text-green-600" />
+                          <span className="text-sm text-green-700 flex-1">عرض الشهادة</span>
+                          <ExternalLink className="h-4 w-4 text-green-600" />
+                        </a>
+                      ) : (
+                        <div className="p-3 bg-muted rounded-lg text-muted-foreground text-sm">
+                          لم يتم رفع شهادة العمل الحر
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </>
+              )}
+            </CardContent>
+          </Card>
+        )}
 
         <Card>
           <CardHeader>

@@ -9,7 +9,7 @@ import {
   TableHeader, 
   TableRow 
 } from "@/components/ui/table";
-import { Search, MoreHorizontal, ShieldCheck, Ban, CheckCircle, Loader2, Store, Eye } from "lucide-react";
+import { Search, MoreHorizontal, ShieldCheck, Ban, CheckCircle, Loader2, Store, Eye, FileText, ExternalLink, Image } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -278,6 +278,68 @@ export default function AdminMerchants() {
                     <p className="font-medium">{new Date(selectedMerchant.createdAt).toLocaleDateString('ar-SA')}</p>
                   </div>
                 </div>
+                {/* Documents Section */}
+                <div className="border-t pt-4">
+                  <p className="text-sm text-muted-foreground mb-2 flex items-center gap-2">
+                    <FileText className="w-4 h-4" />
+                    المستندات الرسمية
+                  </p>
+                  {(selectedMerchant.storeType === "company" || selectedMerchant.storeType === "institution") && (
+                    <div className="space-y-2">
+                      {selectedMerchant.commercialRegistrationDoc ? (
+                        <a 
+                          href={selectedMerchant.commercialRegistrationDoc} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-2 p-2 border rounded bg-green-50 border-green-200 hover:bg-green-100 transition-colors w-fit"
+                          data-testid="link-commercial-doc"
+                        >
+                          <FileText className="h-4 w-4 text-green-600" />
+                          <span className="text-sm text-green-700">صورة السجل التجاري</span>
+                          <ExternalLink className="h-3 w-3 text-green-600" />
+                        </a>
+                      ) : (
+                        <p className="text-sm text-muted-foreground">لم يتم رفع السجل التجاري</p>
+                      )}
+                    </div>
+                  )}
+                  
+                  {selectedMerchant.storeType === "individual" && (
+                    <div className="flex flex-wrap gap-2">
+                      {selectedMerchant.nationalIdImage ? (
+                        <a 
+                          href={selectedMerchant.nationalIdImage} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-2 p-2 border rounded bg-green-50 border-green-200 hover:bg-green-100 transition-colors"
+                          data-testid="link-national-id"
+                        >
+                          <Image className="h-4 w-4 text-green-600" />
+                          <span className="text-sm text-green-700">صورة الهوية</span>
+                          <ExternalLink className="h-3 w-3 text-green-600" />
+                        </a>
+                      ) : (
+                        <p className="text-sm text-muted-foreground">لم يتم رفع الهوية</p>
+                      )}
+                      {selectedMerchant.freelanceCertificateImage ? (
+                        <a 
+                          href={selectedMerchant.freelanceCertificateImage} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-2 p-2 border rounded bg-green-50 border-green-200 hover:bg-green-100 transition-colors"
+                          data-testid="link-freelance-cert"
+                        >
+                          <FileText className="h-4 w-4 text-green-600" />
+                          <span className="text-sm text-green-700">شهادة العمل الحر</span>
+                          <ExternalLink className="h-3 w-3 text-green-600" />
+                        </a>
+                      ) : (
+                        <p className="text-sm text-muted-foreground">لم يتم رفع شهادة العمل الحر</p>
+                      )}
+                    </div>
+                  )}
+                </div>
+
                 {selectedMerchant.branches && selectedMerchant.branches.length > 0 && (
                   <div>
                     <p className="text-sm text-muted-foreground mb-2">الفروع</p>

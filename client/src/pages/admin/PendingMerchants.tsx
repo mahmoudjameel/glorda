@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { CheckCircle, XCircle, Loader2, Store, Eye, Clock, MapPin, Phone, Mail, Building, Truck } from "lucide-react";
+import { CheckCircle, XCircle, Loader2, Store, Eye, Clock, MapPin, Phone, Mail, Building, Truck, FileText, ExternalLink, Image } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -263,7 +263,11 @@ export default function PendingMerchants() {
                       <p className="font-medium">{storeTypeLabels[selectedMerchant.storeType]}</p>
                     </div>
                     <div className="space-y-1">
-                      <p className="text-sm text-muted-foreground">رقم السجل التجاري</p>
+                      <p className="text-sm text-muted-foreground">
+                        {(selectedMerchant.storeType === "company" || selectedMerchant.storeType === "institution") 
+                          ? "رقم السجل التجاري" 
+                          : "رقم وثيقة العمل الحر"}
+                      </p>
                       <p className="font-mono">{selectedMerchant.registrationNumber}</p>
                     </div>
                     <div className="space-y-1">
@@ -275,6 +279,75 @@ export default function PendingMerchants() {
                       <p className="font-medium">{deliveryMethodLabels[selectedMerchant.deliveryMethod]}</p>
                     </div>
                   </div>
+                </div>
+
+                {/* Documents Section */}
+                <div className="border-t pt-4">
+                  <h4 className="font-semibold mb-3 flex items-center gap-2">
+                    <FileText className="w-4 h-4" />
+                    المستندات الرسمية
+                  </h4>
+                  {(selectedMerchant.storeType === "company" || selectedMerchant.storeType === "institution") && (
+                    <div className="space-y-2">
+                      <p className="text-sm text-muted-foreground">صورة السجل التجاري</p>
+                      {selectedMerchant.commercialRegistrationDoc ? (
+                        <a 
+                          href={selectedMerchant.commercialRegistrationDoc} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-2 p-3 border rounded-lg bg-green-50 border-green-200 hover:bg-green-100 transition-colors w-fit"
+                          data-testid="link-commercial-doc"
+                        >
+                          <FileText className="h-5 w-5 text-green-600" />
+                          <span className="text-sm text-green-700">عرض السجل التجاري</span>
+                          <ExternalLink className="h-4 w-4 text-green-600" />
+                        </a>
+                      ) : (
+                        <p className="text-sm text-amber-600 bg-amber-50 p-2 rounded">لم يتم رفع صورة السجل التجاري</p>
+                      )}
+                    </div>
+                  )}
+                  
+                  {selectedMerchant.storeType === "individual" && (
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <p className="text-sm text-muted-foreground">صورة الهوية الوطنية</p>
+                        {selectedMerchant.nationalIdImage ? (
+                          <a 
+                            href={selectedMerchant.nationalIdImage} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-2 p-3 border rounded-lg bg-green-50 border-green-200 hover:bg-green-100 transition-colors"
+                            data-testid="link-national-id"
+                          >
+                            <Image className="h-5 w-5 text-green-600" />
+                            <span className="text-sm text-green-700">عرض الهوية</span>
+                            <ExternalLink className="h-4 w-4 text-green-600" />
+                          </a>
+                        ) : (
+                          <p className="text-sm text-amber-600 bg-amber-50 p-2 rounded">لم يتم رفع صورة الهوية</p>
+                        )}
+                      </div>
+                      <div className="space-y-2">
+                        <p className="text-sm text-muted-foreground">شهادة العمل الحر</p>
+                        {selectedMerchant.freelanceCertificateImage ? (
+                          <a 
+                            href={selectedMerchant.freelanceCertificateImage} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-2 p-3 border rounded-lg bg-green-50 border-green-200 hover:bg-green-100 transition-colors"
+                            data-testid="link-freelance-cert"
+                          >
+                            <FileText className="h-5 w-5 text-green-600" />
+                            <span className="text-sm text-green-700">عرض الشهادة</span>
+                            <ExternalLink className="h-4 w-4 text-green-600" />
+                          </a>
+                        ) : (
+                          <p className="text-sm text-amber-600 bg-amber-50 p-2 rounded">لم يتم رفع شهادة العمل الحر</p>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {selectedMerchant.branches && selectedMerchant.branches.length > 0 && (

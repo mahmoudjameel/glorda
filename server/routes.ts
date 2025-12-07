@@ -25,6 +25,35 @@ if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
 }
 
+// Configure multer for merchant document uploads
+const documentsDir = path.join(process.cwd(), "uploads", "documents");
+if (!fs.existsSync(documentsDir)) {
+  fs.mkdirSync(documentsDir, { recursive: true });
+}
+
+const documentStorage = multer.diskStorage({
+  destination: (_req, _file, cb) => {
+    cb(null, documentsDir);
+  },
+  filename: (_req, file, cb) => {
+    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
+    cb(null, uniqueSuffix + path.extname(file.originalname));
+  }
+});
+
+const documentUpload = multer({
+  storage: documentStorage,
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
+  fileFilter: (_req, file, cb) => {
+    const allowedTypes = ["image/jpeg", "image/png", "image/gif", "image/webp", "application/pdf"];
+    if (allowedTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error("نوع الملف غير مدعوم. يرجى رفع صورة أو ملف PDF"));
+    }
+  }
+});
+
 const productImageStorage = multer.diskStorage({
   destination: (_req, _file, cb) => {
     cb(null, uploadsDir);
@@ -113,19 +142,54 @@ export async function registerRoutes(
 
   // ========== AUTH ROUTES ==========
   
-  app.post("/api/auth/register", async (req, res) => {
+  const registerUpload = documentUpload.fields([
+    { name: "commercialRegDoc", maxCount: 1 },
+    { name: "nationalIdImage", maxCount: 1 },
+    { name: "freelanceCertImage", maxCount: 1 }
+  ]);
+  
+  app.post("/api/auth/register", registerUpload, async (req, res) => {
     try {
-      const data = insertMerchantSchema.parse(req.body);
+      // Parse branches if it's a JSON string (from FormData)
+      const bodyData = { ...req.body };
+      if (bodyData.branches && typeof bodyData.branches === "string") {
+        try {
+          bodyData.branches = JSON.parse(bodyData.branches);
+        } catch {
+          bodyData.branches = [];
+        }
+      }
+      
+      const data = insertMerchantSchema.parse(bodyData);
       
       const existing = await storage.getMerchantByEmail(data.email);
       if (existing) {
         return res.status(400).json({ error: "البريد الإلكتروني مستخدم بالفعل" });
       }
       
+      // Get file paths from uploaded files
+      const files = req.files as { [fieldname: string]: Express.Multer.File[] };
+      let commercialRegistrationDoc: string | null = null;
+      let nationalIdImage: string | null = null;
+      let freelanceCertificateImage: string | null = null;
+      
+      if (files?.commercialRegDoc?.[0]) {
+        commercialRegistrationDoc = `/uploads/documents/${files.commercialRegDoc[0].filename}`;
+      }
+      if (files?.nationalIdImage?.[0]) {
+        nationalIdImage = `/uploads/documents/${files.nationalIdImage[0].filename}`;
+      }
+      if (files?.freelanceCertImage?.[0]) {
+        freelanceCertificateImage = `/uploads/documents/${files.freelanceCertImage[0].filename}`;
+      }
+      
       const hashedPassword = await bcrypt.hash(data.password, 10);
       const merchant = await storage.createMerchant({
         ...data,
-        password: hashedPassword
+        password: hashedPassword,
+        commercialRegistrationDoc,
+        nationalIdImage,
+        freelanceCertificateImage
       });
       const { password, ...merchantData } = merchant;
       

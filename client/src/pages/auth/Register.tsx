@@ -14,7 +14,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Link, useLocation } from "wouter";
-import { Store, Plus, Trash2, Loader2, ChevronsUpDown, Check, Eye, EyeOff, FileText, Shield, BookOpen } from "lucide-react";
+import { Store, Plus, Trash2, Loader2, ChevronsUpDown, Check, Eye, EyeOff, FileText, Shield, BookOpen, Upload, X, Image } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery } from "@tanstack/react-query";
@@ -77,6 +77,9 @@ export default function Register() {
   const [showTermsDialog, setShowTermsDialog] = useState(false);
   const [customBankName, setCustomBankName] = useState("");
   const [isOtherBank, setIsOtherBank] = useState(false);
+  const [commercialRegDoc, setCommercialRegDoc] = useState<File | null>(null);
+  const [nationalIdImage, setNationalIdImage] = useState<File | null>(null);
+  const [freelanceCertImage, setFreelanceCertImage] = useState<File | null>(null);
 
   const { data: termsData } = useQuery({
     queryKey: ["/api/public/settings/merchant_terms_conditions"],
@@ -146,6 +149,7 @@ export default function Register() {
   });
 
   const deliveryMethod = form.watch("deliveryMethod");
+  const storeType = form.watch("storeType");
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsSubmitting(true);
@@ -153,11 +157,52 @@ export default function Register() {
     try {
       const { confirmPassword, acceptTerms, ...registerData } = values;
       
+      // Validate required documents based on store type
+      if (values.storeType === "company" || values.storeType === "institution") {
+        if (!commercialRegDoc) {
+          toast({
+            variant: "destructive",
+            title: "خطأ",
+            description: "يرجى رفع صورة السجل التجاري",
+          });
+          setIsSubmitting(false);
+          return;
+        }
+      } else if (values.storeType === "individual") {
+        if (!nationalIdImage || !freelanceCertImage) {
+          toast({
+            variant: "destructive",
+            title: "خطأ",
+            description: "يرجى رفع صورة الهوية الوطنية وشهادة العمل الحر",
+          });
+          setIsSubmitting(false);
+          return;
+        }
+      }
+      
+      const formData = new FormData();
+      Object.entries(registerData).forEach(([key, value]) => {
+        if (value !== undefined && value !== null) {
+          if (Array.isArray(value)) {
+            formData.append(key, JSON.stringify(value));
+          } else {
+            formData.append(key, String(value));
+          }
+        }
+      });
+      
+      // Add document files based on store type
+      if (values.storeType === "company" || values.storeType === "institution") {
+        if (commercialRegDoc) formData.append("commercialRegDoc", commercialRegDoc);
+      } else if (values.storeType === "individual") {
+        if (nationalIdImage) formData.append("nationalIdImage", nationalIdImage);
+        if (freelanceCertImage) formData.append("freelanceCertImage", freelanceCertImage);
+      }
+      
       const response = await fetch("/api/auth/register", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify(registerData),
+        body: formData,
       });
       
       const data = await response.json();
@@ -292,43 +337,191 @@ export default function Register() {
                   />
                 </div>
 
-                <div className="grid md:grid-cols-2 gap-6">
-                  <FormField
-                    control={form.control}
-                    name="storeType"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>نوع الكيان</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
-                          <FormControl>
-                            <SelectTrigger data-testid="select-store-type">
-                              <SelectValue placeholder="اختر نوع الكيان" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent dir="rtl">
-                            <SelectItem value="individual">فرد / عمل حر</SelectItem>
-                            <SelectItem value="institution">مؤسسة</SelectItem>
-                            <SelectItem value="company">شركة</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="registrationNumber"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>رقم السجل / وثيقة العمل الحر</FormLabel>
+                <FormField
+                  control={form.control}
+                  name="storeType"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>نوع الكيان</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
                         <FormControl>
-                          <Input placeholder="70xxxxxxxxx" {...field} className="font-mono text-right" data-testid="input-registration-number" />
+                          <SelectTrigger data-testid="select-store-type">
+                            <SelectValue placeholder="اختر نوع الكيان" />
+                          </SelectTrigger>
                         </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
+                        <SelectContent dir="rtl">
+                          <SelectItem value="individual">فرد / عمل حر</SelectItem>
+                          <SelectItem value="institution">مؤسسة</SelectItem>
+                          <SelectItem value="company">شركة</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {/* Documents section based on store type */}
+                {(storeType === "company" || storeType === "institution") && (
+                  <div className="space-y-4 p-4 border rounded-lg bg-muted/30">
+                    <h3 className="font-semibold text-base">مستندات {storeType === "company" ? "الشركة" : "المؤسسة"}</h3>
+                    <div className="grid md:grid-cols-2 gap-6">
+                      <FormField
+                        control={form.control}
+                        name="registrationNumber"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>رقم السجل التجاري</FormLabel>
+                            <FormControl>
+                              <Input placeholder="70xxxxxxxxx" {...field} className="font-mono text-right" data-testid="input-registration-number" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">صورة السجل التجاري *</label>
+                        <div className="relative">
+                          <input
+                            type="file"
+                            accept="image/*,.pdf"
+                            className="hidden"
+                            id="commercial-reg-upload"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) setCommercialRegDoc(file);
+                            }}
+                            data-testid="input-commercial-reg-doc"
+                          />
+                          {commercialRegDoc ? (
+                            <div className="flex items-center gap-2 p-3 border rounded-lg bg-green-50 border-green-200">
+                              <FileText className="h-5 w-5 text-green-600" />
+                              <span className="text-sm text-green-700 flex-1 truncate">{commercialRegDoc.name}</span>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setCommercialRegDoc(null)}
+                                className="h-8 w-8 p-0"
+                              >
+                                <X className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          ) : (
+                            <label
+                              htmlFor="commercial-reg-upload"
+                              className="flex flex-col items-center justify-center p-4 border-2 border-dashed rounded-lg cursor-pointer hover:border-primary transition-colors"
+                            >
+                              <Upload className="h-8 w-8 text-muted-foreground mb-2" />
+                              <span className="text-sm text-muted-foreground">اضغط لرفع صورة السجل</span>
+                              <span className="text-xs text-muted-foreground mt-1">صورة أو PDF</span>
+                            </label>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {storeType === "individual" && (
+                  <div className="space-y-4 p-4 border rounded-lg bg-muted/30">
+                    <h3 className="font-semibold text-base">مستندات العمل الحر</h3>
+                    <FormField
+                      control={form.control}
+                      name="registrationNumber"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>رقم وثيقة العمل الحر</FormLabel>
+                          <FormControl>
+                            <Input placeholder="رقم الوثيقة" {...field} className="font-mono text-right" data-testid="input-registration-number" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <div className="grid md:grid-cols-2 gap-6">
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">صورة الهوية الوطنية *</label>
+                        <div className="relative">
+                          <input
+                            type="file"
+                            accept="image/*,.pdf"
+                            className="hidden"
+                            id="national-id-upload"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) setNationalIdImage(file);
+                            }}
+                            data-testid="input-national-id"
+                          />
+                          {nationalIdImage ? (
+                            <div className="flex items-center gap-2 p-3 border rounded-lg bg-green-50 border-green-200">
+                              <Image className="h-5 w-5 text-green-600" />
+                              <span className="text-sm text-green-700 flex-1 truncate">{nationalIdImage.name}</span>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setNationalIdImage(null)}
+                                className="h-8 w-8 p-0"
+                              >
+                                <X className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          ) : (
+                            <label
+                              htmlFor="national-id-upload"
+                              className="flex flex-col items-center justify-center p-4 border-2 border-dashed rounded-lg cursor-pointer hover:border-primary transition-colors"
+                            >
+                              <Upload className="h-8 w-8 text-muted-foreground mb-2" />
+                              <span className="text-sm text-muted-foreground">اضغط لرفع صورة الهوية</span>
+                              <span className="text-xs text-muted-foreground mt-1">صورة أو PDF</span>
+                            </label>
+                          )}
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">صورة شهادة العمل الحر *</label>
+                        <div className="relative">
+                          <input
+                            type="file"
+                            accept="image/*,.pdf"
+                            className="hidden"
+                            id="freelance-cert-upload"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) setFreelanceCertImage(file);
+                            }}
+                            data-testid="input-freelance-cert"
+                          />
+                          {freelanceCertImage ? (
+                            <div className="flex items-center gap-2 p-3 border rounded-lg bg-green-50 border-green-200">
+                              <FileText className="h-5 w-5 text-green-600" />
+                              <span className="text-sm text-green-700 flex-1 truncate">{freelanceCertImage.name}</span>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setFreelanceCertImage(null)}
+                                className="h-8 w-8 p-0"
+                              >
+                                <X className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          ) : (
+                            <label
+                              htmlFor="freelance-cert-upload"
+                              className="flex flex-col items-center justify-center p-4 border-2 border-dashed rounded-lg cursor-pointer hover:border-primary transition-colors"
+                            >
+                              <Upload className="h-8 w-8 text-muted-foreground mb-2" />
+                              <span className="text-sm text-muted-foreground">اضغط لرفع شهادة العمل الحر</span>
+                              <span className="text-xs text-muted-foreground mt-1">صورة أو PDF</span>
+                            </label>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 <FormField
                   control={form.control}

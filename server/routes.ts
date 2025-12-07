@@ -93,7 +93,7 @@ export async function registerRoutes(
   const isReplit = !!process.env.REPL_SLUG;
   
   if (isProduction && !process.env.SESSION_SECRET) {
-    console.warn("WARNING: SESSION_SECRET is not set. Using default secret is NOT secure for production!");
+    throw new Error("SESSION_SECRET is required in production mode");
   }
   
   if (isProduction && !process.env.DATABASE_URL) {
@@ -162,6 +162,11 @@ export async function registerRoutes(
       
       const data = insertMerchantSchema.parse(bodyData);
       
+      // Validate username is English only (letters, numbers, underscore)
+      if (data.username && !/^[a-zA-Z0-9_]+$/.test(data.username)) {
+        return res.status(400).json({ error: "اسم المستخدم يجب أن يكون بالإنجليزية فقط (أحرف، أرقام، شرطة سفلية)" });
+      }
+      
       const existing = await storage.getMerchantByEmail(data.email);
       if (existing) {
         return res.status(400).json({ error: "البريد الإلكتروني مستخدم بالفعل" });
@@ -181,6 +186,27 @@ export async function registerRoutes(
       }
       if (files?.freelanceCertImage?.[0]) {
         freelanceCertificateImage = `/uploads/documents/${files.freelanceCertImage[0].filename}`;
+      }
+      
+      // Validate storeType is valid
+      const storeType = data.storeType;
+      const validStoreTypes = ["company", "institution", "individual"];
+      if (!storeType || !validStoreTypes.includes(storeType)) {
+        return res.status(400).json({ error: "نوع المتجر غير صالح" });
+      }
+      
+      // Validate required documents based on store type
+      if (storeType === "company" || storeType === "institution") {
+        if (!commercialRegistrationDoc) {
+          return res.status(400).json({ error: "السجل التجاري مطلوب للشركات والمؤسسات" });
+        }
+      } else if (storeType === "individual") {
+        if (!nationalIdImage) {
+          return res.status(400).json({ error: "صورة الهوية الوطنية مطلوبة للأفراد" });
+        }
+        if (!freelanceCertificateImage) {
+          return res.status(400).json({ error: "وثيقة العمل الحر مطلوبة للأفراد" });
+        }
       }
       
       const hashedPassword = await bcrypt.hash(data.password, 10);

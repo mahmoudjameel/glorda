@@ -66,3 +66,44 @@ Preferred communication style: Simple, everyday language.
 - Vite HMR over WebSocket at `/vite-hmr` path
 
 **Build Output**: Client builds to `dist/public`, server bundles to `dist/index.cjs`. Static files served by Express in production with SPA fallback to index.html.
+
+# Deployment Guide (External Hosting)
+
+## Required Environment Variables
+
+The following environment variables must be configured for production deployment:
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `DATABASE_URL` | Yes | PostgreSQL connection string |
+| `SESSION_SECRET` | Yes | Secure random string for session encryption (min 32 chars) |
+| `NODE_ENV` | Yes | Set to `production` for production builds |
+| `PORT` | No | Server port (default: 5000) |
+
+## Build & Deploy Steps
+
+1. **Install dependencies**: `npm install`
+2. **Build the application**: `npm run build`
+3. **Run database migrations**: `npm run db:push`
+4. **Start the server**: `npm start`
+
+## File Storage
+
+Uploaded files are stored in the `uploads/` directory:
+- `uploads/documents/` - Merchant registration documents
+- `uploads/products/` - Product images
+
+For cloud deployment, configure persistent storage or mount a volume at `/uploads`.
+
+## Admin Access
+
+Default admin account: `admin@glorda.com`
+Change the password immediately after first login.
+
+## Security Notes
+
+- All passwords are hashed with bcryptjs
+- Sessions stored in PostgreSQL (production) with secure cookies
+- Username validation: English characters only
+- Document validation: Entity-specific requirements enforced server-side
+- HTTPS required in production (set secure cookies)

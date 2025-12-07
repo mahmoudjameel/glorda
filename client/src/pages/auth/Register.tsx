@@ -582,7 +582,7 @@ export default function Register() {
                                 <SelectValue placeholder="اختر البنك" />
                               </SelectTrigger>
                             </FormControl>
-                            <SelectContent>
+                            <SelectContent position="popper" className="max-h-[300px]">
                               {saudiBanks.map((bank) => (
                                 <SelectItem key={bank.value} value={bank.value}>
                                   {bank.label}

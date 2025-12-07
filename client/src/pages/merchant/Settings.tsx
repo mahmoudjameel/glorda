@@ -449,7 +449,7 @@ export default function MerchantSettings() {
                 <SelectTrigger id="bankName" data-testid="select-bank-name">
                   <SelectValue placeholder="اختر البنك" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent position="popper" className="max-h-[300px]">
                   {saudiBanks.map((bank) => (
                     <SelectItem key={bank.value} value={bank.value}>
                       {bank.label}

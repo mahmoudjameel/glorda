@@ -1,6 +1,39 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
+/* GE SS Unique Font - Self hosted */
+@font-face {
+  font-family: 'GE SS Unique';
+  src: url('/fonts/GE-SS-Unique-Light.otf') format('opentype');
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'GE SS Unique';
+  src: url('/fonts/GE-SS-Unique-Medium.otf') format('opentype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'GE SS Unique';
+  src: url('/fonts/GE-SS-Unique-Medium.otf') format('opentype');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'GE SS Unique';
+  src: url('/fonts/GE-SS-Unique-Bold.otf') format('opentype');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
@@ -52,8 +85,8 @@
   --color-sidebar-border: hsl(var(--sidebar-border));
   --color-sidebar-ring: hsl(var(--sidebar-ring));
 
-  --font-sans: 'Cairo', sans-serif;
-  --font-display: 'Cairo', sans-serif;
+  --font-sans: 'GE SS Unique', 'Cairo', sans-serif;
+  --font-display: 'GE SS Unique', 'Cairo', sans-serif;
 }
 
 :root {

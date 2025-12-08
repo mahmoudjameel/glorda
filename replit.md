@@ -97,8 +97,11 @@ For cloud deployment, configure persistent storage or mount a volume at `/upload
 
 ## Admin Access
 
-Default admin account: `admin@glorda.com`
-Change the password immediately after first login.
+Create your first admin account by connecting to the database and running:
+```sql
+INSERT INTO admins (email, password, name) VALUES ('your-email@example.com', 'bcrypt-hashed-password', 'اسم المدير');
+```
+Use bcryptjs to hash passwords before insertion.
 
 ## Security Notes
 

@@ -1357,25 +1357,5 @@ export async function registerRoutes(
     }
   });
 
-  // ========== SEED DEFAULT ADMIN ==========
-  const seedAdmin = async () => {
-    try {
-      const existingAdmin = await storage.getAdminByEmail("admin@glorda.com");
-      if (!existingAdmin) {
-        const hashedPassword = await bcrypt.hash("admin123", 10);
-        await storage.createAdmin({
-          email: "admin@glorda.com",
-          password: hashedPassword,
-          name: "مدير النظام"
-        });
-        console.log("Default admin created: admin@glorda.com / admin123");
-      }
-    } catch (error) {
-      console.error("Failed to seed admin:", error);
-    }
-  };
-  
-  seedAdmin();
-
   return httpServer;
 }

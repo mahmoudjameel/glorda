@@ -15,7 +15,14 @@ import {
   DialogTrigger,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { Image, Grid3X3, Plus, Trash2, Loader2, Edit, GripVertical, MapPin, ChevronsUpDown, Check } from "lucide-react";
+import { Image, Grid3X3, Plus, Trash2, Loader2, Edit, GripVertical, MapPin, ChevronsUpDown, Check, Tag, Percent, DollarSign, Truck } from "lucide-react";
+import { 
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -52,6 +59,19 @@ interface City {
   nameEn: string | null;
   isActive: boolean;
   sortOrder: number;
+  createdAt: string;
+}
+
+interface DiscountCode {
+  id: number;
+  code: string;
+  type: "percentage" | "fixed" | "free_shipping";
+  value: number;
+  minOrderAmount: number | null;
+  maxUses: number | null;
+  usedCount: number;
+  isActive: boolean;
+  expiresAt: string | null;
   createdAt: string;
 }
 
@@ -92,6 +112,18 @@ export default function AppSettings() {
     sortOrder: 0
   });
 
+  const [isDiscountOpen, setIsDiscountOpen] = useState(false);
+  const [editingDiscount, setEditingDiscount] = useState<DiscountCode | null>(null);
+  const [discountForm, setDiscountForm] = useState({
+    code: "",
+    type: "percentage" as "percentage" | "fixed" | "free_shipping",
+    value: 0,
+    minOrderAmount: 0,
+    maxUses: null as number | null,
+    isActive: true,
+    expiresAt: ""
+  });
+
   const { data: banners = [], isLoading: loadingBanners } = useQuery<Banner[]>({
     queryKey: ["/api/admin/banners"],
     queryFn: async () => {
@@ -115,6 +147,15 @@ export default function AppSettings() {
     queryFn: async () => {
       const res = await fetch("/api/admin/cities", { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch cities");
+      return res.json();
+    }
+  });
+
+  const { data: discountCodes = [], isLoading: loadingDiscounts } = useQuery<DiscountCode[]>({
+    queryKey: ["/api/admin/discount-codes"],
+    queryFn: async () => {
+      const res = await fetch("/api/admin/discount-codes", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch discount codes");
       return res.json();
     }
   });
@@ -346,6 +387,75 @@ export default function AppSettings() {
     }
   });
 
+  const createDiscountMutation = useMutation({
+    mutationFn: async (data: typeof discountForm) => {
+      const res = await fetch("/api/admin/discount-codes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ ...data, expiresAt: data.expiresAt || null })
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || "Failed to create discount code");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/discount-codes"] });
+      toast({ title: "تم إضافة كود الخصم بنجاح", className: "bg-emerald-50 border-emerald-200 text-emerald-800" });
+      setIsDiscountOpen(false);
+      resetDiscountForm();
+    },
+    onError: (error: Error) => {
+      toast({ variant: "destructive", title: error.message });
+    }
+  });
+
+  const updateDiscountMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: number; data: Partial<typeof discountForm> }) => {
+      const res = await fetch(`/api/admin/discount-codes/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ ...data, expiresAt: data.expiresAt || null })
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || "Failed to update discount code");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/discount-codes"] });
+      toast({ title: "تم تحديث كود الخصم بنجاح", className: "bg-emerald-50 border-emerald-200 text-emerald-800" });
+      setIsDiscountOpen(false);
+      setEditingDiscount(null);
+      resetDiscountForm();
+    },
+    onError: (error: Error) => {
+      toast({ variant: "destructive", title: error.message });
+    }
+  });
+
+  const deleteDiscountMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const res = await fetch(`/api/admin/discount-codes/${id}`, {
+        method: "DELETE",
+        credentials: "include"
+      });
+      if (!res.ok) throw new Error("Failed to delete discount code");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/discount-codes"] });
+      toast({ title: "تم حذف كود الخصم" });
+    },
+    onError: () => {
+      toast({ variant: "destructive", title: "فشل حذف كود الخصم" });
+    }
+  });
+
   const resetBannerForm = () => {
     setBannerForm({ title: "", image: "", link: "", isActive: true, sortOrder: 0 });
   };
@@ -356,6 +466,71 @@ export default function AppSettings() {
 
   const resetCityForm = () => {
     setCityForm({ name: "", nameEn: "", isActive: true, sortOrder: 0 });
+  };
+
+  const resetDiscountForm = () => {
+    setDiscountForm({
+      code: "",
+      type: "percentage",
+      value: 0,
+      minOrderAmount: 0,
+      maxUses: null,
+      isActive: true,
+      expiresAt: ""
+    });
+  };
+
+  const handleDiscountSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!discountForm.code) {
+      toast({ variant: "destructive", title: "اسم الكود مطلوب" });
+      return;
+    }
+    if (discountForm.type !== "free_shipping" && discountForm.value <= 0) {
+      toast({ variant: "destructive", title: "قيمة الخصم يجب أن تكون أكبر من صفر" });
+      return;
+    }
+    if (discountForm.type === "percentage" && discountForm.value > 100) {
+      toast({ variant: "destructive", title: "نسبة الخصم لا يمكن أن تتجاوز 100%" });
+      return;
+    }
+    if (editingDiscount) {
+      updateDiscountMutation.mutate({ id: editingDiscount.id, data: discountForm });
+    } else {
+      createDiscountMutation.mutate(discountForm);
+    }
+  };
+
+  const openEditDiscount = (discount: DiscountCode) => {
+    setEditingDiscount(discount);
+    setDiscountForm({
+      code: discount.code,
+      type: discount.type,
+      value: discount.value,
+      minOrderAmount: discount.minOrderAmount || 0,
+      maxUses: discount.maxUses,
+      isActive: discount.isActive,
+      expiresAt: discount.expiresAt ? new Date(discount.expiresAt).toISOString().split("T")[0] : ""
+    });
+    setIsDiscountOpen(true);
+  };
+
+  const getDiscountTypeLabel = (type: string) => {
+    switch (type) {
+      case "percentage": return "نسبة مئوية";
+      case "fixed": return "قيمة ثابتة";
+      case "free_shipping": return "شحن مجاني";
+      default: return type;
+    }
+  };
+
+  const getDiscountTypeIcon = (type: string) => {
+    switch (type) {
+      case "percentage": return <Percent className="w-4 h-4" />;
+      case "fixed": return <DollarSign className="w-4 h-4" />;
+      case "free_shipping": return <Truck className="w-4 h-4" />;
+      default: return <Tag className="w-4 h-4" />;
+    }
   };
 
   const handleEditCity = (city: City) => {
@@ -439,7 +614,7 @@ export default function AppSettings() {
         </div>
 
         <Tabs defaultValue="banners" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3 max-w-xl">
+          <TabsList className="grid w-full grid-cols-4 max-w-2xl">
             <TabsTrigger value="banners" className="gap-2">
               <Image className="w-4 h-4" />
               البانرات
@@ -451,6 +626,10 @@ export default function AppSettings() {
             <TabsTrigger value="cities" className="gap-2">
               <MapPin className="w-4 h-4" />
               المدن
+            </TabsTrigger>
+            <TabsTrigger value="discounts" className="gap-2">
+              <Tag className="w-4 h-4" />
+              أكواد الخصم
             </TabsTrigger>
           </TabsList>
 
@@ -896,6 +1075,243 @@ export default function AppSettings() {
                                   onClick={() => deleteCityMutation.mutate(city.id)}
                                   disabled={deleteCityMutation.isPending}
                                   data-testid={`button-delete-city-${city.id}`}
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="discounts">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <Tag className="w-5 h-5" />
+                    أكواد الخصم
+                  </CardTitle>
+                  <CardDescription className="mt-2">
+                    إدارة أكواد الخصم للتطبيق
+                  </CardDescription>
+                </div>
+                <Dialog open={isDiscountOpen} onOpenChange={(open) => {
+                  setIsDiscountOpen(open);
+                  if (!open) {
+                    setEditingDiscount(null);
+                    resetDiscountForm();
+                  }
+                }}>
+                  <DialogTrigger asChild>
+                    <Button className="gap-2" data-testid="button-add-discount">
+                      <Plus className="w-4 h-4" />
+                      إضافة كود خصم
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-md">
+                    <DialogHeader>
+                      <DialogTitle>{editingDiscount ? "تعديل كود الخصم" : "إضافة كود خصم جديد"}</DialogTitle>
+                      <DialogDescription>
+                        {editingDiscount ? "عدّل بيانات كود الخصم" : "أدخل بيانات كود الخصم الجديد"}
+                      </DialogDescription>
+                    </DialogHeader>
+                    <form onSubmit={handleDiscountSubmit} className="space-y-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="discountCode">اسم الكود</Label>
+                        <Input
+                          id="discountCode"
+                          placeholder="مثال: SAVE20"
+                          value={discountForm.code}
+                          onChange={(e) => setDiscountForm(prev => ({ ...prev, code: e.target.value.toUpperCase() }))}
+                          data-testid="input-discount-code"
+                          className="font-mono"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>نوع الخصم</Label>
+                        <Select
+                          value={discountForm.type}
+                          onValueChange={(value: "percentage" | "fixed" | "free_shipping") => 
+                            setDiscountForm(prev => ({ ...prev, type: value, value: value === "free_shipping" ? 0 : prev.value }))
+                          }
+                        >
+                          <SelectTrigger data-testid="select-discount-type">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="percentage">
+                              <div className="flex items-center gap-2">
+                                <Percent className="w-4 h-4" />
+                                نسبة مئوية
+                              </div>
+                            </SelectItem>
+                            <SelectItem value="fixed">
+                              <div className="flex items-center gap-2">
+                                <DollarSign className="w-4 h-4" />
+                                قيمة ثابتة
+                              </div>
+                            </SelectItem>
+                            <SelectItem value="free_shipping">
+                              <div className="flex items-center gap-2">
+                                <Truck className="w-4 h-4" />
+                                شحن مجاني
+                              </div>
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      {discountForm.type !== "free_shipping" && (
+                        <div className="space-y-2">
+                          <Label htmlFor="discountValue">
+                            {discountForm.type === "percentage" ? "نسبة الخصم (%)" : "قيمة الخصم (ريال)"}
+                          </Label>
+                          <Input
+                            id="discountValue"
+                            type="number"
+                            min="0"
+                            max={discountForm.type === "percentage" ? 100 : undefined}
+                            placeholder={discountForm.type === "percentage" ? "مثال: 20" : "مثال: 50"}
+                            value={discountForm.value || ""}
+                            onChange={(e) => setDiscountForm(prev => ({ ...prev, value: parseInt(e.target.value) || 0 }))}
+                            data-testid="input-discount-value"
+                          />
+                        </div>
+                      )}
+                      <div className="space-y-2">
+                        <Label htmlFor="minOrderAmount">الحد الأدنى للطلب (ريال) - اختياري</Label>
+                        <Input
+                          id="minOrderAmount"
+                          type="number"
+                          min="0"
+                          placeholder="مثال: 100"
+                          value={discountForm.minOrderAmount || ""}
+                          onChange={(e) => setDiscountForm(prev => ({ ...prev, minOrderAmount: parseInt(e.target.value) || 0 }))}
+                          data-testid="input-min-order"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="maxUses">الحد الأقصى للاستخدام - اختياري</Label>
+                        <Input
+                          id="maxUses"
+                          type="number"
+                          min="1"
+                          placeholder="اتركه فارغاً لاستخدام غير محدود"
+                          value={discountForm.maxUses || ""}
+                          onChange={(e) => setDiscountForm(prev => ({ ...prev, maxUses: e.target.value ? parseInt(e.target.value) : null }))}
+                          data-testid="input-max-uses"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="expiresAt">تاريخ الانتهاء - اختياري</Label>
+                        <Input
+                          id="expiresAt"
+                          type="date"
+                          value={discountForm.expiresAt}
+                          onChange={(e) => setDiscountForm(prev => ({ ...prev, expiresAt: e.target.value }))}
+                          data-testid="input-expires-at"
+                        />
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <Label htmlFor="isActive">نشط</Label>
+                        <Switch
+                          id="isActive"
+                          checked={discountForm.isActive}
+                          onCheckedChange={(checked) => setDiscountForm(prev => ({ ...prev, isActive: checked }))}
+                          data-testid="switch-is-active"
+                        />
+                      </div>
+                      <DialogFooter>
+                        <Button 
+                          type="submit" 
+                          disabled={createDiscountMutation.isPending || updateDiscountMutation.isPending} 
+                          data-testid="button-submit-discount"
+                        >
+                          {(createDiscountMutation.isPending || updateDiscountMutation.isPending) && 
+                            <Loader2 className="w-4 h-4 animate-spin ml-2" />
+                          }
+                          {editingDiscount ? "حفظ التغييرات" : "إضافة الكود"}
+                        </Button>
+                      </DialogFooter>
+                    </form>
+                  </DialogContent>
+                </Dialog>
+              </CardHeader>
+              <CardContent>
+                {loadingDiscounts ? (
+                  <div className="flex justify-center py-12">
+                    <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+                  </div>
+                ) : discountCodes.length === 0 ? (
+                  <div className="text-center py-12 border rounded-lg bg-muted/20">
+                    <Tag className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                    <h3 className="font-semibold text-lg">لا توجد أكواد خصم</h3>
+                    <p className="text-muted-foreground">قم بإضافة كود خصم جديد للبدء</p>
+                  </div>
+                ) : (
+                  <div className="rounded-md border">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="text-right">الكود</TableHead>
+                          <TableHead className="text-right">النوع</TableHead>
+                          <TableHead className="text-right">القيمة</TableHead>
+                          <TableHead className="text-right">الاستخدام</TableHead>
+                          <TableHead className="text-right">الحالة</TableHead>
+                          <TableHead className="text-right">إجراءات</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {discountCodes.map((discount) => (
+                          <TableRow key={discount.id} data-testid={`row-discount-${discount.id}`}>
+                            <TableCell className="font-mono font-bold">{discount.code}</TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-2">
+                                {getDiscountTypeIcon(discount.type)}
+                                {getDiscountTypeLabel(discount.type)}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              {discount.type === "percentage" ? `${discount.value}%` :
+                               discount.type === "fixed" ? `${discount.value} ريال` : "-"}
+                            </TableCell>
+                            <TableCell>
+                              {discount.maxUses 
+                                ? `${discount.usedCount}/${discount.maxUses}`
+                                : `${discount.usedCount} (غير محدود)`
+                              }
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant={discount.isActive ? "default" : "secondary"}>
+                                {discount.isActive ? "نشط" : "غير نشط"}
+                              </Badge>
+                              {discount.expiresAt && new Date(discount.expiresAt) < new Date() && (
+                                <Badge variant="destructive" className="mr-2">منتهي</Badge>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-1">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => openEditDiscount(discount)}
+                                  data-testid={`button-edit-discount-${discount.id}`}
+                                >
+                                  <Edit className="w-4 h-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                                  onClick={() => deleteDiscountMutation.mutate(discount.id)}
+                                  disabled={deleteDiscountMutation.isPending}
+                                  data-testid={`button-delete-discount-${discount.id}`}
                                 >
                                   <Trash2 className="w-4 h-4" />
                                 </Button>

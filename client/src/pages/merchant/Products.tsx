@@ -19,7 +19,7 @@ import {
   DialogTitle, 
   DialogTrigger 
 } from "@/components/ui/dialog";
-import { Plus, Search, MoreHorizontal, Edit, Trash, Loader2, Package, Upload, X, ImageIcon } from "lucide-react";
+import { Plus, Search, MoreHorizontal, Edit, Trash, Loader2, Package, Upload, X, ImageIcon, ListPlus, Type, ToggleLeft } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Label } from "@/components/ui/label";
@@ -28,6 +28,21 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState, useRef } from "react";
 import { useToast } from "@/hooks/use-toast";
 import type { Product } from "@shared/schema";
+import { Switch } from "@/components/ui/switch";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
+
+interface ProductOptionChoice {
+  label: string;
+}
+
+interface ProductOption {
+  type: "multiple_choice" | "text" | "single";
+  title: string;
+  placeholder?: string;
+  required: boolean;
+  choices?: ProductOptionChoice[];
+}
 
 interface Category {
   id: number;
@@ -45,6 +60,7 @@ export default function MerchantProducts() {
   const [searchQuery, setSearchQuery] = useState("");
   const [images, setImages] = useState<string[]>([]);
   const [isUploading, setIsUploading] = useState(false);
+  const [productOptions, setProductOptions] = useState<ProductOption[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -145,7 +161,10 @@ export default function MerchantProducts() {
       if (!res.ok) throw new Error("Failed to create product");
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: async (product) => {
+      if (productOptions.length > 0) {
+        await saveProductOptions(product.id);
+      }
       queryClient.invalidateQueries({ queryKey: ["/api/merchant/products"] });
       setIsAddOpen(false);
       resetForm();
@@ -165,9 +184,10 @@ export default function MerchantProducts() {
         body: JSON.stringify(data)
       });
       if (!res.ok) throw new Error("Failed to update product");
-      return res.json();
+      return { ...data, id };
     },
-    onSuccess: () => {
+    onSuccess: async (result) => {
+      await saveProductOptions(result.id);
       queryClient.invalidateQueries({ queryKey: ["/api/merchant/products"] });
       setIsEditOpen(false);
       setEditingProduct(null);
@@ -197,6 +217,85 @@ export default function MerchantProducts() {
   const resetForm = () => {
     setFormData({ name: "", description: "", price: "", stock: "", productType: "gifts", category: "", promoBadge: "" });
     setImages([]);
+    setProductOptions([]);
+  };
+
+  const addOption = (type: "multiple_choice" | "text" | "single") => {
+    const newOption: ProductOption = {
+      type,
+      title: "",
+      placeholder: type === "text" ? "أدخل النص هنا..." : undefined,
+      required: false,
+      choices: type === "multiple_choice" ? [{ label: "" }] : undefined
+    };
+    setProductOptions([...productOptions, newOption]);
+  };
+
+  const updateOption = (index: number, updates: Partial<ProductOption>) => {
+    const newOptions = [...productOptions];
+    newOptions[index] = { ...newOptions[index], ...updates };
+    setProductOptions(newOptions);
+  };
+
+  const removeOption = (index: number) => {
+    setProductOptions(productOptions.filter((_, i) => i !== index));
+  };
+
+  const addChoice = (optionIndex: number) => {
+    const newOptions = [...productOptions];
+    if (newOptions[optionIndex].choices) {
+      newOptions[optionIndex].choices!.push({ label: "" });
+      setProductOptions(newOptions);
+    }
+  };
+
+  const updateChoice = (optionIndex: number, choiceIndex: number, label: string) => {
+    const newOptions = [...productOptions];
+    if (newOptions[optionIndex].choices) {
+      newOptions[optionIndex].choices![choiceIndex].label = label;
+      setProductOptions(newOptions);
+    }
+  };
+
+  const removeChoice = (optionIndex: number, choiceIndex: number) => {
+    const newOptions = [...productOptions];
+    if (newOptions[optionIndex].choices) {
+      newOptions[optionIndex].choices = newOptions[optionIndex].choices!.filter((_, i) => i !== choiceIndex);
+      setProductOptions(newOptions);
+    }
+  };
+
+  const saveProductOptions = async (productId: number) => {
+    if (productOptions.length === 0) return;
+    
+    try {
+      await fetch(`/api/merchant/products/${productId}/options`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ options: productOptions })
+      });
+    } catch (error) {
+      console.error("Failed to save product options:", error);
+    }
+  };
+
+  const loadProductOptions = async (productId: number) => {
+    try {
+      const res = await fetch(`/api/merchant/products/${productId}/options`, { credentials: "include" });
+      if (res.ok) {
+        const options = await res.json();
+        setProductOptions(options.map((opt: any) => ({
+          type: opt.type,
+          title: opt.title,
+          placeholder: opt.placeholder,
+          required: opt.required,
+          choices: opt.choices?.map((c: any) => ({ label: c.label }))
+        })));
+      }
+    } catch (error) {
+      console.error("Failed to load product options:", error);
+    }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -220,7 +319,7 @@ export default function MerchantProducts() {
     }
   };
 
-  const handleEdit = (product: Product) => {
+  const handleEdit = async (product: Product) => {
     setEditingProduct(product);
     setFormData({
       name: product.name,
@@ -232,6 +331,8 @@ export default function MerchantProducts() {
       promoBadge: product.promoBadge || ""
     });
     setImages(product.images || []);
+    setProductOptions([]);
+    await loadProductOptions(product.id);
     setIsEditOpen(true);
   };
 
@@ -254,7 +355,7 @@ export default function MerchantProducts() {
                 إضافة منتج
               </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[425px]">
+            <DialogContent className="sm:max-w-[500px] max-h-[90vh]">
               <form onSubmit={handleSubmit}>
                 <DialogHeader className="text-right">
                   <DialogTitle>إضافة منتج جديد</DialogTitle>
@@ -262,6 +363,7 @@ export default function MerchantProducts() {
                     أدخل تفاصيل المنتج الجديد هنا. اضغط حفظ عند الانتهاء.
                   </DialogDescription>
                 </DialogHeader>
+                <ScrollArea className="max-h-[60vh] pr-4">
                 <div className="grid gap-4 py-4">
                   <div className="grid gap-2">
                     <Label htmlFor="name">اسم المنتج</Label>
@@ -399,7 +501,124 @@ export default function MerchantProducts() {
                     </div>
                     <p className="text-xs text-muted-foreground">يمكنك رفع من 1 إلى 5 صور (JPEG, PNG, GIF, WebP)</p>
                   </div>
+                  
+                  <Separator className="my-4" />
+                  
+                  <div className="grid gap-2">
+                    <Label>خيارات المنتج (اختياري)</Label>
+                    <p className="text-xs text-muted-foreground mb-2">أضف خيارات يمكن للعميل اختيارها عند الطلب</p>
+                    
+                    <div className="flex gap-2 flex-wrap">
+                      <Button 
+                        type="button" 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={() => addOption("multiple_choice")}
+                        className="gap-1"
+                      >
+                        <ListPlus className="w-3 h-3" /> اختيار من متعدد
+                      </Button>
+                      <Button 
+                        type="button" 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={() => addOption("text")}
+                        className="gap-1"
+                      >
+                        <Type className="w-3 h-3" /> مربع نص
+                      </Button>
+                      <Button 
+                        type="button" 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={() => addOption("single")}
+                        className="gap-1"
+                      >
+                        <ToggleLeft className="w-3 h-3" /> خيار واحد
+                      </Button>
+                    </div>
+                    
+                    {productOptions.length > 0 && (
+                      <div className="space-y-3 mt-3">
+                        {productOptions.map((option, optIndex) => (
+                          <div key={optIndex} className="border rounded-lg p-3 bg-muted/30">
+                            <div className="flex items-center justify-between mb-2">
+                              <Badge variant="outline" className="text-xs">
+                                {option.type === "multiple_choice" ? "اختيار من متعدد" : 
+                                 option.type === "text" ? "مربع نص" : "خيار واحد"}
+                              </Badge>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => removeOption(optIndex)}
+                                className="h-6 w-6 p-0 text-destructive"
+                              >
+                                <X className="w-3 h-3" />
+                              </Button>
+                            </div>
+                            <Input
+                              placeholder="عنوان الخيار (مثال: اللون، الحجم)"
+                              value={option.title}
+                              onChange={(e) => updateOption(optIndex, { title: e.target.value })}
+                              className="mb-2"
+                            />
+                            {option.type === "text" && (
+                              <Input
+                                placeholder="نص توضيحي (مثال: اكتب رسالتك هنا)"
+                                value={option.placeholder || ""}
+                                onChange={(e) => updateOption(optIndex, { placeholder: e.target.value })}
+                                className="mb-2"
+                              />
+                            )}
+                            {option.type === "multiple_choice" && option.choices && (
+                              <div className="space-y-1">
+                                {option.choices.map((choice, choiceIndex) => (
+                                  <div key={choiceIndex} className="flex gap-1">
+                                    <Input
+                                      placeholder={`الخيار ${choiceIndex + 1}`}
+                                      value={choice.label}
+                                      onChange={(e) => updateChoice(optIndex, choiceIndex, e.target.value)}
+                                      className="h-8 text-sm"
+                                    />
+                                    {option.choices!.length > 1 && (
+                                      <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => removeChoice(optIndex, choiceIndex)}
+                                        className="h-8 w-8 p-0"
+                                      >
+                                        <X className="w-3 h-3" />
+                                      </Button>
+                                    )}
+                                  </div>
+                                ))}
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => addChoice(optIndex)}
+                                  className="text-xs"
+                                >
+                                  + إضافة خيار
+                                </Button>
+                              </div>
+                            )}
+                            <div className="flex items-center gap-2 mt-2">
+                              <Switch
+                                checked={option.required}
+                                onCheckedChange={(checked) => updateOption(optIndex, { required: checked })}
+                              />
+                              <span className="text-xs">إجباري</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
+                </ScrollArea>
                 <DialogFooter>
                   <Button type="submit" disabled={createMutation.isPending || isUploading} data-testid="button-save-product">
                     {createMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : "حفظ المنتج"}
@@ -503,7 +722,7 @@ export default function MerchantProducts() {
         )}
 
         <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-          <DialogContent className="sm:max-w-[425px]">
+          <DialogContent className="sm:max-w-[500px] max-h-[90vh]">
             <form onSubmit={handleSubmit}>
               <DialogHeader className="text-right">
                 <DialogTitle>تعديل المنتج</DialogTitle>
@@ -511,6 +730,7 @@ export default function MerchantProducts() {
                   عدّل تفاصيل المنتج. اضغط حفظ عند الانتهاء.
                 </DialogDescription>
               </DialogHeader>
+              <ScrollArea className="max-h-[60vh] pr-4">
               <div className="grid gap-4 py-4">
                 <div className="grid gap-2">
                   <Label htmlFor="edit-name">اسم المنتج</Label>
@@ -638,7 +858,124 @@ export default function MerchantProducts() {
                   </div>
                   <p className="text-xs text-muted-foreground">يمكنك رفع من 1 إلى 5 صور (JPEG, PNG, GIF, WebP)</p>
                 </div>
+                
+                <Separator className="my-4" />
+                  
+                <div className="grid gap-2">
+                  <Label>خيارات المنتج (اختياري)</Label>
+                  <p className="text-xs text-muted-foreground mb-2">أضف خيارات يمكن للعميل اختيارها عند الطلب</p>
+                  
+                  <div className="flex gap-2 flex-wrap">
+                    <Button 
+                      type="button" 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={() => addOption("multiple_choice")}
+                      className="gap-1"
+                    >
+                      <ListPlus className="w-3 h-3" /> اختيار من متعدد
+                    </Button>
+                    <Button 
+                      type="button" 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={() => addOption("text")}
+                      className="gap-1"
+                    >
+                      <Type className="w-3 h-3" /> مربع نص
+                    </Button>
+                    <Button 
+                      type="button" 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={() => addOption("single")}
+                      className="gap-1"
+                    >
+                      <ToggleLeft className="w-3 h-3" /> خيار واحد
+                    </Button>
+                  </div>
+                  
+                  {productOptions.length > 0 && (
+                    <div className="space-y-3 mt-3">
+                      {productOptions.map((option, optIndex) => (
+                        <div key={optIndex} className="border rounded-lg p-3 bg-muted/30">
+                          <div className="flex items-center justify-between mb-2">
+                            <Badge variant="outline" className="text-xs">
+                              {option.type === "multiple_choice" ? "اختيار من متعدد" : 
+                               option.type === "text" ? "مربع نص" : "خيار واحد"}
+                            </Badge>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => removeOption(optIndex)}
+                              className="h-6 w-6 p-0 text-destructive"
+                            >
+                              <X className="w-3 h-3" />
+                            </Button>
+                          </div>
+                          <Input
+                            placeholder="عنوان الخيار (مثال: اللون، الحجم)"
+                            value={option.title}
+                            onChange={(e) => updateOption(optIndex, { title: e.target.value })}
+                            className="mb-2"
+                          />
+                          {option.type === "text" && (
+                            <Input
+                              placeholder="نص توضيحي (مثال: اكتب رسالتك هنا)"
+                              value={option.placeholder || ""}
+                              onChange={(e) => updateOption(optIndex, { placeholder: e.target.value })}
+                              className="mb-2"
+                            />
+                          )}
+                          {option.type === "multiple_choice" && option.choices && (
+                            <div className="space-y-1">
+                              {option.choices.map((choice, choiceIndex) => (
+                                <div key={choiceIndex} className="flex gap-1">
+                                  <Input
+                                    placeholder={`الخيار ${choiceIndex + 1}`}
+                                    value={choice.label}
+                                    onChange={(e) => updateChoice(optIndex, choiceIndex, e.target.value)}
+                                    className="h-8 text-sm"
+                                  />
+                                  {option.choices!.length > 1 && (
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => removeChoice(optIndex, choiceIndex)}
+                                      className="h-8 w-8 p-0"
+                                    >
+                                      <X className="w-3 h-3" />
+                                    </Button>
+                                  )}
+                                </div>
+                              ))}
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => addChoice(optIndex)}
+                                className="text-xs"
+                              >
+                                + إضافة خيار
+                              </Button>
+                            </div>
+                          )}
+                          <div className="flex items-center gap-2 mt-2">
+                            <Switch
+                              checked={option.required}
+                              onCheckedChange={(checked) => updateOption(optIndex, { required: checked })}
+                            />
+                            <span className="text-xs">إجباري</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
+              </ScrollArea>
               <DialogFooter>
                 <Button type="submit" disabled={updateMutation.isPending || isUploading}>
                   {updateMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : "حفظ التغييرات"}

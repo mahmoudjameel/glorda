@@ -73,7 +73,6 @@ export interface IStorage {
   // Products
   getProduct(id: number): Promise<Product | undefined>;
   getProductsByMerchant(merchantId: number): Promise<Product[]>;
-  getAllProducts(): Promise<Product[]>;
   createProduct(product: InsertProduct): Promise<Product>;
   updateProduct(id: number, product: Partial<InsertProduct>): Promise<void>;
   deleteProduct(id: number): Promise<void>;
@@ -212,10 +211,6 @@ export class DatabaseStorage implements IStorage {
 
   async getProductsByMerchant(merchantId: number): Promise<Product[]> {
     return await db.select().from(products).where(eq(products.merchantId, merchantId)).orderBy(desc(products.createdAt));
-  }
-
-  async getAllProducts(): Promise<Product[]> {
-    return await db.select().from(products).orderBy(desc(products.createdAt));
   }
 
   async createProduct(product: InsertProduct): Promise<Product> {

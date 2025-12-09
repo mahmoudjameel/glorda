@@ -35,7 +35,6 @@ import AdminPolicies from "@/pages/admin/Policies";
 import AdminWithdrawals from "@/pages/admin/Withdrawals";
 import AdminCustomers from "@/pages/admin/Customers";
 import AdminOrders from "@/pages/admin/Orders";
-import AdminProducts from "@/pages/admin/Products";
 
 function Router() {
   return (
@@ -134,11 +133,6 @@ function Router() {
       <Route path="/admin/orders">
         <ProtectedRoute requiredRole="admin">
           <AdminOrders />
-        </ProtectedRoute>
-      </Route>
-      <Route path="/admin/products">
-        <ProtectedRoute requiredRole="admin">
-          <AdminProducts />
         </ProtectedRoute>
       </Route>
       <Route path="/admin">

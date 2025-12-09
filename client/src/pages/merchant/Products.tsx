@@ -19,7 +19,7 @@ import {
   DialogTitle, 
   DialogTrigger 
 } from "@/components/ui/dialog";
-import { Plus, Search, MoreHorizontal, Edit, Trash, Loader2, Package, Upload, X, ImageIcon, ListPlus, Type, ToggleLeft, Star } from "lucide-react";
+import { Plus, Search, MoreHorizontal, Edit, Trash, Loader2, Package, Upload, X, ImageIcon, ListPlus, Type, ToggleLeft, Star, Eye, EyeOff } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Label } from "@/components/ui/label";
@@ -221,6 +221,21 @@ export default function MerchantProducts() {
     },
     onError: () => {
       toast({ variant: "destructive", title: "فشل حذف المنتج" });
+    }
+  });
+
+  const toggleVisibilityMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const res = await fetch(`/api/merchant/products/${id}/visibility`, { method: "PATCH" });
+      if (!res.ok) throw new Error("Failed to toggle visibility");
+      return res.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/merchant/products"] });
+      toast({ title: data.status === "active" ? "تم إظهار المنتج" : "تم إخفاء المنتج" });
+    },
+    onError: () => {
+      toast({ variant: "destructive", title: "فشل تغيير حالة المنتج" });
     }
   });
 
@@ -693,16 +708,16 @@ export default function MerchantProducts() {
                     <Badge 
                       variant={
                         product.status === 'active' ? 'default' : 
-                        product.status === 'out_of_stock' ? 'destructive' : 'secondary'
+                        product.status === 'hidden' ? 'secondary' : 'destructive'
                       }
                       className={`text-xs ${
                         product.status === 'active' ? 'bg-emerald-500 hover:bg-emerald-600' : 
-                        product.status === 'low_stock' ? 'bg-amber-500 hover:bg-amber-600' : ''
+                        product.status === 'hidden' ? 'bg-gray-500 hover:bg-gray-600' : ''
                       }`}
                     >
                       {
                         product.status === 'active' ? 'نشط' : 
-                        product.status === 'out_of_stock' ? 'نفذت الكمية' : 'مخزون منخفض'
+                        product.status === 'hidden' ? 'مخفي' : 'غير نشط'
                       }
                     </Badge>
                   </div>
@@ -731,6 +746,16 @@ export default function MerchantProducts() {
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem className="gap-2 cursor-pointer" onClick={() => handleEdit(product)}>
                           <Edit className="w-4 h-4" /> تعديل
+                        </DropdownMenuItem>
+                        <DropdownMenuItem 
+                          className="gap-2 cursor-pointer"
+                          onClick={() => toggleVisibilityMutation.mutate(product.id)}
+                        >
+                          {product.status === 'hidden' ? (
+                            <><Eye className="w-4 h-4" /> إظهار</>
+                          ) : (
+                            <><EyeOff className="w-4 h-4" /> إخفاء</>
+                          )}
                         </DropdownMenuItem>
                         <DropdownMenuItem 
                           className="gap-2 cursor-pointer text-destructive focus:text-destructive"

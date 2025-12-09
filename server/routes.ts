@@ -669,6 +669,23 @@ export async function registerRoutes(
     }
   });
 
+  app.patch("/api/merchant/products/:id/visibility", requireMerchant, async (req, res) => {
+    try {
+      const productId = parseInt(req.params.id);
+      const product = await storage.getProduct(productId);
+      
+      if (!product || product.merchantId !== req.session.userId) {
+        return res.status(404).json({ error: "لم يتم العثور على المنتج" });
+      }
+
+      const newStatus = product.status === "active" ? "hidden" : "active";
+      await storage.updateProduct(productId, { status: newStatus });
+      res.json({ success: true, status: newStatus });
+    } catch (error) {
+      res.status(500).json({ error: "فشل تغيير حالة المنتج" });
+    }
+  });
+
   // ========== PRODUCT IMAGE UPLOAD ==========
   
   app.post("/api/merchant/products/upload-images", requireMerchant, productImageUpload.array("images", 5), (req, res) => {
@@ -1005,26 +1022,6 @@ export async function registerRoutes(
       res.json(customers);
     } catch (error) {
       res.status(500).json({ error: "فشل جلب العملاء" });
-    }
-  });
-
-  // ========== ADMIN PRODUCTS ROUTES ==========
-  
-  app.get("/api/admin/products", requireAdmin, async (req, res) => {
-    try {
-      const allProducts = await storage.getAllProducts();
-      const productsWithMerchant = await Promise.all(
-        allProducts.map(async (product) => {
-          const merchant = await storage.getMerchant(product.merchantId);
-          return {
-            ...product,
-            merchant: merchant ? { id: merchant.id, storeName: merchant.storeName } : null
-          };
-        })
-      );
-      res.json(productsWithMerchant);
-    } catch (error) {
-      res.status(500).json({ error: "فشل جلب المنتجات" });
     }
   });
 

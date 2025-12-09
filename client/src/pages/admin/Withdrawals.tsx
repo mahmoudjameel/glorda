@@ -220,7 +220,7 @@ export default function AdminWithdrawals() {
                       <TableHeader>
                         <TableRow>
                           <TableHead className="text-right">المتجر</TableHead>
-                          <TableHead className="text-right">المبلغ</TableHead>
+                          <TableHead className="text-right">المبلغ (بعد الرسوم)</TableHead>
                           <TableHead className="text-right">التاريخ</TableHead>
                           <TableHead className="text-right">الحالة</TableHead>
                           <TableHead className="text-right">إجراءات</TableHead>
@@ -241,7 +241,10 @@ export default function AdminWithdrawals() {
                               </div>
                             </TableCell>
                             <TableCell>
-                              <span className="font-bold text-lg">{formatCurrency(withdrawal.amount)}</span>
+                              <div>
+                                <span className="font-bold text-lg">{formatCurrency(withdrawal.amount)}</span>
+                                <p className="text-xs text-muted-foreground">بعد خصم الرسوم (5%)</p>
+                              </div>
                             </TableCell>
                             <TableCell className="text-muted-foreground">
                               {new Date(withdrawal.createdAt).toLocaleDateString('ar-SA')}
@@ -318,14 +321,18 @@ export default function AdminWithdrawals() {
                       <TableHeader>
                         <TableRow>
                           <TableHead className="text-right">المتجر</TableHead>
-                          <TableHead className="text-right">الرصيد</TableHead>
+                          <TableHead className="text-right">الرصيد الإجمالي</TableHead>
+                          <TableHead className="text-right">الصافي (بعد 5% رسوم)</TableHead>
                           <TableHead className="text-right">البنك</TableHead>
                           <TableHead className="text-right">المدينة</TableHead>
                           <TableHead className="text-right">إجراءات</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {activeMerchants.map((merchant) => (
+                        {activeMerchants.map((merchant) => {
+                          const fees = Math.floor(merchant.balance * 5 / 100);
+                          const netBalance = merchant.balance - fees;
+                          return (
                           <TableRow key={merchant.id} data-testid={`row-wallet-${merchant.id}`}>
                             <TableCell>
                               <div className="flex items-center gap-3">
@@ -339,8 +346,13 @@ export default function AdminWithdrawals() {
                               </div>
                             </TableCell>
                             <TableCell>
-                              <span className={`font-bold text-lg ${merchant.balance > 0 ? 'text-emerald-600' : ''}`}>
+                              <span className={`font-bold text-lg ${merchant.balance > 0 ? 'text-muted-foreground' : ''}`}>
                                 {formatCurrency(merchant.balance)}
+                              </span>
+                            </TableCell>
+                            <TableCell>
+                              <span className={`font-bold text-lg ${netBalance > 0 ? 'text-emerald-600' : ''}`}>
+                                {formatCurrency(netBalance)}
                               </span>
                             </TableCell>
                             <TableCell>
@@ -366,7 +378,7 @@ export default function AdminWithdrawals() {
                               </Button>
                             </TableCell>
                           </TableRow>
-                        ))}
+                        );})}
                       </TableBody>
                     </Table>
                   </div>

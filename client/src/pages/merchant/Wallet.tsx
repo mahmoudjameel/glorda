@@ -59,17 +59,22 @@ export default function MerchantWallet() {
     }
   });
 
+  const balance = profile?.balance || 0;
+  const feePercentage = 5;
+
   const handleWithdraw = (e: React.FormEvent) => {
     e.preventDefault();
-    const amount = parseInt(withdrawAmount) * 100;
-    if (amount <= 0) {
+    const amount = Math.round(parseFloat(withdrawAmount) * 100);
+    if (isNaN(amount) || amount <= 0) {
       toast({ variant: "destructive", title: "المبلغ غير صالح" });
       return;
     }
-    withdrawMutation.mutate(amount);
+    // Send the net amount after 5% fee deduction
+    const netAmount = Math.floor(amount * (100 - feePercentage) / 100);
+    withdrawMutation.mutate(netAmount);
   };
-
-  const balance = profile?.balance || 0;
+  const fees = Math.floor(balance * feePercentage / 100);
+  const netBalance = balance - fees;
   const pendingWithdrawals = transactions
     .filter(t => t.type === "withdrawal" && t.status === "pending")
     .reduce((sum, t) => sum + Math.abs(t.amount), 0);
@@ -93,6 +98,16 @@ export default function MerchantWallet() {
             <CardContent>
               <div className="text-3xl font-bold font-mono" data-testid="text-balance">
                 {(balance / 100).toFixed(2)} ر.س
+              </div>
+              <div className="mt-3 pt-3 border-t border-primary-foreground/20 space-y-1">
+                <div className="flex justify-between text-xs text-primary-foreground/70">
+                  <span>رسوم ({feePercentage}%)</span>
+                  <span className="font-mono">- {(fees / 100).toFixed(2)} ر.س</span>
+                </div>
+                <div className="flex justify-between text-sm font-semibold">
+                  <span>الصافي بعد الخصم</span>
+                  <span className="font-mono" data-testid="text-net-balance">{(netBalance / 100).toFixed(2)} ر.س</span>
+                </div>
               </div>
               <p className="text-xs mt-2 text-primary-foreground/60 flex items-center">
                 <Wallet className="w-3 h-3 ml-1" />
@@ -214,6 +229,22 @@ export default function MerchantWallet() {
                         data-testid="input-withdraw-amount"
                       />
                     </div>
+                    {withdrawAmount && parseFloat(withdrawAmount) > 0 && (
+                      <div className="mt-2 p-2 bg-muted/50 rounded-md text-sm space-y-1">
+                        <div className="flex justify-between text-muted-foreground">
+                          <span>المبلغ</span>
+                          <span className="font-mono">{parseFloat(withdrawAmount).toFixed(2)} ر.س</span>
+                        </div>
+                        <div className="flex justify-between text-muted-foreground">
+                          <span>رسوم ({feePercentage}%)</span>
+                          <span className="font-mono text-red-500">- {(parseFloat(withdrawAmount) * feePercentage / 100).toFixed(2)} ر.س</span>
+                        </div>
+                        <div className="flex justify-between font-semibold border-t pt-1">
+                          <span>المبلغ بعد الخصم</span>
+                          <span className="font-mono text-primary">{(parseFloat(withdrawAmount) * (100 - feePercentage) / 100).toFixed(2)} ر.س</span>
+                        </div>
+                      </div>
+                    )}
                   </div>
                   <div className="space-y-2">
                     <Label>الحساب البنكي</Label>

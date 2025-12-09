@@ -345,3 +345,26 @@ export const insertOrderOptionSelectionSchema = createInsertSchema(orderOptionSe
 
 export type InsertOrderOptionSelection = z.infer<typeof insertOrderOptionSelectionSchema>;
 export type OrderOptionSelection = typeof orderOptionSelections.$inferSelect;
+
+// ========== Discount Codes Table ==========
+export const discountCodes = pgTable("discount_codes", {
+  id: serial("id").primaryKey(),
+  code: varchar("code", { length: 50 }).notNull().unique(),
+  type: text("type").notNull(), // 'percentage' | 'fixed' | 'free_shipping'
+  value: integer("value").notNull(), // percentage (0-100) or fixed amount in cents
+  minOrderAmount: integer("min_order_amount").default(0), // minimum order amount to apply
+  maxUses: integer("max_uses"), // null = unlimited
+  usedCount: integer("used_count").notNull().default(0),
+  isActive: boolean("is_active").notNull().default(true),
+  expiresAt: timestamp("expires_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertDiscountCodeSchema = createInsertSchema(discountCodes).omit({
+  id: true,
+  usedCount: true,
+  createdAt: true,
+});
+
+export type InsertDiscountCode = z.infer<typeof insertDiscountCodeSchema>;
+export type DiscountCode = typeof discountCodes.$inferSelect;

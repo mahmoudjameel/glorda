@@ -18,6 +18,7 @@ import {
   productOptions,
   productOptionChoices,
   orderOptionSelections,
+  discountCodes,
   type Merchant, 
   type InsertMerchant,
   type Product,
@@ -49,7 +50,9 @@ import {
   type ProductOptionChoice,
   type InsertProductOptionChoice,
   type OrderOptionSelection,
-  type InsertOrderOptionSelection
+  type InsertOrderOptionSelection,
+  type DiscountCode,
+  type InsertDiscountCode
 } from "@shared/schema";
 
 const { Pool } = pg;
@@ -168,6 +171,15 @@ export interface IStorage {
   // Order Option Selections
   getOrderOptionSelections(orderId: number): Promise<OrderOptionSelection[]>;
   createOrderOptionSelection(selection: InsertOrderOptionSelection): Promise<OrderOptionSelection>;
+  
+  // Discount Codes
+  getDiscountCode(id: number): Promise<DiscountCode | undefined>;
+  getDiscountCodeByCode(code: string): Promise<DiscountCode | undefined>;
+  getAllDiscountCodes(): Promise<DiscountCode[]>;
+  createDiscountCode(discountCode: InsertDiscountCode): Promise<DiscountCode>;
+  updateDiscountCode(id: number, discountCode: Partial<InsertDiscountCode>): Promise<void>;
+  deleteDiscountCode(id: number): Promise<void>;
+  incrementDiscountCodeUsage(id: number): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -584,6 +596,49 @@ export class DatabaseStorage implements IStorage {
   async createOrderOptionSelection(selection: InsertOrderOptionSelection): Promise<OrderOptionSelection> {
     const result = await db.insert(orderOptionSelections).values(selection as any).returning();
     return result[0];
+  }
+
+  // ========== Discount Codes ==========
+  async getDiscountCode(id: number): Promise<DiscountCode | undefined> {
+    const result = await db.select().from(discountCodes).where(eq(discountCodes.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getDiscountCodeByCode(code: string): Promise<DiscountCode | undefined> {
+    const result = await db.select().from(discountCodes)
+      .where(eq(discountCodes.code, code.toUpperCase()))
+      .limit(1);
+    return result[0];
+  }
+
+  async getAllDiscountCodes(): Promise<DiscountCode[]> {
+    return await db.select().from(discountCodes).orderBy(desc(discountCodes.createdAt));
+  }
+
+  async createDiscountCode(discountCode: InsertDiscountCode): Promise<DiscountCode> {
+    const result = await db.insert(discountCodes).values({
+      ...discountCode,
+      code: discountCode.code.toUpperCase()
+    } as any).returning();
+    return result[0];
+  }
+
+  async updateDiscountCode(id: number, discountCode: Partial<InsertDiscountCode>): Promise<void> {
+    const updateData = { ...discountCode };
+    if (updateData.code) {
+      updateData.code = updateData.code.toUpperCase();
+    }
+    await db.update(discountCodes).set(updateData as any).where(eq(discountCodes.id, id));
+  }
+
+  async deleteDiscountCode(id: number): Promise<void> {
+    await db.delete(discountCodes).where(eq(discountCodes.id, id));
+  }
+
+  async incrementDiscountCodeUsage(id: number): Promise<void> {
+    await db.update(discountCodes)
+      .set({ usedCount: sql`${discountCodes.usedCount} + 1` })
+      .where(eq(discountCodes.id, id));
   }
 }
 

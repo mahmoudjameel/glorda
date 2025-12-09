@@ -651,73 +651,80 @@ export default function MerchantProducts() {
             <p className="text-muted-foreground">ابدأ بإضافة منتجات لمتجرك</p>
           </div>
         ) : (
-          <div className="rounded-md border bg-card">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-[100px] text-right">المعرف</TableHead>
-                  <TableHead className="text-right">الاسم</TableHead>
-                  <TableHead className="text-right">النوع</TableHead>
-                  <TableHead className="text-right">الحالة</TableHead>
-                  <TableHead className="text-right">السعر</TableHead>
-                  <TableHead className="text-right">المخزون</TableHead>
-                  <TableHead className="text-right">إجراءات</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredProducts.map((product) => (
-                  <TableRow key={product.id} data-testid={`row-product-${product.id}`}>
-                    <TableCell className="font-medium font-mono text-muted-foreground text-xs">#{product.id}</TableCell>
-                    <TableCell className="font-medium">{product.name}</TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className={product.productType === 'flowers' ? 'border-pink-300 text-pink-600' : 'border-amber-300 text-amber-600'}>
-                        {productTypeLabels[product.productType] || product.productType}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Badge 
-                        variant={
-                          product.status === 'active' ? 'default' : 
-                          product.status === 'out_of_stock' ? 'destructive' : 'secondary'
-                        }
-                        className={
-                          product.status === 'active' ? 'bg-emerald-500 hover:bg-emerald-600' : 
-                          product.status === 'low_stock' ? 'bg-amber-500 hover:bg-amber-600' : ''
-                        }
-                      >
-                        {
-                          product.status === 'active' ? 'نشط' : 
-                          product.status === 'out_of_stock' ? 'نفذت الكمية' : 'مخزون منخفض'
-                        }
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="font-mono">{(product.price / 100).toFixed(2)} ر.س</TableCell>
-                    <TableCell>{product.stock}</TableCell>
-                    <TableCell>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" className="h-8 w-8 p-0" data-testid={`button-product-menu-${product.id}`}>
-                            <span className="sr-only">Open menu</span>
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem className="gap-2 cursor-pointer" onClick={() => handleEdit(product)}>
-                            <Edit className="w-4 h-4" /> تعديل
-                          </DropdownMenuItem>
-                          <DropdownMenuItem 
-                            className="gap-2 cursor-pointer text-destructive focus:text-destructive"
-                            onClick={() => deleteMutation.mutate(product.id)}
-                          >
-                            <Trash className="w-4 h-4" /> حذف
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            {filteredProducts.map((product) => (
+              <div 
+                key={product.id} 
+                className="bg-card border rounded-lg overflow-hidden hover:shadow-md transition-shadow"
+                data-testid={`card-product-${product.id}`}
+              >
+                <div className="aspect-square relative bg-muted">
+                  {product.images && product.images.length > 0 ? (
+                    <img 
+                      src={product.images[0]} 
+                      alt={product.name}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <Package className="w-12 h-12 text-muted-foreground" />
+                    </div>
+                  )}
+                  <div className="absolute top-2 right-2 flex flex-col gap-1">
+                    <Badge 
+                      variant={
+                        product.status === 'active' ? 'default' : 
+                        product.status === 'out_of_stock' ? 'destructive' : 'secondary'
+                      }
+                      className={`text-xs ${
+                        product.status === 'active' ? 'bg-emerald-500 hover:bg-emerald-600' : 
+                        product.status === 'low_stock' ? 'bg-amber-500 hover:bg-amber-600' : ''
+                      }`}
+                    >
+                      {
+                        product.status === 'active' ? 'نشط' : 
+                        product.status === 'out_of_stock' ? 'نفذت الكمية' : 'مخزون منخفض'
+                      }
+                    </Badge>
+                  </div>
+                  {product.promoBadge && (
+                    <div className="absolute top-2 left-2">
+                      <Badge className="bg-primary text-xs">{product.promoBadge}</Badge>
+                    </div>
+                  )}
+                </div>
+                <div className="p-3">
+                  <h3 className="font-semibold text-sm truncate mb-1">{product.name}</h3>
+                  <div className="flex items-center justify-between mb-2">
+                    <Badge variant="outline" className={`text-xs ${product.productType === 'flowers' ? 'border-pink-300 text-pink-600' : 'border-amber-300 text-amber-600'}`}>
+                      {productTypeLabels[product.productType] || product.productType}
+                    </Badge>
+                    <span className="text-xs text-muted-foreground">المخزون: {product.stock}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-primary">{(product.price / 100).toFixed(2)} ر.س</span>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0" data-testid={`button-product-menu-${product.id}`}>
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem className="gap-2 cursor-pointer" onClick={() => handleEdit(product)}>
+                          <Edit className="w-4 h-4" /> تعديل
+                        </DropdownMenuItem>
+                        <DropdownMenuItem 
+                          className="gap-2 cursor-pointer text-destructive focus:text-destructive"
+                          onClick={() => deleteMutation.mutate(product.id)}
+                        >
+                          <Trash className="w-4 h-4" /> حذف
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         )}
 

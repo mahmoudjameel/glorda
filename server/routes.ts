@@ -1008,6 +1008,26 @@ export async function registerRoutes(
     }
   });
 
+  // ========== ADMIN PRODUCTS ROUTES ==========
+  
+  app.get("/api/admin/products", requireAdmin, async (req, res) => {
+    try {
+      const allProducts = await storage.getAllProducts();
+      const productsWithMerchant = await Promise.all(
+        allProducts.map(async (product) => {
+          const merchant = await storage.getMerchant(product.merchantId);
+          return {
+            ...product,
+            merchant: merchant ? { id: merchant.id, storeName: merchant.storeName } : null
+          };
+        })
+      );
+      res.json(productsWithMerchant);
+    } catch (error) {
+      res.status(500).json({ error: "فشل جلب المنتجات" });
+    }
+  });
+
   // ========== ADMIN ORDERS ROUTES ==========
   
   app.get("/api/admin/orders", requireAdmin, async (req, res) => {
@@ -1023,7 +1043,7 @@ export async function registerRoutes(
           // Enrich option selections with option details
           const optionsWithDetails = await Promise.all(
             optionSelections.map(async (sel) => {
-              const option = await storage.getProductOption(sel.productOptionId);
+              const option = await storage.getProductOption(sel.optionId);
               return {
                 ...sel,
                 optionTitle: option?.title || "",

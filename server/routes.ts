@@ -19,6 +19,40 @@ import {
 import { z } from "zod";
 import { fromZodError } from "zod-validation-error";
 
+// Validation schemas for admin endpoints
+const merchantStatusSchema = z.object({
+  status: z.enum(["pending", "active", "suspended", "review"])
+});
+
+const withdrawalStatusSchema = z.object({
+  status: z.enum(["completed", "rejected"])
+});
+
+const bannerUpdateSchema = z.object({
+  title: z.string().min(1).max(200).optional(),
+  imageUrl: z.string().url().optional(),
+  linkUrl: z.string().url().optional().nullable(),
+  isActive: z.boolean().optional(),
+  order: z.number().int().min(0).optional()
+}).strict();
+
+const categoryUpdateSchema = z.object({
+  name: z.string().min(1).max(100).optional(),
+  icon: z.string().optional(),
+  isActive: z.boolean().optional()
+}).strict();
+
+const cityUpdateSchema = z.object({
+  name: z.string().min(1).max(100).optional(),
+  isActive: z.boolean().optional()
+}).strict();
+
+const settingSchema = z.object({
+  key: z.string().min(1).max(100),
+  value: z.string().optional().nullable(),
+  valueJson: z.any().optional()
+});
+
 // Configure multer for product image uploads
 const uploadsDir = path.join(process.cwd(), "uploads", "products");
 if (!fs.existsSync(uploadsDir)) {
@@ -110,7 +144,7 @@ export async function registerRoutes(
       secure: isProduction || isReplit,
       httpOnly: true,
       maxAge: 1000 * 60 * 60 * 24 * 7,
-      sameSite: isProduction || isReplit ? "none" : "lax",
+      sameSite: "lax",
     }
   };
   
@@ -982,11 +1016,11 @@ export async function registerRoutes(
   app.patch("/api/admin/merchants/:id/status", requireAdmin, async (req, res) => {
     try {
       const merchantId = parseInt(req.params.id);
-      const { status } = req.body;
-      
-      if (!["pending", "active", "suspended", "review"].includes(status)) {
+      const parsed = merchantStatusSchema.safeParse(req.body);
+      if (!parsed.success) {
         return res.status(400).json({ error: "حالة غير صالحة" });
       }
+      const { status } = parsed.data;
 
       await storage.updateMerchantStatus(merchantId, status);
       
@@ -1087,11 +1121,11 @@ export async function registerRoutes(
   app.patch("/api/admin/withdrawals/:id", requireAdmin, async (req, res) => {
     try {
       const transactionId = parseInt(req.params.id);
-      const { status } = req.body;
-      
-      if (!["completed", "rejected"].includes(status)) {
+      const parsed = withdrawalStatusSchema.safeParse(req.body);
+      if (!parsed.success) {
         return res.status(400).json({ error: "حالة غير صالحة" });
       }
+      const { status } = parsed.data;
 
       // Get transaction to find merchant
       const transaction = await storage.getTransactionById(transactionId);
@@ -1232,7 +1266,11 @@ export async function registerRoutes(
   app.patch("/api/admin/banners/:id", requireAdmin, async (req, res) => {
     try {
       const bannerId = parseInt(req.params.id);
-      await storage.updateBanner(bannerId, req.body);
+      const parsed = bannerUpdateSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: fromZodError(parsed.error).message });
+      }
+      await storage.updateBanner(bannerId, parsed.data);
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ error: "فشل تحديث البانر" });
@@ -1276,7 +1314,11 @@ export async function registerRoutes(
   app.patch("/api/admin/categories/:id", requireAdmin, async (req, res) => {
     try {
       const categoryId = parseInt(req.params.id);
-      await storage.updateCategory(categoryId, req.body);
+      const parsed = categoryUpdateSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: fromZodError(parsed.error).message });
+      }
+      await storage.updateCategory(categoryId, parsed.data);
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ error: "فشل تحديث القسم" });
@@ -1320,7 +1362,11 @@ export async function registerRoutes(
   app.patch("/api/admin/cities/:id", requireAdmin, async (req, res) => {
     try {
       const cityId = parseInt(req.params.id);
-      await storage.updateCity(cityId, req.body);
+      const parsed = cityUpdateSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: fromZodError(parsed.error).message });
+      }
+      await storage.updateCity(cityId, parsed.data);
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ error: "فشل تحديث المدينة" });
@@ -1350,7 +1396,11 @@ export async function registerRoutes(
 
   app.post("/api/admin/settings", requireAdmin, async (req, res) => {
     try {
-      const { key, value, valueJson } = req.body;
+      const parsed = settingSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: fromZodError(parsed.error).message });
+      }
+      const { key, value, valueJson } = parsed.data;
       const setting = await storage.setSetting(key, value, valueJson);
       res.json(setting);
     } catch (error) {

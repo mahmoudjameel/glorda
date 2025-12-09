@@ -15,6 +15,9 @@ import {
   cities,
   appSettings,
   notifications,
+  productOptions,
+  productOptionChoices,
+  orderOptionSelections,
   type Merchant, 
   type InsertMerchant,
   type Product,
@@ -40,7 +43,13 @@ import {
   type AppSetting,
   type InsertAppSetting,
   type Notification,
-  type InsertNotification
+  type InsertNotification,
+  type ProductOption,
+  type InsertProductOption,
+  type ProductOptionChoice,
+  type InsertProductOptionChoice,
+  type OrderOptionSelection,
+  type InsertOrderOptionSelection
 } from "@shared/schema";
 
 const { Pool } = pg;
@@ -144,6 +153,20 @@ export interface IStorage {
   getUnreadCountForAdmin(): Promise<number>;
   markNotificationRead(id: number): Promise<void>;
   markAllNotificationsRead(recipientType: string, recipientId?: number): Promise<void>;
+  
+  // Product Options
+  getProductOptions(productId: number): Promise<ProductOption[]>;
+  getProductOptionChoices(optionId: number): Promise<ProductOptionChoice[]>;
+  createProductOption(option: InsertProductOption): Promise<ProductOption>;
+  updateProductOption(id: number, option: Partial<InsertProductOption>): Promise<void>;
+  deleteProductOption(id: number): Promise<void>;
+  createProductOptionChoice(choice: InsertProductOptionChoice): Promise<ProductOptionChoice>;
+  deleteProductOptionChoices(optionId: number): Promise<void>;
+  deleteAllProductOptions(productId: number): Promise<void>;
+  
+  // Order Option Selections
+  getOrderOptionSelections(orderId: number): Promise<OrderOptionSelection[]>;
+  createOrderOptionSelection(selection: InsertOrderOptionSelection): Promise<OrderOptionSelection>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -504,6 +527,56 @@ export class DatabaseStorage implements IStorage {
 
   async getTransactionById(id: number): Promise<Transaction | undefined> {
     const result = await db.select().from(transactions).where(eq(transactions.id, id)).limit(1);
+    return result[0];
+  }
+
+  // ========== Product Options ==========
+  async getProductOptions(productId: number): Promise<ProductOption[]> {
+    return await db.select().from(productOptions)
+      .where(eq(productOptions.productId, productId))
+      .orderBy(asc(productOptions.sortOrder));
+  }
+
+  async getProductOptionChoices(optionId: number): Promise<ProductOptionChoice[]> {
+    return await db.select().from(productOptionChoices)
+      .where(eq(productOptionChoices.optionId, optionId))
+      .orderBy(asc(productOptionChoices.sortOrder));
+  }
+
+  async createProductOption(option: InsertProductOption): Promise<ProductOption> {
+    const result = await db.insert(productOptions).values(option as any).returning();
+    return result[0];
+  }
+
+  async updateProductOption(id: number, option: Partial<InsertProductOption>): Promise<void> {
+    await db.update(productOptions).set(option).where(eq(productOptions.id, id));
+  }
+
+  async deleteProductOption(id: number): Promise<void> {
+    await db.delete(productOptions).where(eq(productOptions.id, id));
+  }
+
+  async createProductOptionChoice(choice: InsertProductOptionChoice): Promise<ProductOptionChoice> {
+    const result = await db.insert(productOptionChoices).values(choice as any).returning();
+    return result[0];
+  }
+
+  async deleteProductOptionChoices(optionId: number): Promise<void> {
+    await db.delete(productOptionChoices).where(eq(productOptionChoices.optionId, optionId));
+  }
+
+  async deleteAllProductOptions(productId: number): Promise<void> {
+    await db.delete(productOptions).where(eq(productOptions.productId, productId));
+  }
+
+  // ========== Order Option Selections ==========
+  async getOrderOptionSelections(orderId: number): Promise<OrderOptionSelection[]> {
+    return await db.select().from(orderOptionSelections)
+      .where(eq(orderOptionSelections.orderId, orderId));
+  }
+
+  async createOrderOptionSelection(selection: InsertOrderOptionSelection): Promise<OrderOptionSelection> {
+    const result = await db.insert(orderOptionSelections).values(selection as any).returning();
     return result[0];
   }
 }

@@ -295,3 +295,53 @@ export const insertNotificationSchema = createInsertSchema(notifications).omit({
 
 export type InsertNotification = z.infer<typeof insertNotificationSchema>;
 export type Notification = typeof notifications.$inferSelect;
+
+// ========== Product Options Table ==========
+export const productOptions = pgTable("product_options", {
+  id: serial("id").primaryKey(),
+  productId: integer("product_id").notNull().references(() => products.id, { onDelete: "cascade" }),
+  type: text("type").notNull(), // 'multiple_choice' | 'text' | 'single'
+  title: text("title").notNull(),
+  placeholder: text("placeholder"),
+  required: boolean("required").notNull().default(false),
+  sortOrder: integer("sort_order").notNull().default(0),
+});
+
+export const insertProductOptionSchema = createInsertSchema(productOptions).omit({
+  id: true,
+});
+
+export type InsertProductOption = z.infer<typeof insertProductOptionSchema>;
+export type ProductOption = typeof productOptions.$inferSelect;
+
+// ========== Product Option Choices Table (for multiple_choice) ==========
+export const productOptionChoices = pgTable("product_option_choices", {
+  id: serial("id").primaryKey(),
+  optionId: integer("option_id").notNull().references(() => productOptions.id, { onDelete: "cascade" }),
+  label: text("label").notNull(),
+  sortOrder: integer("sort_order").notNull().default(0),
+});
+
+export const insertProductOptionChoiceSchema = createInsertSchema(productOptionChoices).omit({
+  id: true,
+});
+
+export type InsertProductOptionChoice = z.infer<typeof insertProductOptionChoiceSchema>;
+export type ProductOptionChoice = typeof productOptionChoices.$inferSelect;
+
+// ========== Order Option Selections Table ==========
+export const orderOptionSelections = pgTable("order_option_selections", {
+  id: serial("id").primaryKey(),
+  orderId: integer("order_id").notNull().references(() => orders.id, { onDelete: "cascade" }),
+  optionId: integer("option_id").notNull().references(() => productOptions.id),
+  choiceId: integer("choice_id").references(() => productOptionChoices.id),
+  textValue: text("text_value"),
+  booleanValue: boolean("boolean_value"),
+});
+
+export const insertOrderOptionSelectionSchema = createInsertSchema(orderOptionSelections).omit({
+  id: true,
+});
+
+export type InsertOrderOptionSelection = z.infer<typeof insertOrderOptionSelectionSchema>;
+export type OrderOptionSelection = typeof orderOptionSelections.$inferSelect;

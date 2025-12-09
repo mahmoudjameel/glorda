@@ -45,6 +45,7 @@ Preferred communication style: Simple, everyday language.
 - Products table linked to merchants with customizable options (single choice, text input, toggle)
 - Transactions for payment/withdrawal tracking with 5% platform fee
 - Admins table for platform administrators
+- Discount codes table with percentage/fixed/free_shipping types, usage limits, expiration dates
 - Supporting tables: customers, orders, orderMessages, reviews, banners, categories, cities, appSettings, notifications
 
 **Database Access**: Connection pooling via node-postgres (pg). All queries through Drizzle with type safety from schema definitions.
@@ -263,6 +264,7 @@ server {
 
 # Recent Changes
 
+- **2024-12**: Added discount codes management to App Settings (percentage, fixed amount, free shipping types)
 - **2024-12**: Fixed CSRF vulnerability by setting sameSite=lax cookies
 - **2024-12**: Fixed error handler to prevent process crashes
 - **2024-12**: Added Zod validation to all admin API endpoints

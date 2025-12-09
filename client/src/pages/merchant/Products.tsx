@@ -19,7 +19,7 @@ import {
   DialogTitle, 
   DialogTrigger 
 } from "@/components/ui/dialog";
-import { Plus, Search, MoreHorizontal, Edit, Trash, Loader2, Package, Upload, X, ImageIcon, ListPlus, Type, ToggleLeft } from "lucide-react";
+import { Plus, Search, MoreHorizontal, Edit, Trash, Loader2, Package, Upload, X, ImageIcon, ListPlus, Type, ToggleLeft, Star } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Label } from "@/components/ui/label";
@@ -139,6 +139,16 @@ export default function MerchantProducts() {
 
   const removeImage = (index: number) => {
     setImages(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const setMainImage = (index: number) => {
+    if (index === 0) return;
+    setImages(prev => {
+      const newImages = [...prev];
+      const [selectedImage] = newImages.splice(index, 1);
+      newImages.unshift(selectedImage);
+      return newImages;
+    });
   };
 
   const { data: products = [], isLoading } = useQuery<Product[]>({
@@ -450,6 +460,7 @@ export default function MerchantProducts() {
                   </div>
                   <div className="grid gap-2">
                     <Label>صور المنتج ({images.length}/{MAX_IMAGES})</Label>
+                    <p className="text-xs text-muted-foreground">اضغط على النجمة لتعيين الصورة الرئيسية</p>
                     <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-4">
                       {images.length > 0 && (
                         <div className="grid grid-cols-5 gap-2 mb-3">
@@ -458,8 +469,16 @@ export default function MerchantProducts() {
                               <img 
                                 src={img} 
                                 alt={`صورة ${index + 1}`}
-                                className="w-full h-16 object-cover rounded border"
+                                className={`w-full h-16 object-cover rounded border-2 ${index === 0 ? 'border-primary' : 'border-transparent'}`}
                               />
+                              <button
+                                type="button"
+                                onClick={() => setMainImage(index)}
+                                className={`absolute -top-1 -left-1 rounded-full p-0.5 transition-opacity ${index === 0 ? 'bg-primary text-white' : 'bg-muted text-muted-foreground opacity-0 group-hover:opacity-100'}`}
+                                title={index === 0 ? 'الصورة الرئيسية' : 'تعيين كصورة رئيسية'}
+                              >
+                                <Star className={`w-3 h-3 ${index === 0 ? 'fill-current' : ''}`} />
+                              </button>
                               <button
                                 type="button"
                                 onClick={() => removeImage(index)}
@@ -816,6 +835,7 @@ export default function MerchantProducts() {
                 </div>
                 <div className="grid gap-2">
                   <Label>صور المنتج ({images.length}/{MAX_IMAGES})</Label>
+                  <p className="text-xs text-muted-foreground">اضغط على النجمة لتعيين الصورة الرئيسية</p>
                   <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-4">
                     {images.length > 0 && (
                       <div className="grid grid-cols-5 gap-2 mb-3">
@@ -824,8 +844,16 @@ export default function MerchantProducts() {
                             <img 
                               src={img} 
                               alt={`صورة ${index + 1}`}
-                              className="w-full h-16 object-cover rounded border"
+                              className={`w-full h-16 object-cover rounded border-2 ${index === 0 ? 'border-primary' : 'border-transparent'}`}
                             />
+                            <button
+                              type="button"
+                              onClick={() => setMainImage(index)}
+                              className={`absolute -top-1 -left-1 rounded-full p-0.5 transition-opacity ${index === 0 ? 'bg-primary text-white' : 'bg-muted text-muted-foreground opacity-0 group-hover:opacity-100'}`}
+                              title={index === 0 ? 'الصورة الرئيسية' : 'تعيين كصورة رئيسية'}
+                            >
+                              <Star className={`w-3 h-3 ${index === 0 ? 'fill-current' : ''}`} />
+                            </button>
                             <button
                               type="button"
                               onClick={() => removeImage(index)}

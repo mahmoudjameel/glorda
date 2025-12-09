@@ -17,11 +17,22 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { ShoppingBag, Search, Loader2, Eye, User, Store, Package, MapPin, Phone, Calendar, CreditCard } from "lucide-react";
+import { ShoppingBag, Search, Loader2, Eye, User, Store, Package, MapPin, Phone, Calendar, CreditCard, ListChecks, Type, ToggleLeft, CheckCircle2 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { format } from "date-fns";
 import { ar } from "date-fns/locale";
+
+interface OptionSelection {
+  id: number;
+  orderId: number;
+  productOptionId: number;
+  selectedChoiceId: number | null;
+  textValue: string | null;
+  booleanValue: boolean | null;
+  optionTitle: string;
+  optionType: string;
+}
 
 interface OrderWithDetails {
   id: number;
@@ -55,6 +66,7 @@ interface OrderWithDetails {
     price: number;
     images: string[] | null;
   } | null;
+  optionSelections?: OptionSelection[];
 }
 
 const statusMap: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
@@ -292,6 +304,43 @@ export default function AdminOrders() {
                     </p>
                   </div>
                 </div>
+
+                {selectedOrder.optionSelections && selectedOrder.optionSelections.length > 0 && (
+                  <div className="p-4 rounded-lg border bg-muted/30">
+                    <h4 className="font-semibold mb-3 flex items-center gap-2">
+                      <ListChecks className="w-4 h-4" />
+                      خيارات العميل
+                    </h4>
+                    <div className="space-y-3">
+                      {selectedOrder.optionSelections.map((sel) => (
+                        <div key={sel.id} className="flex items-start gap-3 p-2 rounded bg-background border">
+                          <div className="flex-shrink-0 mt-0.5">
+                            {sel.optionType === "multiple_choice" && <ListChecks className="w-4 h-4 text-primary" />}
+                            {sel.optionType === "text" && <Type className="w-4 h-4 text-primary" />}
+                            {sel.optionType === "toggle" && <ToggleLeft className="w-4 h-4 text-primary" />}
+                          </div>
+                          <div className="flex-1">
+                            <p className="font-medium text-sm">{sel.optionTitle}</p>
+                            <p className="text-sm text-muted-foreground mt-1">
+                              {sel.optionType === "text" && sel.textValue}
+                              {sel.optionType === "toggle" && (
+                                <span className="flex items-center gap-1">
+                                  {sel.booleanValue ? (
+                                    <>
+                                      <CheckCircle2 className="w-3 h-3 text-emerald-500" />
+                                      نعم
+                                    </>
+                                  ) : "لا"}
+                                </span>
+                              )}
+                              {sel.optionType === "multiple_choice" && sel.textValue}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 {selectedOrder.customerNote && (
                   <div className="p-4 rounded-lg border">

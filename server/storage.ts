@@ -155,6 +155,7 @@ export interface IStorage {
   markAllNotificationsRead(recipientType: string, recipientId?: number): Promise<void>;
   
   // Product Options
+  getProductOption(id: number): Promise<ProductOption | undefined>;
   getProductOptions(productId: number): Promise<ProductOption[]>;
   getProductOptionChoices(optionId: number): Promise<ProductOptionChoice[]>;
   createProductOption(option: InsertProductOption): Promise<ProductOption>;
@@ -531,6 +532,11 @@ export class DatabaseStorage implements IStorage {
   }
 
   // ========== Product Options ==========
+  async getProductOption(id: number): Promise<ProductOption | undefined> {
+    const result = await db.select().from(productOptions).where(eq(productOptions.id, id)).limit(1);
+    return result[0];
+  }
+
   async getProductOptions(productId: number): Promise<ProductOption[]> {
     return await db.select().from(productOptions)
       .where(eq(productOptions.productId, productId))

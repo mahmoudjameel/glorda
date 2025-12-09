@@ -1018,11 +1018,26 @@ export async function registerRoutes(
           const customer = await storage.getCustomer(order.customerId);
           const merchant = await storage.getMerchant(order.merchantId);
           const product = await storage.getProduct(order.productId);
+          const optionSelections = await storage.getOrderOptionSelections(order.id);
+          
+          // Enrich option selections with option details
+          const optionsWithDetails = await Promise.all(
+            optionSelections.map(async (sel) => {
+              const option = await storage.getProductOption(sel.productOptionId);
+              return {
+                ...sel,
+                optionTitle: option?.title || "",
+                optionType: option?.type || "text"
+              };
+            })
+          );
+          
           return {
             ...order,
             customer: customer ? { id: customer.id, name: customer.name, mobile: customer.mobile, city: customer.city } : null,
             merchant: merchant ? { id: merchant.id, storeName: merchant.storeName, ownerName: merchant.ownerName } : null,
             product: product ? { id: product.id, name: product.name, price: product.price, images: product.images } : null,
+            optionSelections: optionsWithDetails
           };
         })
       );

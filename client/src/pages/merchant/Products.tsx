@@ -37,7 +37,7 @@ interface ProductOptionChoice {
 }
 
 interface ProductOption {
-  type: "multiple_choice" | "text" | "single";
+  type: "multiple_choice" | "text" | "toggle";
   title: string;
   placeholder?: string;
   required: boolean;
@@ -220,7 +220,7 @@ export default function MerchantProducts() {
     setProductOptions([]);
   };
 
-  const addOption = (type: "multiple_choice" | "text" | "single") => {
+  const addOption = (type: "multiple_choice" | "text" | "toggle") => {
     const newOption: ProductOption = {
       type,
       title: "",
@@ -531,7 +531,7 @@ export default function MerchantProducts() {
                         type="button" 
                         variant="outline" 
                         size="sm" 
-                        onClick={() => addOption("single")}
+                        onClick={() => addOption("toggle")}
                         className="gap-1"
                       >
                         <ToggleLeft className="w-3 h-3" /> خيار واحد
@@ -888,7 +888,7 @@ export default function MerchantProducts() {
                       type="button" 
                       variant="outline" 
                       size="sm" 
-                      onClick={() => addOption("single")}
+                      onClick={() => addOption("toggle")}
                       className="gap-1"
                     >
                       <ToggleLeft className="w-3 h-3" /> خيار واحد

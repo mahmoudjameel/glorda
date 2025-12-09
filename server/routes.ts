@@ -53,6 +53,15 @@ const settingSchema = z.object({
   valueJson: z.any().optional()
 });
 
+const merchantProfileUpdateSchema = z.object({
+  storeName: z.string().min(1).max(100).optional(),
+  username: z.string().regex(/^[a-zA-Z0-9_]+$/).min(3).max(50).optional(),
+  bio: z.string().max(500).optional().nullable(),
+  storeImage: z.string().url().optional().nullable(),
+  socialLinks: z.record(z.string()).optional().nullable(),
+  city: z.string().min(1).max(100).optional()
+}).strict();
+
 // Configure multer for product image uploads
 const uploadsDir = path.join(process.cwd(), "uploads", "products");
 if (!fs.existsSync(uploadsDir)) {
@@ -159,6 +168,52 @@ export async function registerRoutes(
   }
   
   app.use(session(sessionConfig));
+
+  // CSRF Protection: Validate Origin/Referer for state-changing requests
+  const csrfProtection = (req: any, res: any, next: any) => {
+    const method = req.method.toUpperCase();
+    if (['GET', 'HEAD', 'OPTIONS'].includes(method)) {
+      return next();
+    }
+    
+    const origin = req.get('Origin');
+    const referer = req.get('Referer');
+    const host = req.get('Host');
+    
+    // In development, allow requests without origin (e.g., Postman)
+    if (!isProduction && !origin && !referer) {
+      return next();
+    }
+    
+    // Validate origin or referer matches our host
+    if (origin) {
+      try {
+        const originUrl = new URL(origin);
+        if (originUrl.host === host || originUrl.hostname === 'localhost') {
+          return next();
+        }
+      } catch {
+        // Invalid origin URL
+      }
+    }
+    
+    if (referer) {
+      try {
+        const refererUrl = new URL(referer);
+        if (refererUrl.host === host || refererUrl.hostname === 'localhost') {
+          return next();
+        }
+      } catch {
+        // Invalid referer URL
+      }
+    }
+    
+    // Block request if no valid origin/referer
+    return res.status(403).json({ error: "طلب غير مصرح به" });
+  };
+
+  // Apply CSRF protection to all API routes
+  app.use('/api', csrfProtection);
 
   const requireMerchant = (req: any, res: any, next: any) => {
     if (!req.session.userId || req.session.userType !== "merchant") {
@@ -552,8 +607,11 @@ export async function registerRoutes(
 
   app.patch("/api/merchant/profile", requireMerchant, async (req, res) => {
     try {
-      const { storeName, username, bio, storeImage, socialLinks, city } = req.body;
-      await storage.updateMerchant(req.session.userId!, { storeName, username, bio, storeImage, socialLinks, city });
+      const parsed = merchantProfileUpdateSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: fromZodError(parsed.error).message });
+      }
+      await storage.updateMerchant(req.session.userId!, parsed.data);
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ error: "فشل تحديث بيانات المتجر" });
@@ -1401,7 +1459,7 @@ export async function registerRoutes(
         return res.status(400).json({ error: fromZodError(parsed.error).message });
       }
       const { key, value, valueJson } = parsed.data;
-      const setting = await storage.setSetting(key, value, valueJson);
+      const setting = await storage.setSetting(key, value ?? undefined, valueJson);
       res.json(setting);
     } catch (error) {
       res.status(500).json({ error: "فشل حفظ الإعداد" });

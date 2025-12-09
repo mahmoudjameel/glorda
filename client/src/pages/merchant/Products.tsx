@@ -550,7 +550,7 @@ export default function MerchantProducts() {
                         onClick={() => addOption("multiple_choice")}
                         className="gap-1"
                       >
-                        <ListPlus className="w-3 h-3" /> اختيار من متعدد
+                        <ListPlus className="w-3 h-3" /> خيار واحد
                       </Button>
                       <Button 
                         type="button" 
@@ -568,7 +568,7 @@ export default function MerchantProducts() {
                         onClick={() => addOption("toggle")}
                         className="gap-1"
                       >
-                        <ToggleLeft className="w-3 h-3" /> خيار واحد
+                        <ToggleLeft className="w-3 h-3" /> تفعيل/إيقاف
                       </Button>
                     </div>
                     
@@ -578,8 +578,8 @@ export default function MerchantProducts() {
                           <div key={optIndex} className="border rounded-lg p-3 bg-muted/30">
                             <div className="flex items-center justify-between mb-2">
                               <Badge variant="outline" className="text-xs">
-                                {option.type === "multiple_choice" ? "اختيار من متعدد" : 
-                                 option.type === "text" ? "مربع نص" : "خيار واحد"}
+                                {option.type === "multiple_choice" ? "خيار واحد" : 
+                                 option.type === "text" ? "مربع نص" : "تفعيل/إيقاف"}
                               </Badge>
                               <Button
                                 type="button"
@@ -933,7 +933,7 @@ export default function MerchantProducts() {
                       onClick={() => addOption("multiple_choice")}
                       className="gap-1"
                     >
-                      <ListPlus className="w-3 h-3" /> اختيار من متعدد
+                      <ListPlus className="w-3 h-3" /> خيار واحد
                     </Button>
                     <Button 
                       type="button" 
@@ -951,7 +951,7 @@ export default function MerchantProducts() {
                       onClick={() => addOption("toggle")}
                       className="gap-1"
                     >
-                      <ToggleLeft className="w-3 h-3" /> خيار واحد
+                      <ToggleLeft className="w-3 h-3" /> تفعيل/إيقاف
                     </Button>
                   </div>
                   
@@ -961,7 +961,7 @@ export default function MerchantProducts() {
                         <div key={optIndex} className="border rounded-lg p-3 bg-muted/30">
                           <div className="flex items-center justify-between mb-2">
                             <Badge variant="outline" className="text-xs">
-                              {option.type === "multiple_choice" ? "اختيار من متعدد" : 
+                              {option.type === "multiple_choice" ? "خيار واحد" : 
                                option.type === "text" ? "مربع نص" : "خيار واحد"}
                             </Badge>
                             <Button

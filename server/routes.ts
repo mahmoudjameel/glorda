@@ -1466,6 +1466,121 @@ export async function registerRoutes(
     }
   });
 
+  // ========== ADMIN DISCOUNT CODES ROUTES ==========
+  
+  const discountCodeSchema = z.object({
+    code: z.string().min(2).max(50),
+    type: z.enum(["percentage", "fixed", "free_shipping"]),
+    value: z.number().min(0),
+    minOrderAmount: z.number().min(0).optional(),
+    maxUses: z.number().min(1).optional().nullable(),
+    isActive: z.boolean().optional(),
+    expiresAt: z.string().optional().nullable(),
+  });
+
+  app.get("/api/admin/discount-codes", requireAdmin, async (req, res) => {
+    try {
+      const codes = await storage.getAllDiscountCodes();
+      res.json(codes);
+    } catch (error) {
+      res.status(500).json({ error: "فشل جلب أكواد الخصم" });
+    }
+  });
+
+  app.post("/api/admin/discount-codes", requireAdmin, async (req, res) => {
+    try {
+      const parsed = discountCodeSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: fromZodError(parsed.error).message });
+      }
+      const { expiresAt, ...rest } = parsed.data;
+      const code = await storage.createDiscountCode({
+        ...rest,
+        expiresAt: expiresAt ? new Date(expiresAt) : null,
+      });
+      res.json(code);
+    } catch (error: any) {
+      if (error.code === "23505") {
+        return res.status(400).json({ error: "كود الخصم موجود مسبقاً" });
+      }
+      res.status(500).json({ error: "فشل إضافة كود الخصم" });
+    }
+  });
+
+  app.patch("/api/admin/discount-codes/:id", requireAdmin, async (req, res) => {
+    try {
+      const codeId = parseInt(req.params.id);
+      const parsed = discountCodeSchema.partial().safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: fromZodError(parsed.error).message });
+      }
+      const { expiresAt, ...rest } = parsed.data;
+      await storage.updateDiscountCode(codeId, {
+        ...rest,
+        ...(expiresAt !== undefined && { expiresAt: expiresAt ? new Date(expiresAt) : null }),
+      });
+      res.json({ success: true });
+    } catch (error: any) {
+      if (error.code === "23505") {
+        return res.status(400).json({ error: "كود الخصم موجود مسبقاً" });
+      }
+      res.status(500).json({ error: "فشل تحديث كود الخصم" });
+    }
+  });
+
+  app.delete("/api/admin/discount-codes/:id", requireAdmin, async (req, res) => {
+    try {
+      const codeId = parseInt(req.params.id);
+      await storage.deleteDiscountCode(codeId);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "فشل حذف كود الخصم" });
+    }
+  });
+
+  // Public API to validate discount code
+  app.post("/api/public/validate-discount", async (req, res) => {
+    try {
+      const { code, orderAmount } = req.body;
+      if (!code) {
+        return res.status(400).json({ error: "الكود مطلوب" });
+      }
+      
+      const discountCode = await storage.getDiscountCodeByCode(code);
+      
+      if (!discountCode) {
+        return res.status(404).json({ error: "كود الخصم غير صالح" });
+      }
+      
+      if (!discountCode.isActive) {
+        return res.status(400).json({ error: "كود الخصم غير نشط" });
+      }
+      
+      if (discountCode.expiresAt && new Date(discountCode.expiresAt) < new Date()) {
+        return res.status(400).json({ error: "كود الخصم منتهي الصلاحية" });
+      }
+      
+      if (discountCode.maxUses && discountCode.usedCount >= discountCode.maxUses) {
+        return res.status(400).json({ error: "تم استخدام كود الخصم الحد الأقصى من المرات" });
+      }
+      
+      if (discountCode.minOrderAmount && orderAmount < discountCode.minOrderAmount) {
+        return res.status(400).json({ 
+          error: `الحد الأدنى للطلب ${discountCode.minOrderAmount} ريال` 
+        });
+      }
+      
+      res.json({
+        valid: true,
+        type: discountCode.type,
+        value: discountCode.value,
+        code: discountCode.code,
+      });
+    } catch (error) {
+      res.status(500).json({ error: "فشل التحقق من الكود" });
+    }
+  });
+
   // ========== PUBLIC ROUTES (for mobile app) ==========
   
   app.get("/api/public/banners", async (req, res) => {

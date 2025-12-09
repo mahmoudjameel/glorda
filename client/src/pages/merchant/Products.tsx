@@ -355,15 +355,15 @@ export default function MerchantProducts() {
                 إضافة منتج
               </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[500px] max-h-[90vh]">
-              <form onSubmit={handleSubmit}>
-                <DialogHeader className="text-right">
+            <DialogContent className="sm:max-w-[500px] max-h-[90vh] flex flex-col overflow-hidden">
+              <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
+                <DialogHeader className="text-right flex-shrink-0">
                   <DialogTitle>إضافة منتج جديد</DialogTitle>
                   <DialogDescription>
                     أدخل تفاصيل المنتج الجديد هنا. اضغط حفظ عند الانتهاء.
                   </DialogDescription>
                 </DialogHeader>
-                <ScrollArea className="max-h-[60vh] pr-4">
+                <div className="flex-1 overflow-y-auto pr-4 min-h-0">
                 <div className="grid gap-4 py-4">
                   <div className="grid gap-2">
                     <Label htmlFor="name">اسم المنتج</Label>
@@ -618,8 +618,8 @@ export default function MerchantProducts() {
                     )}
                   </div>
                 </div>
-                </ScrollArea>
-                <DialogFooter>
+                </div>
+                <DialogFooter className="flex-shrink-0 pt-4">
                   <Button type="submit" disabled={createMutation.isPending || isUploading} data-testid="button-save-product">
                     {createMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : "حفظ المنتج"}
                   </Button>
@@ -729,15 +729,15 @@ export default function MerchantProducts() {
         )}
 
         <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-          <DialogContent className="sm:max-w-[500px] max-h-[90vh]">
-            <form onSubmit={handleSubmit}>
-              <DialogHeader className="text-right">
+          <DialogContent className="sm:max-w-[500px] max-h-[90vh] flex flex-col overflow-hidden">
+            <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
+              <DialogHeader className="text-right flex-shrink-0">
                 <DialogTitle>تعديل المنتج</DialogTitle>
                 <DialogDescription>
                   عدّل تفاصيل المنتج. اضغط حفظ عند الانتهاء.
                 </DialogDescription>
               </DialogHeader>
-              <ScrollArea className="max-h-[60vh] pr-4">
+              <div className="flex-1 overflow-y-auto pr-4 min-h-0">
               <div className="grid gap-4 py-4">
                 <div className="grid gap-2">
                   <Label htmlFor="edit-name">اسم المنتج</Label>
@@ -982,8 +982,8 @@ export default function MerchantProducts() {
                   )}
                 </div>
               </div>
-              </ScrollArea>
-              <DialogFooter>
+              </div>
+              <DialogFooter className="flex-shrink-0 pt-4">
                 <Button type="submit" disabled={updateMutation.isPending || isUploading}>
                   {updateMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : "حفظ التغييرات"}
                 </Button>

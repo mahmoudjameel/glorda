@@ -690,6 +690,89 @@ export async function registerRoutes(
   const express = await import("express");
   app.use("/uploads", express.default.static(path.join(process.cwd(), "uploads")));
 
+  // ========== PRODUCT OPTIONS ROUTES ==========
+  
+  app.get("/api/merchant/products/:id/options", requireMerchant, async (req, res) => {
+    try {
+      const productId = parseInt(req.params.id);
+      const product = await storage.getProduct(productId);
+      
+      if (!product || product.merchantId !== req.session.userId) {
+        return res.status(404).json({ error: "لم يتم العثور على المنتج" });
+      }
+
+      const options = await storage.getProductOptions(productId);
+      const optionsWithChoices = await Promise.all(
+        options.map(async (option) => {
+          const choices = option.type === "multiple_choice" 
+            ? await storage.getProductOptionChoices(option.id)
+            : [];
+          return { ...option, choices };
+        })
+      );
+      
+      res.json(optionsWithChoices);
+    } catch (error) {
+      res.status(500).json({ error: "فشل جلب خيارات المنتج" });
+    }
+  });
+
+  app.post("/api/merchant/products/:id/options", requireMerchant, async (req, res) => {
+    try {
+      const productId = parseInt(req.params.id);
+      const product = await storage.getProduct(productId);
+      
+      if (!product || product.merchantId !== req.session.userId) {
+        return res.status(404).json({ error: "لم يتم العثور على المنتج" });
+      }
+
+      const { options } = req.body as { 
+        options: Array<{
+          type: string;
+          title: string;
+          placeholder?: string;
+          required: boolean;
+          choices?: Array<{ label: string }>;
+        }> 
+      };
+
+      // Delete existing options first
+      await storage.deleteAllProductOptions(productId);
+
+      // Create new options
+      const createdOptions = [];
+      for (let i = 0; i < options.length; i++) {
+        const opt = options[i];
+        const createdOption = await storage.createProductOption({
+          productId,
+          type: opt.type,
+          title: opt.title,
+          placeholder: opt.placeholder || null,
+          required: opt.required,
+          sortOrder: i,
+        });
+
+        // Create choices for multiple_choice type
+        if (opt.type === "multiple_choice" && opt.choices) {
+          for (let j = 0; j < opt.choices.length; j++) {
+            await storage.createProductOptionChoice({
+              optionId: createdOption.id,
+              label: opt.choices[j].label,
+              sortOrder: j,
+            });
+          }
+        }
+
+        createdOptions.push(createdOption);
+      }
+
+      res.json({ success: true, options: createdOptions });
+    } catch (error) {
+      console.error("Error saving product options:", error);
+      res.status(500).json({ error: "فشل حفظ خيارات المنتج" });
+    }
+  });
+
   // ========== MERCHANT ORDERS ROUTES ==========
   
   app.get("/api/merchant/orders", requireMerchant, async (req, res) => {

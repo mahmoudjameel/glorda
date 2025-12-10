@@ -2,22 +2,22 @@ import DashboardLayout from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow
 } from "@/components/ui/table";
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogDescription, 
-  DialogFooter, 
-  DialogHeader, 
-  DialogTitle, 
-  DialogTrigger 
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger
 } from "@/components/ui/dialog";
 import { Plus, Search, MoreHorizontal, Edit, Trash, Loader2, Package, Upload, X, ImageIcon, ListPlus, Type, ToggleLeft, Star, Eye, EyeOff } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -27,25 +27,26 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState, useRef } from "react";
 import { useToast } from "@/hooks/use-toast";
-import type { Product } from "@shared/schema";
+import { useAuth } from "@/hooks/useAuth";
 import { Switch } from "@/components/ui/switch";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
-
-interface ProductOptionChoice {
-  label: string;
-}
-
-interface ProductOption {
-  type: "multiple_choice" | "text" | "toggle";
-  title: string;
-  placeholder?: string;
-  required: boolean;
-  choices?: ProductOptionChoice[];
-}
+import { uploadMultipleToStorage } from "@/lib/storage-upload";
+import { getCollectionAll } from "@/lib/firestore";
+import {
+  addProduct,
+  deleteProduct,
+  getMerchantProducts,
+  getProductOptions,
+  saveProductOptions as persistProductOptions,
+  setProductVisibility,
+  updateProduct,
+  type Product,
+  type ProductOption
+} from "@/lib/merchant-data";
 
 interface Category {
-  id: number;
+  id: string;
   name: string;
   nameEn: string | null;
   isActive: boolean;
@@ -54,6 +55,7 @@ interface Category {
 const MAX_IMAGES = 5;
 
 export default function MerchantProducts() {
+  const { user } = useAuth();
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
@@ -81,12 +83,8 @@ export default function MerchantProducts() {
   };
 
   const { data: categories = [] } = useQuery<Category[]>({
-    queryKey: ["/api/public/categories"],
-    queryFn: async () => {
-      const res = await fetch("/api/public/categories");
-      if (!res.ok) throw new Error("Failed to fetch categories");
-      return res.json();
-    }
+    queryKey: ["categories"],
+    queryFn: () => getCollectionAll<Category>("categories"),
   });
 
   const promoBadgeOptions = [
@@ -107,28 +105,21 @@ export default function MerchantProducts() {
     }
 
     setIsUploading(true);
-    const formData = new FormData();
-    for (let i = 0; i < files.length; i++) {
-      formData.append("images", files[i]);
-    }
 
     try {
-      const res = await fetch("/api/merchant/products/upload-images", {
-        method: "POST",
-        credentials: "include",
-        body: formData
-      });
+      // Upload directly to Firebase Storage
+      const filesArray = Array.from(files);
+      const uploadedUrls = await uploadMultipleToStorage(filesArray, "products");
 
-      if (!res.ok) {
-        const error = await res.json();
-        throw new Error(error.error || "فشل رفع الصور");
-      }
-
-      const data = await res.json();
-      setImages(prev => [...prev, ...data.images]);
+      setImages(prev => [...prev, ...uploadedUrls]);
       toast({ title: "تم رفع الصور بنجاح" });
     } catch (error: any) {
-      toast({ variant: "destructive", title: error.message || "فشل رفع الصور" });
+      console.error("Upload error:", error);
+      toast({
+        variant: "destructive",
+        title: "فشل رفع الصور",
+        description: error.message || "حدث خطأ أثناء رفع الصور"
+      });
     } finally {
       setIsUploading(false);
       if (fileInputRef.current) {
@@ -152,30 +143,24 @@ export default function MerchantProducts() {
   };
 
   const { data: products = [], isLoading } = useQuery<Product[]>({
-    queryKey: ["/api/merchant/products"],
-    queryFn: async () => {
-      const res = await fetch("/api/merchant/products", { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to fetch products");
-      return res.json();
-    }
+    queryKey: ["merchant-products", user?.id],
+    queryFn: () => getMerchantProducts(user!.id),
+    enabled: !!user?.id,
   });
 
   const createMutation = useMutation({
     mutationFn: async (data: any) => {
-      const res = await fetch("/api/merchant/products", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify(data)
+      const newId = await addProduct({
+        merchantId: user!.id,
+        ...data,
       });
-      if (!res.ok) throw new Error("Failed to create product");
-      return res.json();
+      return newId;
     },
-    onSuccess: async (product) => {
+    onSuccess: async (productId) => {
       if (productOptions.length > 0) {
-        await saveProductOptions(product.id);
+        await persistProductOptions(productId, productOptions);
       }
-      queryClient.invalidateQueries({ queryKey: ["/api/merchant/products"] });
+      queryClient.invalidateQueries({ queryKey: ["merchant-products", user?.id] });
       setIsAddOpen(false);
       resetForm();
       toast({ title: "تم إضافة المنتج بنجاح" });
@@ -186,19 +171,13 @@ export default function MerchantProducts() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: async ({ id, data }: { id: number, data: any }) => {
-      const res = await fetch(`/api/merchant/products/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify(data)
-      });
-      if (!res.ok) throw new Error("Failed to update product");
+    mutationFn: async ({ id, data }: { id: string, data: any }) => {
+      await updateProduct(id, data);
       return { ...data, id };
     },
     onSuccess: async (result) => {
-      await saveProductOptions(result.id);
-      queryClient.invalidateQueries({ queryKey: ["/api/merchant/products"] });
+      await persistProductOptions(result.id, productOptions);
+      queryClient.invalidateQueries({ queryKey: ["merchant-products", user?.id] });
       setIsEditOpen(false);
       setEditingProduct(null);
       resetForm();
@@ -210,13 +189,9 @@ export default function MerchantProducts() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: async (id: number) => {
-      const res = await fetch(`/api/merchant/products/${id}`, { method: "DELETE" });
-      if (!res.ok) throw new Error("Failed to delete product");
-      return res.json();
-    },
+    mutationFn: (id: string) => deleteProduct(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/merchant/products"] });
+      queryClient.invalidateQueries({ queryKey: ["merchant-products", user?.id] });
       toast({ title: "تم حذف المنتج بنجاح" });
     },
     onError: () => {
@@ -225,14 +200,10 @@ export default function MerchantProducts() {
   });
 
   const toggleVisibilityMutation = useMutation({
-    mutationFn: async (id: number) => {
-      const res = await fetch(`/api/merchant/products/${id}/visibility`, { method: "PATCH" });
-      if (!res.ok) throw new Error("Failed to toggle visibility");
-      return res.json();
-    },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/merchant/products"] });
-      toast({ title: data.status === "active" ? "تم إظهار المنتج" : "تم إخفاء المنتج" });
+    mutationFn: ({ id, isActive }: { id: string; isActive: boolean }) => setProductVisibility(id, isActive),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["merchant-products", user?.id] });
+      toast({ title: variables.isActive ? "تم إظهار المنتج" : "تم إخفاء المنتج" });
     },
     onError: () => {
       toast({ variant: "destructive", title: "فشل تغيير حالة المنتج" });
@@ -290,34 +261,25 @@ export default function MerchantProducts() {
     }
   };
 
-  const saveProductOptions = async (productId: number) => {
+  const saveProductOptions = async (productId: string) => {
     if (productOptions.length === 0) return;
-    
     try {
-      await fetch(`/api/merchant/products/${productId}/options`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ options: productOptions })
-      });
+      await persistProductOptions(productId, productOptions);
     } catch (error) {
       console.error("Failed to save product options:", error);
     }
   };
 
-  const loadProductOptions = async (productId: number) => {
+  const loadProductOptions = async (productId: string) => {
     try {
-      const res = await fetch(`/api/merchant/products/${productId}/options`, { credentials: "include" });
-      if (res.ok) {
-        const options = await res.json();
-        setProductOptions(options.map((opt: any) => ({
-          type: opt.type,
-          title: opt.title,
-          placeholder: opt.placeholder,
-          required: opt.required,
-          choices: opt.choices?.map((c: any) => ({ label: c.label }))
-        })));
-      }
+      const options = await getProductOptions(productId);
+      setProductOptions(options.map((opt: any) => ({
+        type: opt.type,
+        title: opt.title,
+        placeholder: opt.placeholder,
+        required: opt.required,
+        choices: opt.choices?.map((c: any) => ({ label: c.label }))
+      })));
     } catch (error) {
       console.error("Failed to load product options:", error);
     }
@@ -325,6 +287,10 @@ export default function MerchantProducts() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!user?.id) {
+      toast({ variant: "destructive", title: "يجب تسجيل الدخول كـ تاجر" });
+      return;
+    }
     const data = {
       name: formData.name,
       description: formData.description,
@@ -361,7 +327,7 @@ export default function MerchantProducts() {
     setIsEditOpen(true);
   };
 
-  const filteredProducts = products.filter(p => 
+  const filteredProducts = products.filter(p =>
     p.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
@@ -389,61 +355,445 @@ export default function MerchantProducts() {
                   </DialogDescription>
                 </DialogHeader>
                 <div className="flex-1 overflow-y-auto pr-4 min-h-0">
+                  <div className="grid gap-4 py-4">
+                    <div className="grid gap-2">
+                      <Label htmlFor="name">اسم المنتج</Label>
+                      <Input
+                        id="name"
+                        placeholder="مثال: باقة ورد فاخرة"
+                        value={formData.name}
+                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                        required
+                        data-testid="input-product-name"
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="description">وصف المنتج</Label>
+                      <Textarea
+                        id="description"
+                        placeholder="وصف المنتج..."
+                        value={formData.description}
+                        onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                        data-testid="input-product-description"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="grid gap-2">
+                        <Label htmlFor="price">السعر (ر.س)</Label>
+                        <Input
+                          id="price"
+                          type="number"
+                          placeholder="0.00"
+                          value={formData.price}
+                          onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                          required
+                          data-testid="input-product-price"
+                        />
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="stock">الكمية</Label>
+                        <Input
+                          id="stock"
+                          type="number"
+                          placeholder="0"
+                          value={formData.stock}
+                          onChange={(e) => setFormData({ ...formData, stock: e.target.value })}
+                          required
+                          data-testid="input-product-stock"
+                        />
+                      </div>
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="category">فئة المنتج</Label>
+                      <Select
+                        value={formData.category}
+                        onValueChange={(value) => setFormData({ ...formData, category: value })}
+                      >
+                        <SelectTrigger id="category" data-testid="select-product-category">
+                          <SelectValue placeholder="اختر فئة المنتج" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {categories.map((cat) => (
+                            <SelectItem key={cat.id} value={cat.name}>
+                              {cat.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="promoBadge">العنوان الترويجي</Label>
+                      <Select
+                        value={formData.promoBadge}
+                        onValueChange={(value) => setFormData({ ...formData, promoBadge: value })}
+                      >
+                        <SelectTrigger id="promoBadge" data-testid="select-promo-badge">
+                          <SelectValue placeholder="اختر عنوان ترويجي (اختياري)" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {promoBadgeOptions.map((option) => (
+                            <SelectItem key={option.value || "none"} value={option.value}>
+                              {option.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="grid gap-2">
+                      <Label>صور المنتج ({images.length}/{MAX_IMAGES})</Label>
+                      <p className="text-xs text-muted-foreground">اضغط على النجمة لتعيين الصورة الرئيسية</p>
+                      <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-4">
+                        {images.length > 0 && (
+                          <div className="grid grid-cols-5 gap-2 mb-3">
+                            {images.map((img, index) => (
+                              <div key={index} className="relative group">
+                                <img
+                                  src={img}
+                                  alt={`صورة ${index + 1}`}
+                                  className={`w-full h-16 object-cover rounded border-2 ${index === 0 ? 'border-primary' : 'border-transparent'}`}
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => setMainImage(index)}
+                                  className={`absolute -top-1 -left-1 rounded-full p-0.5 transition-opacity ${index === 0 ? 'bg-primary text-white' : 'bg-muted text-muted-foreground opacity-0 group-hover:opacity-100'}`}
+                                  title={index === 0 ? 'الصورة الرئيسية' : 'تعيين كصورة رئيسية'}
+                                >
+                                  <Star className={`w-3 h-3 ${index === 0 ? 'fill-current' : ''}`} />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => removeImage(index)}
+                                  className="absolute -top-1 -right-1 bg-destructive text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                                >
+                                  <X className="w-3 h-3" />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        {images.length < MAX_IMAGES && (
+                          <div className="flex flex-col items-center gap-2">
+                            <input
+                              ref={fileInputRef}
+                              type="file"
+                              accept="image/*"
+                              multiple
+                              onChange={handleImageUpload}
+                              className="hidden"
+                              id="product-images"
+                              data-testid="input-product-images"
+                            />
+                            <label
+                              htmlFor="product-images"
+                              className="cursor-pointer flex flex-col items-center gap-1 text-muted-foreground hover:text-foreground transition-colors"
+                            >
+                              {isUploading ? (
+                                <Loader2 className="w-8 h-8 animate-spin" />
+                              ) : (
+                                <>
+                                  <Upload className="w-8 h-8" />
+                                  <span className="text-xs">اضغط لرفع الصور</span>
+                                </>
+                              )}
+                            </label>
+                          </div>
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground">يمكنك رفع من 1 إلى 5 صور (JPEG, PNG, GIF, WebP)</p>
+                    </div>
+
+                    <Separator className="my-4" />
+
+                    <div className="grid gap-2">
+                      <Label>خيارات المنتج (اختياري)</Label>
+                      <p className="text-xs text-muted-foreground mb-2">أضف خيارات يمكن للعميل اختيارها عند الطلب</p>
+
+                      <div className="flex gap-2 flex-wrap">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => addOption("multiple_choice")}
+                          className="gap-1"
+                        >
+                          <ListPlus className="w-3 h-3" /> خيار واحد
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => addOption("text")}
+                          className="gap-1"
+                        >
+                          <Type className="w-3 h-3" /> مربع نص
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => addOption("toggle")}
+                          className="gap-1"
+                        >
+                          <ToggleLeft className="w-3 h-3" /> تفعيل/إيقاف
+                        </Button>
+                      </div>
+
+                      {productOptions.length > 0 && (
+                        <div className="space-y-3 mt-3">
+                          {productOptions.map((option, optIndex) => (
+                            <div key={optIndex} className="border rounded-lg p-3 bg-muted/30">
+                              <div className="flex items-center justify-between mb-2">
+                                <Badge variant="outline" className="text-xs">
+                                  {option.type === "multiple_choice" ? "خيار واحد" :
+                                    option.type === "text" ? "مربع نص" : "تفعيل/إيقاف"}
+                                </Badge>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => removeOption(optIndex)}
+                                  className="h-6 w-6 p-0 text-destructive"
+                                >
+                                  <X className="w-3 h-3" />
+                                </Button>
+                              </div>
+                              <Input
+                                placeholder="عنوان الخيار (مثال: اللون، الحجم)"
+                                value={option.title}
+                                onChange={(e) => updateOption(optIndex, { title: e.target.value })}
+                                className="mb-2"
+                              />
+                              {option.type === "text" && (
+                                <Input
+                                  placeholder="نص توضيحي (مثال: اكتب رسالتك هنا)"
+                                  value={option.placeholder || ""}
+                                  onChange={(e) => updateOption(optIndex, { placeholder: e.target.value })}
+                                  className="mb-2"
+                                />
+                              )}
+                              {option.type === "multiple_choice" && option.choices && (
+                                <div className="space-y-1">
+                                  {option.choices.map((choice, choiceIndex) => (
+                                    <div key={choiceIndex} className="flex gap-1">
+                                      <Input
+                                        placeholder={`الخيار ${choiceIndex + 1}`}
+                                        value={choice.label}
+                                        onChange={(e) => updateChoice(optIndex, choiceIndex, e.target.value)}
+                                        className="h-8 text-sm"
+                                      />
+                                      {option.choices!.length > 1 && (
+                                        <Button
+                                          type="button"
+                                          variant="ghost"
+                                          size="sm"
+                                          onClick={() => removeChoice(optIndex, choiceIndex)}
+                                          className="h-8 w-8 p-0"
+                                        >
+                                          <X className="w-3 h-3" />
+                                        </Button>
+                                      )}
+                                    </div>
+                                  ))}
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => addChoice(optIndex)}
+                                    className="text-xs"
+                                  >
+                                    + إضافة خيار
+                                  </Button>
+                                </div>
+                              )}
+                              <div className="flex items-center gap-2 mt-2">
+                                <Switch
+                                  checked={option.required}
+                                  onCheckedChange={(checked) => updateOption(optIndex, { required: checked })}
+                                />
+                                <span className="text-xs">إجباري</span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+                <DialogFooter className="flex-shrink-0 pt-4">
+                  <Button type="submit" disabled={createMutation.isPending || isUploading} data-testid="button-save-product">
+                    {createMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : "حفظ المنتج"}
+                  </Button>
+                </DialogFooter>
+              </form>
+            </DialogContent>
+          </Dialog>
+        </div>
+
+        <div className="flex items-center gap-4 bg-card p-4 rounded-lg border">
+          <Search className="w-5 h-5 text-muted-foreground" />
+          <Input
+            placeholder="بحث عن منتج..."
+            className="max-w-sm border-none shadow-none focus-visible:ring-0"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            data-testid="input-search-products"
+          />
+        </div>
+
+        {isLoading ? (
+          <div className="flex justify-center py-12">
+            <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+          </div>
+        ) : filteredProducts.length === 0 ? (
+          <div className="text-center py-12 border rounded-lg bg-muted/20">
+            <Package className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+            <h3 className="font-semibold text-lg">لا توجد منتجات</h3>
+            <p className="text-muted-foreground">ابدأ بإضافة منتجات لمتجرك</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            {filteredProducts.map((product) => (
+              <div
+                key={product.id}
+                className="bg-card border rounded-lg overflow-hidden hover:shadow-md transition-shadow"
+                data-testid={`card-product-${product.id}`}
+              >
+                <div className="aspect-square relative bg-muted">
+                  {product.images && product.images.length > 0 ? (
+                    <img
+                      src={product.images[0]}
+                      alt={product.name}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <Package className="w-12 h-12 text-muted-foreground" />
+                    </div>
+                  )}
+                  <div className="absolute top-2 right-2 flex flex-col gap-1">
+                    <Badge
+                      variant={
+                        product.status === 'active' ? 'default' :
+                          product.status === 'hidden' ? 'secondary' : 'destructive'
+                      }
+                      className={`text-xs ${product.status === 'active' ? 'bg-emerald-500 hover:bg-emerald-600' :
+                        product.status === 'hidden' ? 'bg-gray-500 hover:bg-gray-600' : ''
+                        }`}
+                    >
+                      {
+                        product.status === 'active' ? 'نشط' :
+                          product.status === 'hidden' ? 'مخفي' : 'غير نشط'
+                      }
+                    </Badge>
+                  </div>
+                  {product.promoBadge && (
+                    <div className="absolute top-2 left-2">
+                      <Badge className="bg-primary text-xs">{product.promoBadge}</Badge>
+                    </div>
+                  )}
+                </div>
+                <div className="p-3">
+                  <h3 className="font-semibold text-sm truncate mb-1">{product.name}</h3>
+                  <div className="flex items-center justify-between mb-2">
+                    <Badge variant="outline" className={`text-xs ${product.productType === 'flowers' ? 'border-pink-300 text-pink-600' : 'border-amber-300 text-amber-600'}`}>
+                      {productTypeLabels[product.productType] || product.productType}
+                    </Badge>
+                    <span className="text-xs text-muted-foreground">المخزون: {product.stock}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-primary">{(product.price / 100).toFixed(2)} ر.س</span>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0" data-testid={`button-product-menu-${product.id}`}>
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem className="gap-2 cursor-pointer" onClick={() => handleEdit(product)}>
+                          <Edit className="w-4 h-4" /> تعديل
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          className="gap-2 cursor-pointer"
+                          onClick={() => toggleVisibilityMutation.mutate({ id: product.id, isActive: product.status === "hidden" })}
+                        >
+                          {product.status === 'hidden' ? (
+                            <><Eye className="w-4 h-4" /> إظهار</>
+                          ) : (
+                            <><EyeOff className="w-4 h-4" /> إخفاء</>
+                          )}
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          className="gap-2 cursor-pointer text-destructive focus:text-destructive"
+                          onClick={() => deleteMutation.mutate(product.id)}
+                        >
+                          <Trash className="w-4 h-4" /> حذف
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+          <DialogContent className="sm:max-w-[500px] max-h-[90vh] flex flex-col overflow-hidden">
+            <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
+              <DialogHeader className="text-right flex-shrink-0">
+                <DialogTitle>تعديل المنتج</DialogTitle>
+                <DialogDescription>
+                  عدّل تفاصيل المنتج. اضغط حفظ عند الانتهاء.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="flex-1 overflow-y-auto pr-4 min-h-0">
                 <div className="grid gap-4 py-4">
                   <div className="grid gap-2">
-                    <Label htmlFor="name">اسم المنتج</Label>
-                    <Input 
-                      id="name" 
-                      placeholder="مثال: باقة ورد فاخرة" 
+                    <Label htmlFor="edit-name">اسم المنتج</Label>
+                    <Input
+                      id="edit-name"
                       value={formData.name}
                       onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                       required
-                      data-testid="input-product-name"
                     />
                   </div>
                   <div className="grid gap-2">
-                    <Label htmlFor="description">وصف المنتج</Label>
-                    <Textarea 
-                      id="description" 
-                      placeholder="وصف المنتج..."
+                    <Label htmlFor="edit-description">وصف المنتج</Label>
+                    <Textarea
+                      id="edit-description"
                       value={formData.description}
                       onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                      data-testid="input-product-description"
                     />
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="grid gap-2">
-                      <Label htmlFor="price">السعر (ر.س)</Label>
-                      <Input 
-                        id="price" 
-                        type="number" 
-                        placeholder="0.00"
+                      <Label htmlFor="edit-price">السعر (ر.س)</Label>
+                      <Input
+                        id="edit-price"
+                        type="number"
                         value={formData.price}
                         onChange={(e) => setFormData({ ...formData, price: e.target.value })}
                         required
-                        data-testid="input-product-price"
                       />
                     </div>
                     <div className="grid gap-2">
-                      <Label htmlFor="stock">الكمية</Label>
-                      <Input 
-                        id="stock" 
-                        type="number" 
-                        placeholder="0"
+                      <Label htmlFor="edit-stock">الكمية</Label>
+                      <Input
+                        id="edit-stock"
+                        type="number"
                         value={formData.stock}
                         onChange={(e) => setFormData({ ...formData, stock: e.target.value })}
                         required
-                        data-testid="input-product-stock"
                       />
                     </div>
                   </div>
                   <div className="grid gap-2">
-                    <Label htmlFor="category">فئة المنتج</Label>
+                    <Label htmlFor="edit-category">فئة المنتج</Label>
                     <Select
                       value={formData.category}
                       onValueChange={(value) => setFormData({ ...formData, category: value })}
                     >
-                      <SelectTrigger id="category" data-testid="select-product-category">
+                      <SelectTrigger id="edit-category">
                         <SelectValue placeholder="اختر فئة المنتج" />
                       </SelectTrigger>
                       <SelectContent>
@@ -456,12 +806,12 @@ export default function MerchantProducts() {
                     </Select>
                   </div>
                   <div className="grid gap-2">
-                    <Label htmlFor="promoBadge">العنوان الترويجي</Label>
+                    <Label htmlFor="edit-promoBadge">العنوان الترويجي</Label>
                     <Select
                       value={formData.promoBadge}
                       onValueChange={(value) => setFormData({ ...formData, promoBadge: value })}
                     >
-                      <SelectTrigger id="promoBadge" data-testid="select-promo-badge">
+                      <SelectTrigger id="edit-promoBadge">
                         <SelectValue placeholder="اختر عنوان ترويجي (اختياري)" />
                       </SelectTrigger>
                       <SelectContent>
@@ -481,8 +831,8 @@ export default function MerchantProducts() {
                         <div className="grid grid-cols-5 gap-2 mb-3">
                           {images.map((img, index) => (
                             <div key={index} className="relative group">
-                              <img 
-                                src={img} 
+                              <img
+                                src={img}
                                 alt={`صورة ${index + 1}`}
                                 className={`w-full h-16 object-cover rounded border-2 ${index === 0 ? 'border-primary' : 'border-transparent'}`}
                               />
@@ -508,17 +858,15 @@ export default function MerchantProducts() {
                       {images.length < MAX_IMAGES && (
                         <div className="flex flex-col items-center gap-2">
                           <input
-                            ref={fileInputRef}
                             type="file"
                             accept="image/*"
                             multiple
                             onChange={handleImageUpload}
                             className="hidden"
-                            id="product-images"
-                            data-testid="input-product-images"
+                            id="edit-product-images"
                           />
                           <label
-                            htmlFor="product-images"
+                            htmlFor="edit-product-images"
                             className="cursor-pointer flex flex-col items-center gap-1 text-muted-foreground hover:text-foreground transition-colors"
                           >
                             {isUploading ? (
@@ -535,51 +883,51 @@ export default function MerchantProducts() {
                     </div>
                     <p className="text-xs text-muted-foreground">يمكنك رفع من 1 إلى 5 صور (JPEG, PNG, GIF, WebP)</p>
                   </div>
-                  
+
                   <Separator className="my-4" />
-                  
+
                   <div className="grid gap-2">
                     <Label>خيارات المنتج (اختياري)</Label>
                     <p className="text-xs text-muted-foreground mb-2">أضف خيارات يمكن للعميل اختيارها عند الطلب</p>
-                    
+
                     <div className="flex gap-2 flex-wrap">
-                      <Button 
-                        type="button" 
-                        variant="outline" 
-                        size="sm" 
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
                         onClick={() => addOption("multiple_choice")}
                         className="gap-1"
                       >
                         <ListPlus className="w-3 h-3" /> خيار واحد
                       </Button>
-                      <Button 
-                        type="button" 
-                        variant="outline" 
-                        size="sm" 
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
                         onClick={() => addOption("text")}
                         className="gap-1"
                       >
                         <Type className="w-3 h-3" /> مربع نص
                       </Button>
-                      <Button 
-                        type="button" 
-                        variant="outline" 
-                        size="sm" 
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
                         onClick={() => addOption("toggle")}
                         className="gap-1"
                       >
                         <ToggleLeft className="w-3 h-3" /> تفعيل/إيقاف
                       </Button>
                     </div>
-                    
+
                     {productOptions.length > 0 && (
                       <div className="space-y-3 mt-3">
                         {productOptions.map((option, optIndex) => (
                           <div key={optIndex} className="border rounded-lg p-3 bg-muted/30">
                             <div className="flex items-center justify-between mb-2">
                               <Badge variant="outline" className="text-xs">
-                                {option.type === "multiple_choice" ? "خيار واحد" : 
-                                 option.type === "text" ? "مربع نص" : "تفعيل/إيقاف"}
+                                {option.type === "multiple_choice" ? "خيار واحد" :
+                                  option.type === "text" ? "مربع نص" : "خيار واحد"}
                               </Badge>
                               <Button
                                 type="button"
@@ -652,389 +1000,6 @@ export default function MerchantProducts() {
                     )}
                   </div>
                 </div>
-                </div>
-                <DialogFooter className="flex-shrink-0 pt-4">
-                  <Button type="submit" disabled={createMutation.isPending || isUploading} data-testid="button-save-product">
-                    {createMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : "حفظ المنتج"}
-                  </Button>
-                </DialogFooter>
-              </form>
-            </DialogContent>
-          </Dialog>
-        </div>
-
-        <div className="flex items-center gap-4 bg-card p-4 rounded-lg border">
-          <Search className="w-5 h-5 text-muted-foreground" />
-          <Input 
-            placeholder="بحث عن منتج..." 
-            className="max-w-sm border-none shadow-none focus-visible:ring-0"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            data-testid="input-search-products"
-          />
-        </div>
-
-        {isLoading ? (
-          <div className="flex justify-center py-12">
-            <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
-          </div>
-        ) : filteredProducts.length === 0 ? (
-          <div className="text-center py-12 border rounded-lg bg-muted/20">
-            <Package className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-            <h3 className="font-semibold text-lg">لا توجد منتجات</h3>
-            <p className="text-muted-foreground">ابدأ بإضافة منتجات لمتجرك</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            {filteredProducts.map((product) => (
-              <div 
-                key={product.id} 
-                className="bg-card border rounded-lg overflow-hidden hover:shadow-md transition-shadow"
-                data-testid={`card-product-${product.id}`}
-              >
-                <div className="aspect-square relative bg-muted">
-                  {product.images && product.images.length > 0 ? (
-                    <img 
-                      src={product.images[0]} 
-                      alt={product.name}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center">
-                      <Package className="w-12 h-12 text-muted-foreground" />
-                    </div>
-                  )}
-                  <div className="absolute top-2 right-2 flex flex-col gap-1">
-                    <Badge 
-                      variant={
-                        product.status === 'active' ? 'default' : 
-                        product.status === 'hidden' ? 'secondary' : 'destructive'
-                      }
-                      className={`text-xs ${
-                        product.status === 'active' ? 'bg-emerald-500 hover:bg-emerald-600' : 
-                        product.status === 'hidden' ? 'bg-gray-500 hover:bg-gray-600' : ''
-                      }`}
-                    >
-                      {
-                        product.status === 'active' ? 'نشط' : 
-                        product.status === 'hidden' ? 'مخفي' : 'غير نشط'
-                      }
-                    </Badge>
-                  </div>
-                  {product.promoBadge && (
-                    <div className="absolute top-2 left-2">
-                      <Badge className="bg-primary text-xs">{product.promoBadge}</Badge>
-                    </div>
-                  )}
-                </div>
-                <div className="p-3">
-                  <h3 className="font-semibold text-sm truncate mb-1">{product.name}</h3>
-                  <div className="flex items-center justify-between mb-2">
-                    <Badge variant="outline" className={`text-xs ${product.productType === 'flowers' ? 'border-pink-300 text-pink-600' : 'border-amber-300 text-amber-600'}`}>
-                      {productTypeLabels[product.productType] || product.productType}
-                    </Badge>
-                    <span className="text-xs text-muted-foreground">المخزون: {product.stock}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-primary">{(product.price / 100).toFixed(2)} ر.س</span>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0" data-testid={`button-product-menu-${product.id}`}>
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem className="gap-2 cursor-pointer" onClick={() => handleEdit(product)}>
-                          <Edit className="w-4 h-4" /> تعديل
-                        </DropdownMenuItem>
-                        <DropdownMenuItem 
-                          className="gap-2 cursor-pointer"
-                          onClick={() => toggleVisibilityMutation.mutate(product.id)}
-                        >
-                          {product.status === 'hidden' ? (
-                            <><Eye className="w-4 h-4" /> إظهار</>
-                          ) : (
-                            <><EyeOff className="w-4 h-4" /> إخفاء</>
-                          )}
-                        </DropdownMenuItem>
-                        <DropdownMenuItem 
-                          className="gap-2 cursor-pointer text-destructive focus:text-destructive"
-                          onClick={() => deleteMutation.mutate(product.id)}
-                        >
-                          <Trash className="w-4 h-4" /> حذف
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-          <DialogContent className="sm:max-w-[500px] max-h-[90vh] flex flex-col overflow-hidden">
-            <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
-              <DialogHeader className="text-right flex-shrink-0">
-                <DialogTitle>تعديل المنتج</DialogTitle>
-                <DialogDescription>
-                  عدّل تفاصيل المنتج. اضغط حفظ عند الانتهاء.
-                </DialogDescription>
-              </DialogHeader>
-              <div className="flex-1 overflow-y-auto pr-4 min-h-0">
-              <div className="grid gap-4 py-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="edit-name">اسم المنتج</Label>
-                  <Input 
-                    id="edit-name" 
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    required
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="edit-description">وصف المنتج</Label>
-                  <Textarea 
-                    id="edit-description"
-                    value={formData.description}
-                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="grid gap-2">
-                    <Label htmlFor="edit-price">السعر (ر.س)</Label>
-                    <Input 
-                      id="edit-price" 
-                      type="number"
-                      value={formData.price}
-                      onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-                      required
-                    />
-                  </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="edit-stock">الكمية</Label>
-                    <Input 
-                      id="edit-stock" 
-                      type="number"
-                      value={formData.stock}
-                      onChange={(e) => setFormData({ ...formData, stock: e.target.value })}
-                      required
-                    />
-                  </div>
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="edit-category">فئة المنتج</Label>
-                  <Select
-                    value={formData.category}
-                    onValueChange={(value) => setFormData({ ...formData, category: value })}
-                  >
-                    <SelectTrigger id="edit-category">
-                      <SelectValue placeholder="اختر فئة المنتج" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {categories.map((cat) => (
-                        <SelectItem key={cat.id} value={cat.name}>
-                          {cat.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="edit-promoBadge">العنوان الترويجي</Label>
-                  <Select
-                    value={formData.promoBadge}
-                    onValueChange={(value) => setFormData({ ...formData, promoBadge: value })}
-                  >
-                    <SelectTrigger id="edit-promoBadge">
-                      <SelectValue placeholder="اختر عنوان ترويجي (اختياري)" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {promoBadgeOptions.map((option) => (
-                        <SelectItem key={option.value || "none"} value={option.value}>
-                          {option.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="grid gap-2">
-                  <Label>صور المنتج ({images.length}/{MAX_IMAGES})</Label>
-                  <p className="text-xs text-muted-foreground">اضغط على النجمة لتعيين الصورة الرئيسية</p>
-                  <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-4">
-                    {images.length > 0 && (
-                      <div className="grid grid-cols-5 gap-2 mb-3">
-                        {images.map((img, index) => (
-                          <div key={index} className="relative group">
-                            <img 
-                              src={img} 
-                              alt={`صورة ${index + 1}`}
-                              className={`w-full h-16 object-cover rounded border-2 ${index === 0 ? 'border-primary' : 'border-transparent'}`}
-                            />
-                            <button
-                              type="button"
-                              onClick={() => setMainImage(index)}
-                              className={`absolute -top-1 -left-1 rounded-full p-0.5 transition-opacity ${index === 0 ? 'bg-primary text-white' : 'bg-muted text-muted-foreground opacity-0 group-hover:opacity-100'}`}
-                              title={index === 0 ? 'الصورة الرئيسية' : 'تعيين كصورة رئيسية'}
-                            >
-                              <Star className={`w-3 h-3 ${index === 0 ? 'fill-current' : ''}`} />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => removeImage(index)}
-                              className="absolute -top-1 -right-1 bg-destructive text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
-                            >
-                              <X className="w-3 h-3" />
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                    {images.length < MAX_IMAGES && (
-                      <div className="flex flex-col items-center gap-2">
-                        <input
-                          type="file"
-                          accept="image/*"
-                          multiple
-                          onChange={handleImageUpload}
-                          className="hidden"
-                          id="edit-product-images"
-                        />
-                        <label
-                          htmlFor="edit-product-images"
-                          className="cursor-pointer flex flex-col items-center gap-1 text-muted-foreground hover:text-foreground transition-colors"
-                        >
-                          {isUploading ? (
-                            <Loader2 className="w-8 h-8 animate-spin" />
-                          ) : (
-                            <>
-                              <Upload className="w-8 h-8" />
-                              <span className="text-xs">اضغط لرفع الصور</span>
-                            </>
-                          )}
-                        </label>
-                      </div>
-                    )}
-                  </div>
-                  <p className="text-xs text-muted-foreground">يمكنك رفع من 1 إلى 5 صور (JPEG, PNG, GIF, WebP)</p>
-                </div>
-                
-                <Separator className="my-4" />
-                  
-                <div className="grid gap-2">
-                  <Label>خيارات المنتج (اختياري)</Label>
-                  <p className="text-xs text-muted-foreground mb-2">أضف خيارات يمكن للعميل اختيارها عند الطلب</p>
-                  
-                  <div className="flex gap-2 flex-wrap">
-                    <Button 
-                      type="button" 
-                      variant="outline" 
-                      size="sm" 
-                      onClick={() => addOption("multiple_choice")}
-                      className="gap-1"
-                    >
-                      <ListPlus className="w-3 h-3" /> خيار واحد
-                    </Button>
-                    <Button 
-                      type="button" 
-                      variant="outline" 
-                      size="sm" 
-                      onClick={() => addOption("text")}
-                      className="gap-1"
-                    >
-                      <Type className="w-3 h-3" /> مربع نص
-                    </Button>
-                    <Button 
-                      type="button" 
-                      variant="outline" 
-                      size="sm" 
-                      onClick={() => addOption("toggle")}
-                      className="gap-1"
-                    >
-                      <ToggleLeft className="w-3 h-3" /> تفعيل/إيقاف
-                    </Button>
-                  </div>
-                  
-                  {productOptions.length > 0 && (
-                    <div className="space-y-3 mt-3">
-                      {productOptions.map((option, optIndex) => (
-                        <div key={optIndex} className="border rounded-lg p-3 bg-muted/30">
-                          <div className="flex items-center justify-between mb-2">
-                            <Badge variant="outline" className="text-xs">
-                              {option.type === "multiple_choice" ? "خيار واحد" : 
-                               option.type === "text" ? "مربع نص" : "خيار واحد"}
-                            </Badge>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => removeOption(optIndex)}
-                              className="h-6 w-6 p-0 text-destructive"
-                            >
-                              <X className="w-3 h-3" />
-                            </Button>
-                          </div>
-                          <Input
-                            placeholder="عنوان الخيار (مثال: اللون، الحجم)"
-                            value={option.title}
-                            onChange={(e) => updateOption(optIndex, { title: e.target.value })}
-                            className="mb-2"
-                          />
-                          {option.type === "text" && (
-                            <Input
-                              placeholder="نص توضيحي (مثال: اكتب رسالتك هنا)"
-                              value={option.placeholder || ""}
-                              onChange={(e) => updateOption(optIndex, { placeholder: e.target.value })}
-                              className="mb-2"
-                            />
-                          )}
-                          {option.type === "multiple_choice" && option.choices && (
-                            <div className="space-y-1">
-                              {option.choices.map((choice, choiceIndex) => (
-                                <div key={choiceIndex} className="flex gap-1">
-                                  <Input
-                                    placeholder={`الخيار ${choiceIndex + 1}`}
-                                    value={choice.label}
-                                    onChange={(e) => updateChoice(optIndex, choiceIndex, e.target.value)}
-                                    className="h-8 text-sm"
-                                  />
-                                  {option.choices!.length > 1 && (
-                                    <Button
-                                      type="button"
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() => removeChoice(optIndex, choiceIndex)}
-                                      className="h-8 w-8 p-0"
-                                    >
-                                      <X className="w-3 h-3" />
-                                    </Button>
-                                  )}
-                                </div>
-                              ))}
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => addChoice(optIndex)}
-                                className="text-xs"
-                              >
-                                + إضافة خيار
-                              </Button>
-                            </div>
-                          )}
-                          <div className="flex items-center gap-2 mt-2">
-                            <Switch
-                              checked={option.required}
-                              onCheckedChange={(checked) => updateOption(optIndex, { required: checked })}
-                            />
-                            <span className="text-xs">إجباري</span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
               </div>
               <DialogFooter className="flex-shrink-0 pt-4">
                 <Button type="submit" disabled={updateMutation.isPending || isUploading}>

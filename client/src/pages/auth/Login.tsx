@@ -15,6 +15,9 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { useQuery } from "@tanstack/react-query";
 import logoUrl from "@assets/شعار_غلوردا_1764881546720.jpg";
+import { auth } from "@/lib/firebase";
+import { signInWithEmailAndPassword, signOut } from "firebase/auth";
+import { getDocData } from "@/lib/firestore";
 
 const formSchema = z.object({
   email: z.string().email({ message: "البريد الإلكتروني غير صالح" }),
@@ -29,35 +32,25 @@ export default function Login() {
   const { toast } = useToast();
   const { refetch } = useAuth();
 
+  const fetchSetting = async (key: string) => (await getDocData<{ value?: string }>(`settings/${key}`)) || { value: "" };
+
   const { data: termsData } = useQuery({
-    queryKey: ["/api/public/settings/merchant_terms_conditions"],
-    queryFn: async () => {
-      const res = await fetch("/api/public/settings/merchant_terms_conditions");
-      if (!res.ok) return { value: "" };
-      return res.json();
-    },
+    queryKey: ["settings", "merchant_terms_conditions"],
+    queryFn: () => fetchSetting("merchant_terms_conditions"),
     staleTime: 0,
     refetchOnMount: "always"
   });
 
   const { data: privacyData } = useQuery({
-    queryKey: ["/api/public/settings/merchant_privacy_policy"],
-    queryFn: async () => {
-      const res = await fetch("/api/public/settings/merchant_privacy_policy");
-      if (!res.ok) return { value: "" };
-      return res.json();
-    },
+    queryKey: ["settings", "merchant_privacy_policy"],
+    queryFn: () => fetchSetting("merchant_privacy_policy"),
     staleTime: 0,
     refetchOnMount: "always"
   });
 
   const { data: aboutData } = useQuery({
-    queryKey: ["/api/public/settings/merchant_about_us"],
-    queryFn: async () => {
-      const res = await fetch("/api/public/settings/merchant_about_us");
-      if (!res.ok) return { value: "" };
-      return res.json();
-    },
+    queryKey: ["settings", "merchant_about_us"],
+    queryFn: () => fetchSetting("merchant_about_us"),
     staleTime: 0,
     refetchOnMount: "always"
   });
@@ -72,40 +65,82 @@ export default function Login() {
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsSubmitting(true);
-    
+
     try {
-      const response = await fetch("/api/auth/login/merchant", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify(values),
-      });
-      
-      const data = await response.json();
-      
-      if (!response.ok) {
+      const credential = await signInWithEmailAndPassword(auth, values.email, values.password);
+      const uid = credential.user.uid;
+
+      const userDoc = await getDocData<{ role?: string; merchantId?: string }>(`users/${uid}`);
+      if (!userDoc || userDoc.role !== "merchant") {
+        await signOut(auth);
         toast({
           variant: "destructive",
-          title: "خطأ في تسجيل الدخول",
-          description: data.error || "حدث خطأ ما",
+          title: "صلاحيات غير صحيحة",
+          description: "هذا الحساب ليس تاجر.",
         });
         return;
       }
-      
-      toast({
-        title: "تم تسجيل الدخول بنجاح",
-        description: `مرحباً ${data.merchant.storeName}`,
-      });
-      
+
+      // Check merchant status
+      const merchantId = userDoc.merchantId || uid;
+      const merchantDoc = await getDocData<{ status?: string; storeName?: string }>(`merchants/${merchantId}`);
+
+      if (!merchantDoc) {
+        await signOut(auth);
+        toast({
+          variant: "destructive",
+          title: "خطأ",
+          description: "لم يتم العثور على بيانات التاجر.",
+        });
+        return;
+      }
+
+      // Handle different merchant statuses
+      if (merchantDoc.status === "pending") {
+        await signOut(auth);
+        toast({
+          variant: "default",
+          title: "الحساب قيد المراجعة ⏳",
+          description: "طلب تسجيلك قيد المراجعة حالياً. سيتم إشعارك عند تفعيل الحساب.",
+        });
+        return;
+      }
+
+      if (merchantDoc.status === "rejected") {
+        await signOut(auth);
+        toast({
+          variant: "destructive",
+          title: "تم رفض الطلب ❌",
+          description: "للأسف تم رفض طلب تسجيلك. يرجى التواصل مع الدعم لمزيد من المعلومات.",
+        });
+        return;
+      }
+
+      if (merchantDoc.status !== "active") {
+        await signOut(auth);
+        toast({
+          variant: "destructive",
+          title: "الحساب غير نشط",
+          description: "حسابك غير نشط حالياً. يرجى التواصل مع الدعم.",
+        });
+        return;
+      }
+
+      // Merchant is active - proceed to dashboard
       await refetch();
-      setTimeout(() => {
-        setLocation("/dashboard");
-      }, 100);
-    } catch (error) {
+
+      toast({
+        title: "تم تسجيل الدخول بنجاح ✅",
+        description: `مرحباً بك ${merchantDoc.storeName || "في لوحة التاجر"}`,
+      });
+
+      setLocation("/dashboard");
+    } catch (error: any) {
+      console.error("Login error:", error);
       toast({
         variant: "destructive",
-        title: "خطأ",
-        description: "فشل الاتصال بالخادم",
+        title: "خطأ في تسجيل الدخول",
+        description: error?.message || "حدث خطأ ما",
       });
     } finally {
       setIsSubmitting(false);
@@ -155,12 +190,12 @@ export default function Login() {
                       <FormLabel>كلمة المرور</FormLabel>
                       <FormControl>
                         <div className="relative">
-                          <Input 
-                            type={showPassword ? "text" : "password"} 
-                            placeholder="••••••••" 
-                            {...field} 
-                            className="bg-background/50 pl-10" 
-                            data-testid="input-password" 
+                          <Input
+                            type={showPassword ? "text" : "password"}
+                            placeholder="••••••••"
+                            {...field}
+                            className="bg-background/50 pl-10"
+                            data-testid="input-password"
                           />
                           <Button
                             type="button"
@@ -181,7 +216,7 @@ export default function Login() {
                 <Button type="submit" className="w-full h-12 text-base font-display rounded-xl bg-primary hover:bg-primary/90 shadow-lg shadow-primary/25 transition-all duration-200" disabled={isSubmitting} data-testid="button-submit">
                   {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin" /> : "تسجيل الدخول"}
                 </Button>
-                
+
                 <div className="text-center">
                   <Link href="/forgot-password" className="text-sm text-muted-foreground hover:text-primary transition-colors" data-testid="link-forgot-password">
                     نسيت كلمة المرور؟

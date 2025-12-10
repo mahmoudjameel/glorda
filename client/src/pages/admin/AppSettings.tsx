@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
-import { 
+import {
   Dialog,
   DialogContent,
   DialogHeader,
@@ -16,7 +16,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Image, Grid3X3, Plus, Trash2, Loader2, Edit, GripVertical, MapPin, ChevronsUpDown, Check, Tag, Percent, DollarSign, Truck } from "lucide-react";
-import { 
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -31,61 +31,41 @@ import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState, useRef } from "react";
-
-interface Banner {
-  id: number;
-  title: string;
-  image: string;
-  link: string | null;
-  isActive: boolean;
-  sortOrder: number;
-  createdAt: string;
-}
-
-interface Category {
-  id: number;
-  name: string;
-  nameEn: string | null;
-  icon: string | null;
-  image: string | null;
-  isActive: boolean;
-  sortOrder: number;
-  createdAt: string;
-}
-
-interface City {
-  id: number;
-  name: string;
-  nameEn: string | null;
-  isActive: boolean;
-  sortOrder: number;
-  createdAt: string;
-}
-
-interface DiscountCode {
-  id: number;
-  code: string;
-  type: "percentage" | "fixed" | "free_shipping";
-  value: number;
-  minOrderAmount: number | null;
-  maxUses: number | null;
-  usedCount: number;
-  isActive: boolean;
-  expiresAt: string | null;
-  createdAt: string;
-}
+import { uploadToStorage } from "@/lib/storage-upload";
+import {
+  addBanner,
+  addCategory,
+  addCity,
+  addDiscountCode,
+  deleteBanner,
+  deleteCategory,
+  deleteCity,
+  deleteDiscountCode,
+  getBanners,
+  getCategories,
+  getCities,
+  getDiscountCodes,
+  updateBanner,
+  updateCategory,
+  updateCity,
+  updateDiscountCode,
+  type Banners,
+  type Categories,
+  type Cities,
+  type DiscountCodes,
+} from "@/lib/admin-data";
 
 export default function AppSettings() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  
+
   const [isAddBannerOpen, setIsAddBannerOpen] = useState(false);
   const [isAddCategoryOpen, setIsAddCategoryOpen] = useState(false);
   const [editingBanner, setEditingBanner] = useState<Banner | null>(null);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [isUploading, setIsUploading] = useState(false);
-  
+
   const [bannerForm, setBannerForm] = useState({
     title: "",
     image: "",
@@ -93,7 +73,7 @@ export default function AppSettings() {
     isActive: true,
     sortOrder: 0
   });
-  
+
   const [categoryForm, setCategoryForm] = useState({
     name: "",
     nameEn: "",
@@ -124,72 +104,54 @@ export default function AppSettings() {
     expiresAt: ""
   });
 
-  const { data: banners = [], isLoading: loadingBanners } = useQuery<Banner[]>({
-    queryKey: ["/api/admin/banners"],
-    queryFn: async () => {
-      const res = await fetch("/api/admin/banners", { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to fetch banners");
-      return res.json();
-    }
+  const { data: banners = [], isLoading: loadingBanners } = useQuery<Banners[]>({
+    queryKey: ["banners"],
+    queryFn: getBanners
   });
 
-  const { data: categories = [], isLoading: loadingCategories } = useQuery<Category[]>({
-    queryKey: ["/api/admin/categories"],
-    queryFn: async () => {
-      const res = await fetch("/api/admin/categories", { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to fetch categories");
-      return res.json();
-    }
+  const { data: categories = [], isLoading: loadingCategories } = useQuery<Categories[]>({
+    queryKey: ["categories"],
+    queryFn: getCategories
   });
 
-  const { data: cities = [], isLoading: loadingCities } = useQuery<City[]>({
-    queryKey: ["/api/admin/cities"],
-    queryFn: async () => {
-      const res = await fetch("/api/admin/cities", { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to fetch cities");
-      return res.json();
-    }
+  const { data: cities = [], isLoading: loadingCities } = useQuery<Cities[]>({
+    queryKey: ["cities"],
+    queryFn: getCities
   });
 
-  const { data: discountCodes = [], isLoading: loadingDiscounts } = useQuery<DiscountCode[]>({
-    queryKey: ["/api/admin/discount-codes"],
-    queryFn: async () => {
-      const res = await fetch("/api/admin/discount-codes", { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to fetch discount codes");
-      return res.json();
-    }
+  const { data: discountCodes = [], isLoading: loadingDiscounts } = useQuery<DiscountCodes[]>({
+    queryKey: ["discount-codes"],
+    queryFn: getDiscountCodes
   });
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'banner' | 'category') => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast({ variant: "destructive", title: "حجم الصورة كبير جداً", description: "الحد الأقصى 5 ميجابايت" });
+      return;
+    }
 
     setIsUploading(true);
-    const formData = new FormData();
-    formData.append("images", files[0]);
 
     try {
-      const res = await fetch("/api/merchant/products/upload-images", {
-        method: "POST",
-        credentials: "include",
-        body: formData
-      });
+      // Upload directly to Firebase Storage
+      const uploadedUrl = await uploadToStorage(file, type === 'banner' ? 'banners' : 'categories');
 
-      if (!res.ok) {
-        throw new Error("فشل رفع الصورة");
-      }
-
-      const data = await res.json();
-      const imageUrl = data.images[0];
-      
       if (type === 'banner') {
-        setBannerForm(prev => ({ ...prev, image: imageUrl }));
-      } else {
-        setCategoryForm(prev => ({ ...prev, image: imageUrl }));
+        setBannerForm(prev => ({ ...prev, image: uploadedUrl }));
+      } else { // type === 'category'
+        setCategoryForm(prev => ({ ...prev, icon: uploadedUrl })); // Assuming 'icon' for category based on instruction's 'setCategoryIcon'
       }
       toast({ title: "تم رفع الصورة بنجاح" });
     } catch (error: any) {
-      toast({ variant: "destructive", title: error.message || "فشل رفع الصورة" });
+      console.error("Upload error:", error);
+      toast({
+        variant: "destructive",
+        title: "فشل رفع الصورة",
+        description: error.message || "حدث خطأ أثناء رفع الصورة"
+      });
     } finally {
       setIsUploading(false);
       if (fileInputRef.current) {
@@ -200,18 +162,9 @@ export default function AppSettings() {
 
   // Banner mutations
   const createBannerMutation = useMutation({
-    mutationFn: async (data: typeof bannerForm) => {
-      const res = await fetch("/api/admin/banners", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify(data)
-      });
-      if (!res.ok) throw new Error("Failed to create banner");
-      return res.json();
-    },
+    mutationFn: (data: typeof bannerForm) => addBanner(data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/banners"] });
+      queryClient.invalidateQueries({ queryKey: ["banners"] });
       toast({ title: "تم إضافة البانر بنجاح" });
       setIsAddBannerOpen(false);
       resetBannerForm();
@@ -222,18 +175,9 @@ export default function AppSettings() {
   });
 
   const updateBannerMutation = useMutation({
-    mutationFn: async ({ id, data }: { id: number; data: Partial<typeof bannerForm> }) => {
-      const res = await fetch(`/api/admin/banners/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify(data)
-      });
-      if (!res.ok) throw new Error("Failed to update banner");
-      return res.json();
-    },
+    mutationFn: ({ id, data }: { id: string; data: Partial<typeof bannerForm> }) => updateBanner(id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/banners"] });
+      queryClient.invalidateQueries({ queryKey: ["banners"] });
       toast({ title: "تم تحديث البانر بنجاح" });
       setEditingBanner(null);
       resetBannerForm();
@@ -244,16 +188,9 @@ export default function AppSettings() {
   });
 
   const deleteBannerMutation = useMutation({
-    mutationFn: async (id: number) => {
-      const res = await fetch(`/api/admin/banners/${id}`, {
-        method: "DELETE",
-        credentials: "include"
-      });
-      if (!res.ok) throw new Error("Failed to delete banner");
-      return res.json();
-    },
+    mutationFn: (id: string) => deleteBanner(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/banners"] });
+      queryClient.invalidateQueries({ queryKey: ["banners"] });
       toast({ title: "تم حذف البانر" });
     },
     onError: () => {
@@ -263,18 +200,9 @@ export default function AppSettings() {
 
   // Category mutations
   const createCategoryMutation = useMutation({
-    mutationFn: async (data: typeof categoryForm) => {
-      const res = await fetch("/api/admin/categories", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify(data)
-      });
-      if (!res.ok) throw new Error("Failed to create category");
-      return res.json();
-    },
+    mutationFn: (data: typeof categoryForm) => addCategory(data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/categories"] });
+      queryClient.invalidateQueries({ queryKey: ["categories"] });
       toast({ title: "تم إضافة القسم بنجاح" });
       setIsAddCategoryOpen(false);
       resetCategoryForm();
@@ -285,18 +213,9 @@ export default function AppSettings() {
   });
 
   const updateCategoryMutation = useMutation({
-    mutationFn: async ({ id, data }: { id: number; data: Partial<typeof categoryForm> }) => {
-      const res = await fetch(`/api/admin/categories/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify(data)
-      });
-      if (!res.ok) throw new Error("Failed to update category");
-      return res.json();
-    },
+    mutationFn: ({ id, data }: { id: string; data: Partial<typeof categoryForm> }) => updateCategory(id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/categories"] });
+      queryClient.invalidateQueries({ queryKey: ["categories"] });
       toast({ title: "تم تحديث القسم بنجاح" });
       setEditingCategory(null);
       resetCategoryForm();
@@ -307,16 +226,9 @@ export default function AppSettings() {
   });
 
   const deleteCategoryMutation = useMutation({
-    mutationFn: async (id: number) => {
-      const res = await fetch(`/api/admin/categories/${id}`, {
-        method: "DELETE",
-        credentials: "include"
-      });
-      if (!res.ok) throw new Error("Failed to delete category");
-      return res.json();
-    },
+    mutationFn: (id: string) => deleteCategory(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/categories"] });
+      queryClient.invalidateQueries({ queryKey: ["categories"] });
       toast({ title: "تم حذف القسم" });
     },
     onError: () => {
@@ -326,18 +238,9 @@ export default function AppSettings() {
 
   // City mutations
   const createCityMutation = useMutation({
-    mutationFn: async (data: typeof cityForm) => {
-      const res = await fetch("/api/admin/cities", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify(data)
-      });
-      if (!res.ok) throw new Error("Failed to create city");
-      return res.json();
-    },
+    mutationFn: (data: typeof cityForm) => addCity(data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/cities"] });
+      queryClient.invalidateQueries({ queryKey: ["cities"] });
       toast({ title: "تم إضافة المدينة بنجاح", className: "bg-emerald-50 border-emerald-200 text-emerald-800" });
       setIsAddCityOpen(false);
       resetCityForm();
@@ -348,18 +251,9 @@ export default function AppSettings() {
   });
 
   const updateCityMutation = useMutation({
-    mutationFn: async ({ id, data }: { id: number; data: Partial<typeof cityForm> }) => {
-      const res = await fetch(`/api/admin/cities/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify(data)
-      });
-      if (!res.ok) throw new Error("Failed to update city");
-      return res.json();
-    },
+    mutationFn: ({ id, data }: { id: string; data: Partial<typeof cityForm> }) => updateCity(id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/cities"] });
+      queryClient.invalidateQueries({ queryKey: ["cities"] });
       toast({ title: "تم تحديث المدينة بنجاح" });
       setEditingCity(null);
       resetCityForm();
@@ -370,16 +264,9 @@ export default function AppSettings() {
   });
 
   const deleteCityMutation = useMutation({
-    mutationFn: async (id: number) => {
-      const res = await fetch(`/api/admin/cities/${id}`, {
-        method: "DELETE",
-        credentials: "include"
-      });
-      if (!res.ok) throw new Error("Failed to delete city");
-      return res.json();
-    },
+    mutationFn: (id: string) => deleteCity(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/cities"] });
+      queryClient.invalidateQueries({ queryKey: ["cities"] });
       toast({ title: "تم حذف المدينة" });
     },
     onError: () => {
@@ -388,21 +275,9 @@ export default function AppSettings() {
   });
 
   const createDiscountMutation = useMutation({
-    mutationFn: async (data: typeof discountForm) => {
-      const res = await fetch("/api/admin/discount-codes", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ ...data, expiresAt: data.expiresAt || null })
-      });
-      if (!res.ok) {
-        const error = await res.json();
-        throw new Error(error.error || "Failed to create discount code");
-      }
-      return res.json();
-    },
+    mutationFn: (data: typeof discountForm) => addDiscountCode({ ...data, expiresAt: data.expiresAt || null }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/discount-codes"] });
+      queryClient.invalidateQueries({ queryKey: ["discount-codes"] });
       toast({ title: "تم إضافة كود الخصم بنجاح", className: "bg-emerald-50 border-emerald-200 text-emerald-800" });
       setIsDiscountOpen(false);
       resetDiscountForm();
@@ -413,21 +288,10 @@ export default function AppSettings() {
   });
 
   const updateDiscountMutation = useMutation({
-    mutationFn: async ({ id, data }: { id: number; data: Partial<typeof discountForm> }) => {
-      const res = await fetch(`/api/admin/discount-codes/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ ...data, expiresAt: data.expiresAt || null })
-      });
-      if (!res.ok) {
-        const error = await res.json();
-        throw new Error(error.error || "Failed to update discount code");
-      }
-      return res.json();
-    },
+    mutationFn: ({ id, data }: { id: string; data: Partial<typeof discountForm> }) =>
+      updateDiscountCode(id, { ...data, expiresAt: data.expiresAt || null }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/discount-codes"] });
+      queryClient.invalidateQueries({ queryKey: ["discount-codes"] });
       toast({ title: "تم تحديث كود الخصم بنجاح", className: "bg-emerald-50 border-emerald-200 text-emerald-800" });
       setIsDiscountOpen(false);
       setEditingDiscount(null);
@@ -439,16 +303,9 @@ export default function AppSettings() {
   });
 
   const deleteDiscountMutation = useMutation({
-    mutationFn: async (id: number) => {
-      const res = await fetch(`/api/admin/discount-codes/${id}`, {
-        method: "DELETE",
-        credentials: "include"
-      });
-      if (!res.ok) throw new Error("Failed to delete discount code");
-      return res.json();
-    },
+    mutationFn: (id: string) => deleteDiscountCode(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/discount-codes"] });
+      queryClient.invalidateQueries({ queryKey: ["discount-codes"] });
       toast({ title: "تم حذف كود الخصم" });
     },
     onError: () => {
@@ -691,8 +548,8 @@ export default function AppSettings() {
                             className="hidden"
                             onChange={(e) => handleImageUpload(e, 'banner')}
                           />
-                          <Button 
-                            type="button" 
+                          <Button
+                            type="button"
                             variant="outline"
                             onClick={() => fileInputRef.current?.click()}
                             disabled={isUploading}
@@ -722,7 +579,7 @@ export default function AppSettings() {
                       </div>
                       <DialogFooter>
                         <Button type="submit" disabled={createBannerMutation.isPending || updateBannerMutation.isPending}>
-                          {(createBannerMutation.isPending || updateBannerMutation.isPending) && 
+                          {(createBannerMutation.isPending || updateBannerMutation.isPending) &&
                             <Loader2 className="w-4 h-4 animate-spin ml-2" />}
                           {editingBanner ? "حفظ التعديلات" : "إضافة البانر"}
                         </Button>
@@ -758,9 +615,9 @@ export default function AppSettings() {
                             <Button variant="outline" size="sm" onClick={() => handleEditBanner(banner)}>
                               <Edit className="w-4 h-4" />
                             </Button>
-                            <Button 
-                              variant="outline" 
-                              size="sm" 
+                            <Button
+                              variant="outline"
+                              size="sm"
                               className="text-destructive"
                               onClick={() => deleteBannerMutation.mutate(banner.id)}
                             >
@@ -853,7 +710,7 @@ export default function AppSettings() {
                       </div>
                       <DialogFooter>
                         <Button type="submit" disabled={createCategoryMutation.isPending || updateCategoryMutation.isPending}>
-                          {(createCategoryMutation.isPending || updateCategoryMutation.isPending) && 
+                          {(createCategoryMutation.isPending || updateCategoryMutation.isPending) &&
                             <Loader2 className="w-4 h-4 animate-spin ml-2" />}
                           {editingCategory ? "حفظ التعديلات" : "إضافة القسم"}
                         </Button>
@@ -893,9 +750,9 @@ export default function AppSettings() {
                           <Button variant="outline" size="sm" onClick={() => handleEditCategory(category)}>
                             <Edit className="w-4 h-4" />
                           </Button>
-                          <Button 
-                            variant="outline" 
-                            size="sm" 
+                          <Button
+                            variant="outline"
+                            size="sm"
                             className="text-destructive"
                             onClick={() => deleteCategoryMutation.mutate(category.id)}
                           >
@@ -1138,7 +995,7 @@ export default function AppSettings() {
                         <Label>نوع الخصم</Label>
                         <Select
                           value={discountForm.type}
-                          onValueChange={(value: "percentage" | "fixed" | "free_shipping") => 
+                          onValueChange={(value: "percentage" | "fixed" | "free_shipping") =>
                             setDiscountForm(prev => ({ ...prev, type: value, value: value === "free_shipping" ? 0 : prev.value }))
                           }
                         >
@@ -1228,12 +1085,12 @@ export default function AppSettings() {
                         />
                       </div>
                       <DialogFooter>
-                        <Button 
-                          type="submit" 
-                          disabled={createDiscountMutation.isPending || updateDiscountMutation.isPending} 
+                        <Button
+                          type="submit"
+                          disabled={createDiscountMutation.isPending || updateDiscountMutation.isPending}
                           data-testid="button-submit-discount"
                         >
-                          {(createDiscountMutation.isPending || updateDiscountMutation.isPending) && 
+                          {(createDiscountMutation.isPending || updateDiscountMutation.isPending) &&
                             <Loader2 className="w-4 h-4 animate-spin ml-2" />
                           }
                           {editingDiscount ? "حفظ التغييرات" : "إضافة الكود"}
@@ -1279,10 +1136,10 @@ export default function AppSettings() {
                             </TableCell>
                             <TableCell>
                               {discount.type === "percentage" ? `${discount.value}%` :
-                               discount.type === "fixed" ? `${discount.value} ريال` : "-"}
+                                discount.type === "fixed" ? `${discount.value} ريال` : "-"}
                             </TableCell>
                             <TableCell>
-                              {discount.maxUses 
+                              {discount.maxUses
                                 ? `${discount.usedCount}/${discount.maxUses}`
                                 : `${discount.usedCount} (غير محدود)`
                               }

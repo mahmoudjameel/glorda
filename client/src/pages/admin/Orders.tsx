@@ -22,6 +22,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { format } from "date-fns";
 import { ar } from "date-fns/locale";
+import { getAllOrders } from "@/lib/admin-ops";
 
 interface OptionSelection {
   id: number;
@@ -34,40 +35,7 @@ interface OptionSelection {
   optionType: string;
 }
 
-interface OrderWithDetails {
-  id: number;
-  orderNumber: string;
-  customerId: number;
-  merchantId: number;
-  productId: number;
-  quantity: number;
-  totalAmount: number;
-  status: string;
-  customerNote: string | null;
-  deliveryAddress: string | null;
-  deliveryMethod: string;
-  isPaid: boolean;
-  createdAt: string;
-  updatedAt: string;
-  customer: {
-    id: number;
-    name: string;
-    mobile: string;
-    city: string | null;
-  } | null;
-  merchant: {
-    id: number;
-    storeName: string;
-    ownerName: string;
-  } | null;
-  product: {
-    id: number;
-    name: string;
-    price: number;
-    images: string[] | null;
-  } | null;
-  optionSelections?: OptionSelection[];
-}
+type OrderWithDetails = any;
 
 const statusMap: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
   pending: { label: "قيد الانتظار", variant: "secondary" },
@@ -85,16 +53,12 @@ export default function AdminOrders() {
   const [selectedOrder, setSelectedOrder] = useState<OrderWithDetails | null>(null);
 
   const { data: orders = [], isLoading } = useQuery<OrderWithDetails[]>({
-    queryKey: ["/api/admin/orders"],
-    queryFn: async () => {
-      const res = await fetch("/api/admin/orders", { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to fetch orders");
-      return res.json();
-    }
+    queryKey: ["admin-orders"],
+    queryFn: () => getAllOrders()
   });
 
   const filteredOrders = orders.filter(order => 
-    order.orderNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (order.orderNumber && order.orderNumber.toLowerCase().includes(searchQuery.toLowerCase())) ||
     (order.customer?.name && order.customer.name.toLowerCase().includes(searchQuery.toLowerCase())) ||
     (order.merchant?.storeName && order.merchant.storeName.toLowerCase().includes(searchQuery.toLowerCase())) ||
     (order.product?.name && order.product.name.toLowerCase().includes(searchQuery.toLowerCase()))

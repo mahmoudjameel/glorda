@@ -27,13 +27,9 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useAuth } from "@/hooks/useAuth";
+import { getAdmins, addAdmin, deleteAdmin } from "@/lib/admin-ops";
 
-interface Admin {
-  id: number;
-  email: string;
-  name: string;
-  createdAt: string;
-}
+type Admin = any;
 
 export default function AdminSettings() {
   const { toast } = useToast();
@@ -52,30 +48,14 @@ export default function AdminSettings() {
   });
 
   const { data: admins = [], isLoading } = useQuery<Admin[]>({
-    queryKey: ["/api/admin/admins"],
-    queryFn: async () => {
-      const res = await fetch("/api/admin/admins", { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to fetch admins");
-      return res.json();
-    }
+    queryKey: ["admin-admins"],
+    queryFn: () => getAdmins()
   });
 
   const createMutation = useMutation({
-    mutationFn: async (data: typeof formData) => {
-      const res = await fetch("/api/admin/admins", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify(data)
-      });
-      if (!res.ok) {
-        const error = await res.json();
-        throw new Error(error.error || "Failed to create admin");
-      }
-      return res.json();
-    },
+    mutationFn: (data: typeof formData) => addAdmin({ email: data.email, name: data.name }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/admins"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-admins"] });
       toast({ title: "تم إضافة المسؤول بنجاح", className: "bg-emerald-50 border-emerald-200 text-emerald-800" });
       setIsAddOpen(false);
       setFormData({ name: "", email: "", password: "" });
@@ -86,19 +66,9 @@ export default function AdminSettings() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: async (id: number) => {
-      const res = await fetch(`/api/admin/admins/${id}`, {
-        method: "DELETE",
-        credentials: "include"
-      });
-      if (!res.ok) {
-        const error = await res.json();
-        throw new Error(error.error || "Failed to delete admin");
-      }
-      return res.json();
-    },
+    mutationFn: (id: string) => deleteAdmin(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/admins"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-admins"] });
       toast({ title: "تم حذف المسؤول" });
     },
     onError: (error: Error) => {
@@ -107,23 +77,10 @@ export default function AdminSettings() {
   });
 
   const changePasswordMutation = useMutation({
-    mutationFn: async (data: { currentPassword: string; newPassword: string }) => {
-      const res = await fetch("/api/admin/password", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify(data)
-      });
-      if (!res.ok) {
-        const error = await res.json();
-        throw new Error(error.error || "Failed to change password");
-      }
-      return res.json();
+    mutationFn: async () => {
+      throw new Error("تغيير كلمة المرور غير مدعوم في الواجهة الجديدة");
     },
-    onSuccess: () => {
-      toast({ title: "تم تغيير كلمة المرور بنجاح", className: "bg-emerald-50 border-emerald-200 text-emerald-800" });
-      setPasswordForm({ currentPassword: "", newPassword: "", confirmPassword: "" });
-    },
+    onSuccess: () => {},
     onError: (error: Error) => {
       toast({ variant: "destructive", title: error.message });
     }
@@ -131,12 +88,8 @@ export default function AdminSettings() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.name || !formData.email || !formData.password) {
+    if (!formData.name || !formData.email) {
       toast({ variant: "destructive", title: "جميع الحقول مطلوبة" });
-      return;
-    }
-    if (formData.password.length < 6) {
-      toast({ variant: "destructive", title: "كلمة المرور يجب أن تكون 6 أحرف على الأقل" });
       return;
     }
     createMutation.mutate(formData);

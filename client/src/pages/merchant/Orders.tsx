@@ -31,35 +31,10 @@ import { format } from "date-fns";
 import { ar } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
+import { useAuth } from "@/hooks/useAuth";
+import { getMerchantOrders, updateOrderStatus, type Order } from "@/lib/merchant-data";
 
-interface OrderWithDetails {
-  id: number;
-  orderNumber: string;
-  customerId: number;
-  merchantId: number;
-  productId: number;
-  quantity: number;
-  totalAmount: number;
-  status: string;
-  customerNote: string | null;
-  deliveryAddress: string | null;
-  deliveryMethod: string;
-  isPaid: boolean;
-  createdAt: string;
-  updatedAt: string;
-  customer: {
-    id: number;
-    name: string;
-    mobile: string;
-    city: string | null;
-  } | null;
-  product: {
-    id: number;
-    name: string;
-    price: number;
-    images: string[] | null;
-  } | null;
-}
+type OrderWithDetails = Order;
 
 const statusMap: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
   pending: { label: "قيد الانتظار", variant: "secondary" },
@@ -94,28 +69,17 @@ export default function MerchantOrders() {
     setLocation(`/dashboard/messages?orderId=${orderId}&orderNumber=${orderNumber}`);
   };
 
+  const { user } = useAuth();
   const { data: orders = [], isLoading } = useQuery<OrderWithDetails[]>({
-    queryKey: ["/api/merchant/orders"],
-    queryFn: async () => {
-      const res = await fetch("/api/merchant/orders", { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to fetch orders");
-      return res.json();
-    }
+    queryKey: ["merchant-orders", user?.id],
+    enabled: !!user?.id,
+    queryFn: () => getMerchantOrders(user!.id),
   });
 
   const updateStatusMutation = useMutation({
-    mutationFn: async ({ orderId, status }: { orderId: number; status: string }) => {
-      const res = await fetch(`/api/merchant/orders/${orderId}/status`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ status })
-      });
-      if (!res.ok) throw new Error("Failed to update status");
-      return res.json();
-    },
+    mutationFn: ({ orderId, status }: { orderId: string; status: string }) => updateOrderStatus(orderId, status),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/merchant/orders"] });
+      queryClient.invalidateQueries({ queryKey: ["merchant-orders", user?.id] });
       toast({ title: "تم تحديث حالة الطلب بنجاح" });
     },
     onError: () => {

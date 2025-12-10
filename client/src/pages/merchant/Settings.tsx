@@ -17,11 +17,13 @@ import { Link } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState, useRef, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
-import type { Merchant } from "@shared/schema";
+import { useAuth } from "@/hooks/useAuth";
+import { getDocData, setDocData, getCollectionAll } from "@/lib/firestore";
 import { saudiBanks } from "@/constants/saudiBanks";
+import { uploadToStorage } from "@/lib/storage-upload";
 
 interface City {
-  id: number;
+  id: string;
   name: string;
   nameEn: string | null;
   isActive: boolean;
@@ -39,7 +41,8 @@ export default function MerchantSettings() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  
+  const { user } = useAuth();
+
   const [storeName, setStoreName] = useState("");
   const [username, setUsername] = useState("");
   const [bio, setBio] = useState("");
@@ -61,7 +64,7 @@ export default function MerchantSettings() {
   const [ownerName, setOwnerName] = useState("");
   const [email, setEmail] = useState("");
   const [mobile, setMobile] = useState("");
-  
+
   // Document upload states
   const [commercialRegFile, setCommercialRegFile] = useState<File | null>(null);
   const [nationalIdFile, setNationalIdFile] = useState<File | null>(null);
@@ -71,22 +74,15 @@ export default function MerchantSettings() {
   const nationalIdInputRef = useRef<HTMLInputElement>(null);
   const freelanceCertInputRef = useRef<HTMLInputElement>(null);
 
-  const { data: profile, isLoading } = useQuery<Merchant>({
-    queryKey: ["/api/merchant/profile"],
-    queryFn: async () => {
-      const res = await fetch("/api/merchant/profile", { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to fetch profile");
-      return res.json();
-    }
+  const { data: profile, isLoading } = useQuery<any>({
+    queryKey: ["merchant-profile", user?.id],
+    enabled: !!user?.id,
+    queryFn: () => getDocData(`merchants/${user!.id}`)
   });
 
   const { data: cities = [] } = useQuery<City[]>({
-    queryKey: ["/api/public/cities"],
-    queryFn: async () => {
-      const res = await fetch("/api/public/cities");
-      if (!res.ok) throw new Error("Failed to fetch cities");
-      return res.json();
-    }
+    queryKey: ["cities"],
+    queryFn: () => getCollectionAll<City>("cities")
   });
 
   useEffect(() => {
@@ -123,10 +119,10 @@ export default function MerchantSettings() {
   }, [profile]);
 
   const updateProfileMutation = useMutation({
-    mutationFn: async (data: { 
-      storeName?: string; 
-      username?: string; 
-      bio?: string; 
+    mutationFn: async (data: {
+      storeName?: string;
+      username?: string;
+      bio?: string;
       storeImage?: string;
       city?: string;
       socialLinks?: SocialLinks;
@@ -137,20 +133,18 @@ export default function MerchantSettings() {
       email?: string;
       mobile?: string;
     }) => {
-      const res = await fetch("/api/merchant/profile", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify(data)
+      if (!user?.id) throw new Error("لا يوجد تاجر مسجّل");
+      await setDocData(`merchants/${user.id}`, data);
+      await setDocData(`users/${user.id}`, {
+        role: "merchant",
+        email: data.email || user.email,
+        name: data.ownerName || user.name,
+        storeName: data.storeName || user.storeName,
+        merchantId: user.id,
       });
-      if (!res.ok) {
-        const error = await res.json();
-        throw new Error(error.error || "Failed to update profile");
-      }
-      return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/merchant/profile"] });
+      queryClient.invalidateQueries({ queryKey: ["merchant-profile", user?.id] });
       toast({ title: "تم حفظ التغييرات بنجاح" });
     },
     onError: (error: any) => {
@@ -168,31 +162,30 @@ export default function MerchantSettings() {
     }
 
     setIsUploading(true);
-    const formData = new FormData();
-    formData.append("images", file);
 
     try {
-      const res = await fetch("/api/merchant/products/upload-images", {
-        method: "POST",
-        credentials: "include",
-        body: formData
-      });
+      // Upload directly to Firebase Storage
+      const uploadedUrl = await uploadToStorage(file, "stores");
 
-      if (!res.ok) throw new Error("Failed to upload image");
-      
-      const data = await res.json();
-      if (data.images && data.images.length > 0) {
-        setStoreImage(data.images[0]);
-        toast({ title: "تم رفع الصورة بنجاح" });
-      }
-    } catch (error) {
-      toast({ variant: "destructive", title: "فشل رفع الصورة" });
+      setStoreImage(uploadedUrl);
+      toast({ title: "تم رفع الصورة بنجاح" });
+    } catch (error: any) {
+      console.error("Upload error:", error);
+      toast({
+        variant: "destructive",
+        title: "فشل رفع الصورة",
+        description: error.message || "حدث خطأ أثناء رفع الصورة"
+      });
     } finally {
       setIsUploading(false);
     }
   };
 
   const handleSave = () => {
+    if (!user?.id) {
+      toast({ variant: "destructive", title: "يجب تسجيل الدخول كتاجر" });
+      return;
+    }
     const cleanLinks: SocialLinks = {};
     if (socialLinks.instagram?.trim()) cleanLinks.instagram = socialLinks.instagram.trim();
     if (socialLinks.twitter?.trim()) cleanLinks.twitter = socialLinks.twitter.trim();
@@ -218,7 +211,7 @@ export default function MerchantSettings() {
 
   const handleDocumentUpload = async () => {
     if (!profile) return;
-    
+
     const hasNewFiles = commercialRegFile || nationalIdFile || freelanceCertFile;
     if (!hasNewFiles) {
       toast({ variant: "destructive", title: "لم يتم اختيار أي ملف" });
@@ -227,7 +220,7 @@ export default function MerchantSettings() {
 
     setIsUploadingDocs(true);
     const formData = new FormData();
-    
+
     if (profile.storeType === "company" || profile.storeType === "institution") {
       if (commercialRegFile) {
         formData.append("commercialRegistrationDoc", commercialRegFile);
@@ -242,21 +235,15 @@ export default function MerchantSettings() {
     }
 
     try {
-      const res = await fetch("/api/merchant/documents", {
-        method: "POST",
-        credentials: "include",
-        body: formData
-      });
+      const uploads: Record<string, string> = {};
+      if (commercialRegFile) uploads.commercialRegistrationDoc = await uploadToStorage(commercialRegFile, "documents");
+      if (nationalIdFile) uploads.nationalIdImage = await uploadToStorage(nationalIdFile, "documents");
+      if (freelanceCertFile) uploads.freelanceCertificateImage = await uploadToStorage(freelanceCertFile, "documents");
 
-      if (!res.ok) {
-        const error = await res.json();
-        throw new Error(error.error || "فشل رفع المستندات");
-      }
-      
-      queryClient.invalidateQueries({ queryKey: ["/api/merchant/profile"] });
+      await setDocData(`merchants/${user!.id}`, uploads);
+      queryClient.invalidateQueries({ queryKey: ["merchant-profile", user?.id] });
       toast({ title: "تم تحديث المستندات بنجاح" });
-      
-      // Clear file selections
+
       setCommercialRegFile(null);
       setNationalIdFile(null);
       setFreelanceCertFile(null);
@@ -414,8 +401,8 @@ export default function MerchantSettings() {
               <Label className="flex items-center gap-2">
                 <Instagram className="w-4 h-4 text-pink-600" /> انستقرام
               </Label>
-              <Input 
-                placeholder="https://instagram.com/your-store" 
+              <Input
+                placeholder="https://instagram.com/your-store"
                 dir="ltr"
                 value={socialLinks.instagram}
                 onChange={(e) => setSocialLinks(prev => ({ ...prev, instagram: e.target.value }))}
@@ -427,8 +414,8 @@ export default function MerchantSettings() {
               <Label className="flex items-center gap-2">
                 <Twitter className="w-4 h-4 text-sky-500" /> تويتر (X)
               </Label>
-              <Input 
-                placeholder="https://twitter.com/your-store" 
+              <Input
+                placeholder="https://twitter.com/your-store"
                 dir="ltr"
                 value={socialLinks.twitter}
                 onChange={(e) => setSocialLinks(prev => ({ ...prev, twitter: e.target.value }))}
@@ -440,8 +427,8 @@ export default function MerchantSettings() {
               <Label className="flex items-center gap-2">
                 <Facebook className="w-4 h-4 text-blue-600" /> فيسبوك
               </Label>
-              <Input 
-                placeholder="https://facebook.com/your-store" 
+              <Input
+                placeholder="https://facebook.com/your-store"
                 dir="ltr"
                 value={socialLinks.facebook}
                 onChange={(e) => setSocialLinks(prev => ({ ...prev, facebook: e.target.value }))}
@@ -453,24 +440,24 @@ export default function MerchantSettings() {
               <Label className="flex items-center gap-2">
                 <Globe className="w-4 h-4 text-gray-600" /> الموقع الإلكتروني
               </Label>
-              <Input 
-                placeholder="https://your-store.com" 
+              <Input
+                placeholder="https://your-store.com"
                 dir="ltr"
                 value={socialLinks.website}
                 onChange={(e) => setSocialLinks(prev => ({ ...prev, website: e.target.value }))}
                 data-testid="input-website"
               />
             </div>
-            
+
             <div className="space-y-2">
               <Label className="flex items-center gap-2">
                 <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z"/>
+                  <path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z" />
                 </svg>
                 تيك توك
               </Label>
-              <Input 
-                placeholder="https://tiktok.com/@your-store" 
+              <Input
+                placeholder="https://tiktok.com/@your-store"
                 dir="ltr"
                 value={socialLinks.tiktok}
                 onChange={(e) => setSocialLinks(prev => ({ ...prev, tiktok: e.target.value }))}
@@ -496,8 +483,8 @@ export default function MerchantSettings() {
                 <Building2 className="w-4 h-4 text-muted-foreground" />
                 اسم البنك
               </Label>
-              <Select 
-                value={isOtherBank ? "other" : bankName} 
+              <Select
+                value={isOtherBank ? "other" : bankName}
                 onValueChange={(value) => {
                   if (value === "other") {
                     setIsOtherBank(true);
@@ -586,7 +573,7 @@ export default function MerchantSettings() {
                   نوع الكيان: {profile.storeType === "company" ? "شركة" : profile.storeType === "institution" ? "مؤسسة" : "فرد / عمل حر"}
                 </Label>
               </div>
-              
+
               {(profile.storeType === "company" || profile.storeType === "institution") && (
                 <>
                   <div className="space-y-2">
@@ -598,13 +585,13 @@ export default function MerchantSettings() {
                       {profile.registrationNumber}
                     </div>
                   </div>
-                  
+
                   <div className="space-y-2">
                     <Label>صورة السجل التجاري</Label>
                     {profile.commercialRegistrationDoc && (
-                      <a 
-                        href={profile.commercialRegistrationDoc} 
-                        target="_blank" 
+                      <a
+                        href={profile.commercialRegistrationDoc}
+                        target="_blank"
                         rel="noopener noreferrer"
                         className="flex items-center gap-2 p-3 border rounded-lg bg-green-50 border-green-200 hover:bg-green-100 transition-colors mb-2"
                         data-testid="link-commercial-doc"
@@ -633,7 +620,7 @@ export default function MerchantSettings() {
                   </div>
                 </>
               )}
-              
+
               {profile.storeType === "individual" && (
                 <>
                   <div className="space-y-2">
@@ -645,14 +632,14 @@ export default function MerchantSettings() {
                       {profile.registrationNumber}
                     </div>
                   </div>
-                  
+
                   <div className="grid md:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label>صورة الهوية الوطنية</Label>
                       {profile.nationalIdImage && (
-                        <a 
-                          href={profile.nationalIdImage} 
-                          target="_blank" 
+                        <a
+                          href={profile.nationalIdImage}
+                          target="_blank"
                           rel="noopener noreferrer"
                           className="flex items-center gap-2 p-3 border rounded-lg bg-green-50 border-green-200 hover:bg-green-100 transition-colors mb-2"
                           data-testid="link-national-id"
@@ -679,13 +666,13 @@ export default function MerchantSettings() {
                         )}
                       </div>
                     </div>
-                    
+
                     <div className="space-y-2">
                       <Label>شهادة العمل الحر</Label>
                       {profile.freelanceCertificateImage && (
-                        <a 
-                          href={profile.freelanceCertificateImage} 
-                          target="_blank" 
+                        <a
+                          href={profile.freelanceCertificateImage}
+                          target="_blank"
                           rel="noopener noreferrer"
                           className="flex items-center gap-2 p-3 border rounded-lg bg-green-50 border-green-200 hover:bg-green-100 transition-colors mb-2"
                           data-testid="link-freelance-cert"
@@ -715,7 +702,7 @@ export default function MerchantSettings() {
                   </div>
                 </>
               )}
-              
+
               {/* Save Documents Button */}
               {(commercialRegFile || nationalIdFile || freelanceCertFile) && (
                 <Button

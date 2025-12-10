@@ -16,7 +16,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import type { Merchant } from "@shared/schema";
+import { getMerchantsByStatus, updateMerchantStatus } from "@/lib/admin-ops";
 import {
   Dialog,
   DialogContent,
@@ -44,28 +44,15 @@ export default function AdminMerchants() {
   const [selectedMerchant, setSelectedMerchant] = useState<Merchant | null>(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
 
-  const { data: merchants = [], isLoading } = useQuery<Merchant[]>({
-    queryKey: ["/api/admin/merchants"],
-    queryFn: async () => {
-      const res = await fetch("/api/admin/merchants", { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to fetch merchants");
-      return res.json();
-    }
+  const { data: merchants = [], isLoading } = useQuery<any[]>({
+    queryKey: ["admin-merchants", "all"],
+    queryFn: () => getMerchantsByStatus()
   });
 
   const updateStatusMutation = useMutation({
-    mutationFn: async ({ id, status }: { id: number; status: string }) => {
-      const res = await fetch(`/api/admin/merchants/${id}/status`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ status })
-      });
-      if (!res.ok) throw new Error("Failed to update status");
-      return res.json();
-    },
+    mutationFn: ({ id, status }: { id: string; status: string }) => updateMerchantStatus(id, status),
     onSuccess: (_, { status }) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/merchants"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-merchants", "all"] });
       toast({
         title: status === "active" ? "تم قبول المتجر" : status === "suspended" ? "تم إيقاف المتجر" : "تم تحديث الحالة",
         className: status === "active" ? "bg-emerald-50 border-emerald-200 text-emerald-800" : ""
@@ -78,13 +65,13 @@ export default function AdminMerchants() {
 
   const pendingCount = merchants.filter(m => m.status === "pending").length;
 
-  const filteredMerchants = merchants.filter(m =>
-    m.storeName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    m.ownerName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    m.email.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredMerchants = merchants.filter((m: any) =>
+    (m.storeName || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (m.ownerName || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (m.email || "").toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const handleViewDetails = (merchant: Merchant) => {
+  const handleViewDetails = (merchant: any) => {
     setSelectedMerchant(merchant);
     setIsDetailsOpen(true);
   };

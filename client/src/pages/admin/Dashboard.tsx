@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Users, Store, TrendingUp, Activity, Loader2, Clock, CheckCircle, XCircle } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
-import type { Merchant, Transaction } from "@shared/schema";
+import { getMerchantsByStatus, getWithdrawals } from "@/lib/admin-ops";
 
 const StatsCard = ({ title, value, icon: Icon, description, loading }: any) => (
   <Card>
@@ -29,22 +29,14 @@ const StatsCard = ({ title, value, icon: Icon, description, loading }: any) => (
 );
 
 export default function AdminDashboard() {
-  const { data: merchants = [], isLoading: loadingMerchants } = useQuery<Merchant[]>({
-    queryKey: ["/api/admin/merchants"],
-    queryFn: async () => {
-      const res = await fetch("/api/admin/merchants", { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to fetch");
-      return res.json();
-    }
+  const { data: merchants = [], isLoading: loadingMerchants } = useQuery<any[]>({
+    queryKey: ["admin-merchants", "all"],
+    queryFn: () => getMerchantsByStatus()
   });
 
-  const { data: withdrawals = [], isLoading: loadingWithdrawals } = useQuery<Transaction[]>({
-    queryKey: ["/api/admin/withdrawals"],
-    queryFn: async () => {
-      const res = await fetch("/api/admin/withdrawals", { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to fetch");
-      return res.json();
-    }
+  const { data: withdrawals = [], isLoading: loadingWithdrawals } = useQuery<any[]>({
+    queryKey: ["admin-withdrawals"],
+    queryFn: () => getWithdrawals()
   });
 
   const activeMerchants = merchants.filter(m => m.status === "active").length;

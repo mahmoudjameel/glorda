@@ -8,14 +8,7 @@ import { FileText, Shield, BookOpen, Loader2, Save, Smartphone, Store } from "lu
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState, useEffect } from "react";
-
-interface AppSetting {
-  id: number;
-  key: string;
-  value: string | null;
-  valueJson: any;
-  updatedAt: string;
-}
+import { getSetting, setSetting } from "@/lib/admin-ops";
 
 export default function AdminPolicies() {
   const { toast } = useToast();
@@ -31,50 +24,40 @@ export default function AdminPolicies() {
   const [merchantTermsConditions, setMerchantTermsConditions] = useState("");
   const [merchantAboutUs, setMerchantAboutUs] = useState("");
 
-  const { data: settings = [], isLoading } = useQuery<AppSetting[]>({
-    queryKey: ["/api/admin/settings"],
+  const { data: settings = {}, isLoading } = useQuery({
+    queryKey: ["admin-settings-policies"],
     queryFn: async () => {
-      const res = await fetch("/api/admin/settings", { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to fetch settings");
-      return res.json();
+      const keys = [
+        "privacy_policy",
+        "terms_conditions",
+        "about_us",
+        "merchant_privacy_policy",
+        "merchant_terms_conditions",
+        "merchant_about_us",
+      ];
+      const results = await Promise.all(keys.map((k) => getSetting(k)));
+      return keys.reduce((acc, key, idx) => {
+        acc[key] = results[idx]?.value || "";
+        return acc;
+      }, {} as Record<string, string>);
     }
   });
 
   useEffect(() => {
-    if (settings.length > 0) {
-      // Customer policies (existing keys for backward compatibility)
-      const custPrivacy = settings.find(s => s.key === "privacy_policy");
-      const custTerms = settings.find(s => s.key === "terms_conditions");
-      const custAbout = settings.find(s => s.key === "about_us");
-      
-      if (custPrivacy?.value) setCustomerPrivacyPolicy(custPrivacy.value);
-      if (custTerms?.value) setCustomerTermsConditions(custTerms.value);
-      if (custAbout?.value) setCustomerAboutUs(custAbout.value);
-      
-      // Merchant policies (new keys)
-      const merchPrivacy = settings.find(s => s.key === "merchant_privacy_policy");
-      const merchTerms = settings.find(s => s.key === "merchant_terms_conditions");
-      const merchAbout = settings.find(s => s.key === "merchant_about_us");
-      
-      if (merchPrivacy?.value) setMerchantPrivacyPolicy(merchPrivacy.value);
-      if (merchTerms?.value) setMerchantTermsConditions(merchTerms.value);
-      if (merchAbout?.value) setMerchantAboutUs(merchAbout.value);
+    if (settings) {
+      setCustomerPrivacyPolicy(settings["privacy_policy"] || "");
+      setCustomerTermsConditions(settings["terms_conditions"] || "");
+      setCustomerAboutUs(settings["about_us"] || "");
+      setMerchantPrivacyPolicy(settings["merchant_privacy_policy"] || "");
+      setMerchantTermsConditions(settings["merchant_terms_conditions"] || "");
+      setMerchantAboutUs(settings["merchant_about_us"] || "");
     }
   }, [settings]);
 
   const saveMutation = useMutation({
-    mutationFn: async ({ key, value }: { key: string; value: string }) => {
-      const res = await fetch("/api/admin/settings", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ key, value })
-      });
-      if (!res.ok) throw new Error("Failed to save setting");
-      return res.json();
-    },
+    mutationFn: ({ key, value }: { key: string; value: string }) => setSetting(key, value),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-settings-policies"] });
       toast({ title: "تم الحفظ بنجاح", className: "bg-emerald-50 border-emerald-200 text-emerald-800" });
     },
     onError: () => {

@@ -1,8 +1,11 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
 import { useLocation } from "wouter";
+import { auth } from "@/lib/firebase";
+import { onAuthStateChanged, signOut, type User as FirebaseUser } from "firebase/auth";
+import { getDocData } from "@/lib/firestore";
 
 interface User {
-  id: number;
+  id: string;
   email: string;
   name?: string;
   storeName?: string;
@@ -14,6 +17,7 @@ interface AuthContextType {
   userType: "merchant" | "admin" | null;
   isLoading: boolean;
   isAuthenticated: boolean;
+  firebaseUser: FirebaseUser | null;
   logout: () => Promise<void>;
   refetch: () => Promise<void>;
 }
@@ -23,37 +27,77 @@ const AuthContext = createContext<AuthContextType | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [userType, setUserType] = useState<"merchant" | "admin" | null>(null);
+  const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  const fetchUser = async () => {
-    try {
-      const res = await fetch("/api/auth/me", { credentials: "include" });
-      if (res.ok) {
-        const data = await res.json();
-        setUser(data.user);
-        setUserType(data.type);
+  const fetchUser = async (firebaseUid: string) => {
+    // Read user doc to get role and extra info
+    const userDoc = await getDocData<{
+      role?: "merchant" | "admin";
+      email?: string;
+      name?: string;
+      merchantId?: string;
+    }>(`users/${firebaseUid}`);
+
+    if (!userDoc || !userDoc.role) {
+      setUser(null);
+      setUserType(null);
+      return;
+    }
+
+    if (userDoc.role === "merchant") {
+      const merchantId = userDoc.merchantId || firebaseUid;
+      const merchantDoc = await getDocData<{
+        storeName?: string;
+        ownerName?: string;
+        status?: string;
+      }>(`merchants/${merchantId}`);
+
+      setUser({
+        id: merchantId,
+        email: userDoc.email || firebaseUser?.email || "",
+        name: userDoc.name,
+        storeName: merchantDoc?.storeName,
+        ownerName: merchantDoc?.ownerName,
+      });
+      setUserType("merchant");
+    } else {
+      setUser({
+        id: firebaseUid,
+        email: userDoc.email || firebaseUser?.email || "",
+        name: userDoc.name,
+      });
+      setUserType("admin");
+    }
+  };
+
+  // Listen to Firebase auth state changes
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUserData) => {
+      setFirebaseUser(firebaseUserData);
+
+      if (firebaseUserData) {
+        await fetchUser(firebaseUserData.uid);
       } else {
         setUser(null);
         setUserType(null);
       }
-    } catch {
-      setUser(null);
-      setUserType(null);
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
-  useEffect(() => {
-    fetchUser();
+      setIsLoading(false);
+    });
+
+    return () => unsubscribe();
   }, []);
 
   const logout = async () => {
     try {
-      await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
+      await signOut(auth);
+    } catch (error) {
+      console.error("Logout error:", error);
     } finally {
       setUser(null);
       setUserType(null);
+      setFirebaseUser(null);
     }
   };
 
@@ -61,10 +105,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     <AuthContext.Provider value={{
       user,
       userType,
+      firebaseUser,
       isLoading,
-      isAuthenticated: !!user,
+      isAuthenticated: !!firebaseUser && !!userType,
       logout,
-      refetch: fetchUser
+      refetch: () => firebaseUser ? fetchUser(firebaseUser.uid) : Promise.resolve()
     }}>
       {children}
     </AuthContext.Provider>
@@ -79,12 +124,12 @@ export function useAuth() {
   return context;
 }
 
-export function ProtectedRoute({ 
-  children, 
-  requiredRole 
-}: { 
-  children: ReactNode; 
-  requiredRole: "merchant" | "admin" 
+export function ProtectedRoute({
+  children,
+  requiredRole
+}: {
+  children: ReactNode;
+  requiredRole: "merchant" | "admin"
 }) {
   const { isAuthenticated, userType, isLoading } = useAuth();
   const [, navigate] = useLocation();
@@ -116,3 +161,4 @@ export function ProtectedRoute({
 
   return <>{children}</>;
 }
+

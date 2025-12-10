@@ -17,7 +17,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useLocation } from "wouter";
-import type { Merchant } from "@shared/schema";
+import { getMerchantsByStatus, updateMerchantStatus } from "@/lib/admin-ops";
 
 const storeTypeLabels: Record<string, string> = {
   company: "شركة",
@@ -40,30 +40,18 @@ export default function PendingMerchants() {
   const [isRejectOpen, setIsRejectOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
 
-  const { data: allMerchants = [], isLoading } = useQuery<Merchant[]>({
-    queryKey: ["/api/admin/merchants"],
-    queryFn: async () => {
-      const res = await fetch("/api/admin/merchants", { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to fetch merchants");
-      return res.json();
-    }
+  const { data: allMerchants = [], isLoading } = useQuery<any[]>({
+    queryKey: ["admin-merchants", "pending"],
+    queryFn: () => getMerchantsByStatus("pending")
   });
 
   const pendingMerchants = allMerchants.filter(m => m.status === "pending");
 
   const updateStatusMutation = useMutation({
-    mutationFn: async ({ id, status, reason }: { id: number; status: string; reason?: string }) => {
-      const res = await fetch(`/api/admin/merchants/${id}/status`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ status, reason })
-      });
-      if (!res.ok) throw new Error("Failed to update status");
-      return res.json();
-    },
+    mutationFn: ({ id, status }: { id: string; status: string; reason?: string }) =>
+      updateMerchantStatus(id, status),
     onSuccess: (_, { status }) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/merchants"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-merchants", "pending"] });
       if (status === "active") {
         toast({
           title: "تم قبول المتجر بنجاح",
@@ -86,7 +74,7 @@ export default function PendingMerchants() {
     }
   });
 
-  const handleApprove = (merchant: Merchant) => {
+  const handleApprove = (merchant: any) => {
     updateStatusMutation.mutate({ id: merchant.id, status: "active" });
   };
 
@@ -100,12 +88,12 @@ export default function PendingMerchants() {
     }
   };
 
-  const handleViewDetails = (merchant: Merchant) => {
+  const handleViewDetails = (merchant: any) => {
     setSelectedMerchant(merchant);
     setIsDetailsOpen(true);
   };
 
-  const openRejectDialog = (merchant: Merchant) => {
+  const openRejectDialog = (merchant: any) => {
     setSelectedMerchant(merchant);
     setIsRejectOpen(true);
   };

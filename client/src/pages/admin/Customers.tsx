@@ -15,31 +15,28 @@ import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { format } from "date-fns";
 import { ar } from "date-fns/locale";
+import { getCustomers } from "@/lib/admin-ops";
 
 interface Customer {
-  id: number;
+  id: string;
   name: string;
   email: string | null;
   mobile: string;
   city: string | null;
-  createdAt: string;
+  createdAt?: any;
 }
 
 export default function AdminCustomers() {
   const [searchQuery, setSearchQuery] = useState("");
 
   const { data: customers = [], isLoading } = useQuery<Customer[]>({
-    queryKey: ["/api/admin/customers"],
-    queryFn: async () => {
-      const res = await fetch("/api/admin/customers", { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to fetch customers");
-      return res.json();
-    }
+    queryKey: ["admin-customers"],
+    queryFn: () => getCustomers()
   });
 
-  const filteredCustomers = customers.filter(customer => 
-    customer.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    customer.mobile.includes(searchQuery) ||
+  const filteredCustomers = customers.filter(customer =>
+    (customer.name && customer.name.toLowerCase().includes(searchQuery.toLowerCase())) ||
+    (customer.mobile && customer.mobile.toLowerCase().includes(searchQuery.toLowerCase())) ||
     (customer.email && customer.email.toLowerCase().includes(searchQuery.toLowerCase())) ||
     (customer.city && customer.city.toLowerCase().includes(searchQuery.toLowerCase()))
   );
@@ -114,7 +111,7 @@ export default function AdminCustomers() {
                           <div className="flex items-center gap-2">
                             <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
                               <span className="text-sm font-medium text-primary">
-                                {customer.name.charAt(0)}
+                                {customer.name ? customer.name.charAt(0) : "؟"}
                               </span>
                             </div>
                             <span className="font-medium" data-testid={`text-name-${customer.id}`}>{customer.name}</span>

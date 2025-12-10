@@ -1,370 +1,423 @@
-import { sql } from "drizzle-orm";
-import { pgTable, text, integer, serial, timestamp, boolean, jsonb, varchar } from "drizzle-orm/pg-core";
-import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
-// ========== Merchants Table ==========
-export const merchants = pgTable("merchants", {
-  id: serial("id").primaryKey(),
-  ownerName: text("owner_name").notNull(),
-  storeName: text("store_name").notNull(),
-  username: text("username").notNull().unique(),
-  bio: text("bio"),
-  email: text("email").notNull().unique(),
-  mobile: text("mobile").notNull(),
-  password: text("password").notNull(),
-  storeType: text("store_type").notNull(),
-  category: text("category").notNull(),
-  city: text("city").notNull(),
-  registrationNumber: text("registration_number").notNull(),
-  commercialRegistrationDoc: text("commercial_registration_doc"),
-  nationalIdImage: text("national_id_image"),
-  freelanceCertificateImage: text("freelance_certificate_image"),
-  deliveryMethod: text("delivery_method").notNull(),
-  branches: jsonb("branches").$type<{ name: string; mapLink: string }[]>(),
-  status: text("status").notNull().default("pending"),
-  storeImage: text("store_image"),
-  socialLinks: jsonb("social_links").$type<{
+// ========== Merchant Types ==========
+export interface Merchant {
+  id: number;
+  ownerName: string;
+  storeName: string;
+  username: string;
+  bio?: string | null;
+  email: string;
+  mobile: string;
+  password: string;
+  storeType: string;
+  category: string;
+  city: string;
+  registrationNumber: string;
+  commercialRegistrationDoc?: string | null;
+  nationalIdImage?: string | null;
+  freelanceCertificateImage?: string | null;
+  deliveryMethod: string;
+  branches?: { name: string; mapLink: string }[] | null;
+  status: string;
+  storeImage?: string | null;
+  socialLinks?: {
     instagram?: string;
     twitter?: string;
     facebook?: string;
     website?: string;
     tiktok?: string;
     snapchat?: string;
-  }>(),
-  bankName: text("bank_name"),
-  iban: text("iban"),
-  accountHolderName: text("account_holder_name"),
-  balance: integer("balance").notNull().default(0),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+  } | null;
+  bankName?: string | null;
+  iban?: string | null;
+  accountHolderName?: string | null;
+  balance: number;
+  createdAt: Date;
+}
 
-export const insertMerchantSchema = createInsertSchema(merchants, {
+export const insertMerchantSchema = z.object({
+  ownerName: z.string(),
+  storeName: z.string(),
+  username: z.string().regex(/^[a-zA-Z0-9_]+$/),
+  bio: z.string().optional().nullable(),
   email: z.string().email(),
   mobile: z.string().min(9),
   password: z.string().min(6),
-}).omit({
-  id: true,
-  balance: true,
-  createdAt: true,
-  status: true,
+  storeType: z.string(),
+  category: z.string(),
+  city: z.string(),
+  registrationNumber: z.string(),
+  commercialRegistrationDoc: z.string().optional().nullable(),
+  nationalIdImage: z.string().optional().nullable(),
+  freelanceCertificateImage: z.string().optional().nullable(),
+  deliveryMethod: z.string(),
+  branches: z.array(z.object({ name: z.string(), mapLink: z.string() })).optional().nullable(),
+  storeImage: z.string().optional().nullable(),
+  socialLinks: z.object({
+    instagram: z.string().optional(),
+    twitter: z.string().optional(),
+    facebook: z.string().optional(),
+    website: z.string().optional(),
+    tiktok: z.string().optional(),
+    snapchat: z.string().optional(),
+  }).optional().nullable(),
+  bankName: z.string().optional().nullable(),
+  iban: z.string().optional().nullable(),
+  accountHolderName: z.string().optional().nullable(),
 });
 
 export type InsertMerchant = z.infer<typeof insertMerchantSchema>;
-export type Merchant = typeof merchants.$inferSelect;
 
-// ========== Products Table ==========
-export const products = pgTable("products", {
-  id: serial("id").primaryKey(),
-  merchantId: integer("merchant_id").notNull().references(() => merchants.id, { onDelete: "cascade" }),
-  name: text("name").notNull(),
-  description: text("description"),
-  price: integer("price").notNull(),
-  stock: integer("stock").notNull().default(0),
-  productType: text("product_type").notNull().default("gifts"),
-  category: text("category").notNull(),
-  promoBadge: text("promo_badge"),
-  images: jsonb("images").$type<string[]>(),
-  status: text("status").notNull().default("active"),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+// ========== Product Types ==========
+export interface Product {
+  id: number;
+  merchantId: number;
+  name: string;
+  description?: string | null;
+  price: number;
+  stock: number;
+  productType: string;
+  category: string;
+  promoBadge?: string | null;
+  images?: string[] | null;
+  status: string;
+  createdAt: Date;
+}
 
-export const insertProductSchema = createInsertSchema(products, {
+export const insertProductSchema = z.object({
+  merchantId: z.number(),
+  name: z.string(),
+  description: z.string().optional().nullable(),
+  price: z.number(),
+  stock: z.number().default(0),
+  productType: z.string().default("gifts"),
+  category: z.string(),
+  promoBadge: z.string().optional().nullable(),
   images: z.array(z.string()).optional().default([]),
-}).omit({
-  id: true,
-  createdAt: true,
+  status: z.string().default("active"),
 });
 
 export type InsertProduct = z.infer<typeof insertProductSchema>;
-export type Product = typeof products.$inferSelect;
 
-// ========== Customers Table ==========
-export const customers = pgTable("customers", {
-  id: serial("id").primaryKey(),
-  name: text("name").notNull(),
-  email: text("email").unique(),
-  mobile: text("mobile").notNull().unique(),
-  city: text("city"),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+// ========== Customer Types ==========
+export interface Customer {
+  id: number;
+  name: string;
+  email?: string | null;
+  mobile: string;
+  city?: string | null;
+  createdAt: Date;
+}
 
-export const insertCustomerSchema = createInsertSchema(customers).omit({
-  id: true,
-  createdAt: true,
+export const insertCustomerSchema = z.object({
+  name: z.string(),
+  email: z.string().email().optional().nullable(),
+  mobile: z.string(),
+  city: z.string().optional().nullable(),
 });
 
 export type InsertCustomer = z.infer<typeof insertCustomerSchema>;
-export type Customer = typeof customers.$inferSelect;
 
-// ========== Orders Table ==========
-export const orders = pgTable("orders", {
-  id: serial("id").primaryKey(),
-  orderNumber: text("order_number").notNull().unique(),
-  customerId: integer("customer_id").notNull().references(() => customers.id),
-  merchantId: integer("merchant_id").notNull().references(() => merchants.id),
-  productId: integer("product_id").notNull().references(() => products.id),
-  quantity: integer("quantity").notNull().default(1),
-  totalAmount: integer("total_amount").notNull(),
-  status: text("status").notNull().default("pending"),
-  customerNote: text("customer_note"),
-  deliveryAddress: text("delivery_address"),
-  deliveryMethod: text("delivery_method").notNull(),
-  isPaid: boolean("is_paid").notNull().default(false),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
+// ========== Order Types ==========
+export interface Order {
+  id: number;
+  orderNumber: string;
+  customerId: number;
+  merchantId: number;
+  productId: number;
+  quantity: number;
+  totalAmount: number;
+  status: string;
+  customerNote?: string | null;
+  deliveryAddress?: string | null;
+  deliveryMethod: string;
+  isPaid: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
 
-export const insertOrderSchema = createInsertSchema(orders).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
+export const insertOrderSchema = z.object({
+  orderNumber: z.string(),
+  customerId: z.number(),
+  merchantId: z.number(),
+  productId: z.number(),
+  quantity: z.number().default(1),
+  totalAmount: z.number(),
+  status: z.string().default("pending"),
+  customerNote: z.string().optional().nullable(),
+  deliveryAddress: z.string().optional().nullable(),
+  deliveryMethod: z.string(),
+  isPaid: z.boolean().default(false),
 });
 
 export type InsertOrder = z.infer<typeof insertOrderSchema>;
-export type Order = typeof orders.$inferSelect;
 
-// ========== Order Messages Table ==========
-export const orderMessages = pgTable("order_messages", {
-  id: serial("id").primaryKey(),
-  orderId: integer("order_id").notNull().references(() => orders.id, { onDelete: "cascade" }),
-  senderId: integer("sender_id").notNull(),
-  senderType: text("sender_type").notNull(),
-  message: text("message").notNull(),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+// ========== Order Message Types ==========
+export interface OrderMessage {
+  id: number;
+  orderId: number;
+  senderId: number;
+  senderType: string;
+  message: string;
+  createdAt: Date;
+}
 
-export const insertOrderMessageSchema = createInsertSchema(orderMessages).omit({
-  id: true,
-  createdAt: true,
+export const insertOrderMessageSchema = z.object({
+  orderId: z.number(),
+  senderId: z.number(),
+  senderType: z.string(),
+  message: z.string(),
 });
 
 export type InsertOrderMessage = z.infer<typeof insertOrderMessageSchema>;
-export type OrderMessage = typeof orderMessages.$inferSelect;
 
-// ========== Reviews Table ==========
-export const reviews = pgTable("reviews", {
-  id: serial("id").primaryKey(),
-  orderId: integer("order_id").notNull().references(() => orders.id),
-  customerId: integer("customer_id").notNull().references(() => customers.id),
-  productId: integer("product_id").notNull().references(() => products.id),
-  rating: integer("rating").notNull(),
-  comment: text("comment"),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+// ========== Review Types ==========
+export interface Review {
+  id: number;
+  orderId: number;
+  customerId: number;
+  productId: number;
+  rating: number;
+  comment?: string | null;
+  createdAt: Date;
+}
 
-export const insertReviewSchema = createInsertSchema(reviews).omit({
-  id: true,
-  createdAt: true,
+export const insertReviewSchema = z.object({
+  orderId: z.number(),
+  customerId: z.number(),
+  productId: z.number(),
+  rating: z.number(),
+  comment: z.string().optional().nullable(),
 });
 
 export type InsertReview = z.infer<typeof insertReviewSchema>;
-export type Review = typeof reviews.$inferSelect;
 
-// ========== Transactions Table (Wallet) ==========
-export const transactions = pgTable("transactions", {
-  id: serial("id").primaryKey(),
-  merchantId: integer("merchant_id").notNull().references(() => merchants.id, { onDelete: "cascade" }),
-  orderId: integer("order_id").references(() => orders.id),
-  type: text("type").notNull(),
-  amount: integer("amount").notNull(),
-  status: text("status").notNull().default("completed"),
-  description: text("description").notNull(),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+// ========== Transaction Types ==========
+export interface Transaction {
+  id: number;
+  merchantId: number;
+  orderId?: number | null;
+  type: string;
+  amount: number;
+  status: string;
+  description: string;
+  createdAt: Date;
+}
 
-export const insertTransactionSchema = createInsertSchema(transactions).omit({
-  id: true,
-  createdAt: true,
+export const insertTransactionSchema = z.object({
+  merchantId: z.number(),
+  orderId: z.number().optional().nullable(),
+  type: z.string(),
+  amount: z.number(),
+  status: z.string().default("completed"),
+  description: z.string(),
 });
 
 export type InsertTransaction = z.infer<typeof insertTransactionSchema>;
-export type Transaction = typeof transactions.$inferSelect;
 
-// ========== Admins Table ==========
-export const admins = pgTable("admins", {
-  id: serial("id").primaryKey(),
-  email: text("email").notNull().unique(),
-  password: text("password").notNull(),
-  name: text("name").notNull(),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+// ========== Admin Types ==========
+export interface Admin {
+  id: number;
+  email: string;
+  password: string;
+  name: string;
+  createdAt: Date;
+}
 
-export const insertAdminSchema = createInsertSchema(admins).omit({
-  id: true,
-  createdAt: true,
+export const insertAdminSchema = z.object({
+  email: z.string().email(),
+  password: z.string(),
+  name: z.string(),
 });
 
 export type InsertAdmin = z.infer<typeof insertAdminSchema>;
-export type Admin = typeof admins.$inferSelect;
 
-// ========== Banners Table ==========
-export const banners = pgTable("banners", {
-  id: serial("id").primaryKey(),
-  title: text("title").notNull(),
-  image: text("image").notNull(),
-  link: text("link"),
-  isActive: boolean("is_active").notNull().default(true),
-  sortOrder: integer("sort_order").notNull().default(0),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+// ========== Banner Types ==========
+export interface Banner {
+  id: number;
+  title: string;
+  image: string;
+  link?: string | null;
+  isActive: boolean;
+  sortOrder: number;
+  createdAt: Date;
+}
 
-export const insertBannerSchema = createInsertSchema(banners).omit({
-  id: true,
-  createdAt: true,
+export const insertBannerSchema = z.object({
+  title: z.string(),
+  image: z.string(),
+  link: z.string().optional().nullable(),
+  isActive: z.boolean().default(true),
+  sortOrder: z.number().default(0),
 });
 
 export type InsertBanner = z.infer<typeof insertBannerSchema>;
-export type Banner = typeof banners.$inferSelect;
 
-// ========== Categories Table (App Categories) ==========
-export const categories = pgTable("categories", {
-  id: serial("id").primaryKey(),
-  name: text("name").notNull(),
-  nameEn: text("name_en"),
-  icon: text("icon"),
-  image: text("image"),
-  isActive: boolean("is_active").notNull().default(true),
-  sortOrder: integer("sort_order").notNull().default(0),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+// ========== Category Types ==========
+export interface Category {
+  id: number;
+  name: string;
+  nameEn?: string | null;
+  icon?: string | null;
+  image?: string | null;
+  isActive: boolean;
+  sortOrder: number;
+  createdAt: Date;
+}
 
-export const insertCategorySchema = createInsertSchema(categories).omit({
-  id: true,
-  createdAt: true,
+export const insertCategorySchema = z.object({
+  name: z.string(),
+  nameEn: z.string().optional().nullable(),
+  icon: z.string().optional().nullable(),
+  image: z.string().optional().nullable(),
+  isActive: z.boolean().default(true),
+  sortOrder: z.number().default(0),
 });
 
 export type InsertCategory = z.infer<typeof insertCategorySchema>;
-export type Category = typeof categories.$inferSelect;
 
-// ========== Cities Table ==========
-export const cities = pgTable("cities", {
-  id: serial("id").primaryKey(),
-  name: text("name").notNull(),
-  nameEn: text("name_en"),
-  isActive: boolean("is_active").notNull().default(true),
-  sortOrder: integer("sort_order").notNull().default(0),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+// ========== City Types ==========
+export interface City {
+  id: number;
+  name: string;
+  nameEn?: string | null;
+  isActive: boolean;
+  sortOrder: number;
+  createdAt: Date;
+}
 
-export const insertCitySchema = createInsertSchema(cities).omit({
-  id: true,
-  createdAt: true,
+export const insertCitySchema = z.object({
+  name: z.string(),
+  nameEn: z.string().optional().nullable(),
+  isActive: z.boolean().default(true),
+  sortOrder: z.number().default(0),
 });
 
 export type InsertCity = z.infer<typeof insertCitySchema>;
-export type City = typeof cities.$inferSelect;
 
-// ========== App Settings Table ==========
-export const appSettings = pgTable("app_settings", {
-  id: serial("id").primaryKey(),
-  key: text("key").notNull().unique(),
-  value: text("value"),
-  valueJson: jsonb("value_json"),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
+// ========== App Setting Types ==========
+export interface AppSetting {
+  id: number;
+  key: string;
+  value?: string | null;
+  valueJson?: any;
+  updatedAt: Date;
+}
 
-export const insertAppSettingSchema = createInsertSchema(appSettings).omit({
-  id: true,
-  updatedAt: true,
+export const insertAppSettingSchema = z.object({
+  key: z.string(),
+  value: z.string().optional().nullable(),
+  valueJson: z.any().optional(),
 });
 
 export type InsertAppSetting = z.infer<typeof insertAppSettingSchema>;
-export type AppSetting = typeof appSettings.$inferSelect;
 
-// ========== Notifications Table ==========
-export const notifications = pgTable("notifications", {
-  id: serial("id").primaryKey(),
-  recipientType: text("recipient_type").notNull(),
-  recipientId: integer("recipient_id"),
-  title: text("title").notNull(),
-  body: text("body").notNull(),
-  actionType: text("action_type").notNull(),
-  actionRef: jsonb("action_ref").$type<Record<string, any>>(),
-  isRead: boolean("is_read").notNull().default(false),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  readAt: timestamp("read_at"),
-});
+// ========== Notification Types ==========
+export interface Notification {
+  id: number;
+  recipientType: string;
+  recipientId?: number | null;
+  title: string;
+  body: string;
+  actionType: string;
+  actionRef?: Record<string, any> | null;
+  isRead: boolean;
+  createdAt: Date;
+  readAt?: Date | null;
+}
 
-export const insertNotificationSchema = createInsertSchema(notifications).omit({
-  id: true,
-  createdAt: true,
-  isRead: true,
-  readAt: true,
+export const insertNotificationSchema = z.object({
+  recipientType: z.string(),
+  recipientId: z.number().optional().nullable(),
+  title: z.string(),
+  body: z.string(),
+  actionType: z.string(),
+  actionRef: z.record(z.any()).optional().nullable(),
 });
 
 export type InsertNotification = z.infer<typeof insertNotificationSchema>;
-export type Notification = typeof notifications.$inferSelect;
 
-// ========== Product Options Table ==========
-export const productOptions = pgTable("product_options", {
-  id: serial("id").primaryKey(),
-  productId: integer("product_id").notNull().references(() => products.id, { onDelete: "cascade" }),
-  type: text("type").notNull(), // 'multiple_choice' | 'text' | 'single'
-  title: text("title").notNull(),
-  placeholder: text("placeholder"),
-  required: boolean("required").notNull().default(false),
-  sortOrder: integer("sort_order").notNull().default(0),
-});
+// ========== Product Option Types ==========
+export interface ProductOption {
+  id: number;
+  productId: number;
+  type: string;
+  title: string;
+  placeholder?: string | null;
+  required: boolean;
+  sortOrder: number;
+}
 
-export const insertProductOptionSchema = createInsertSchema(productOptions).omit({
-  id: true,
+export const insertProductOptionSchema = z.object({
+  productId: z.number(),
+  type: z.string(),
+  title: z.string(),
+  placeholder: z.string().optional().nullable(),
+  required: z.boolean().default(false),
+  sortOrder: z.number().default(0),
 });
 
 export type InsertProductOption = z.infer<typeof insertProductOptionSchema>;
-export type ProductOption = typeof productOptions.$inferSelect;
 
-// ========== Product Option Choices Table (for multiple_choice) ==========
-export const productOptionChoices = pgTable("product_option_choices", {
-  id: serial("id").primaryKey(),
-  optionId: integer("option_id").notNull().references(() => productOptions.id, { onDelete: "cascade" }),
-  label: text("label").notNull(),
-  sortOrder: integer("sort_order").notNull().default(0),
-});
+// ========== Product Option Choice Types ==========
+export interface ProductOptionChoice {
+  id: number;
+  optionId: number;
+  label: string;
+  sortOrder: number;
+}
 
-export const insertProductOptionChoiceSchema = createInsertSchema(productOptionChoices).omit({
-  id: true,
+export const insertProductOptionChoiceSchema = z.object({
+  optionId: z.number(),
+  label: z.string(),
+  sortOrder: z.number().default(0),
 });
 
 export type InsertProductOptionChoice = z.infer<typeof insertProductOptionChoiceSchema>;
-export type ProductOptionChoice = typeof productOptionChoices.$inferSelect;
 
-// ========== Order Option Selections Table ==========
-export const orderOptionSelections = pgTable("order_option_selections", {
-  id: serial("id").primaryKey(),
-  orderId: integer("order_id").notNull().references(() => orders.id, { onDelete: "cascade" }),
-  optionId: integer("option_id").notNull().references(() => productOptions.id),
-  choiceId: integer("choice_id").references(() => productOptionChoices.id),
-  textValue: text("text_value"),
-  booleanValue: boolean("boolean_value"),
-});
+// ========== Order Option Selection Types ==========
+export interface OrderOptionSelection {
+  id: number;
+  orderId: number;
+  optionId: number;
+  choiceId?: number | null;
+  textValue?: string | null;
+  booleanValue?: boolean | null;
+}
 
-export const insertOrderOptionSelectionSchema = createInsertSchema(orderOptionSelections).omit({
-  id: true,
+export const insertOrderOptionSelectionSchema = z.object({
+  orderId: z.number(),
+  optionId: z.number(),
+  choiceId: z.number().optional().nullable(),
+  textValue: z.string().optional().nullable(),
+  booleanValue: z.boolean().optional().nullable(),
 });
 
 export type InsertOrderOptionSelection = z.infer<typeof insertOrderOptionSelectionSchema>;
-export type OrderOptionSelection = typeof orderOptionSelections.$inferSelect;
 
-// ========== Discount Codes Table ==========
-export const discountCodes = pgTable("discount_codes", {
-  id: serial("id").primaryKey(),
-  code: varchar("code", { length: 50 }).notNull().unique(),
-  type: text("type").notNull(), // 'percentage' | 'fixed' | 'free_shipping'
-  value: integer("value").notNull(), // percentage (0-100) or fixed amount in cents
-  minOrderAmount: integer("min_order_amount").default(0), // minimum order amount to apply
-  maxUses: integer("max_uses"), // null = unlimited
-  usedCount: integer("used_count").notNull().default(0),
-  isActive: boolean("is_active").notNull().default(true),
-  expiresAt: timestamp("expires_at"),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+// ========== Discount Code Types ==========
+export interface DiscountCode {
+  id: number;
+  code: string;
+  type: string;
+  value: number;
+  minOrderAmount?: number | null;
+  maxUses?: number | null;
+  usedCount: number;
+  isActive: boolean;
+  expiresAt?: Date | null;
+  createdAt: Date;
+}
 
-export const insertDiscountCodeSchema = createInsertSchema(discountCodes).omit({
-  id: true,
-  usedCount: true,
-  createdAt: true,
+export const insertDiscountCodeSchema = z.object({
+  code: z.string(),
+  type: z.string(),
+  value: z.number(),
+  minOrderAmount: z.number().optional().nullable(),
+  maxUses: z.number().optional().nullable(),
+  isActive: z.boolean().default(true),
+  expiresAt: z.date().optional().nullable(),
 });
 
 export type InsertDiscountCode = z.infer<typeof insertDiscountCodeSchema>;
-export type DiscountCode = typeof discountCodes.$inferSelect;

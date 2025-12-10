@@ -23,34 +23,11 @@ import { Wallet, Store, CreditCard, Loader2, Check, X, Eye, Building2, Clock, Ch
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
+import { getMerchantsByStatus, getWithdrawals, getTransactions, updateWithdrawalStatus } from "@/lib/admin-ops";
 
-interface Merchant {
-  id: number;
-  ownerName: string;
-  storeName: string;
-  email: string;
-  mobile: string;
-  bankName: string | null;
-  iban: string | null;
-  accountHolderName: string | null;
-  balance: number;
-  status: string;
-  city: string;
-}
-
-interface Transaction {
-  id: number;
-  merchantId: number;
-  type: string;
-  amount: number;
-  status: string;
-  description: string;
-  createdAt: string;
-}
-
-interface WithdrawalWithMerchant extends Transaction {
-  merchant?: Merchant;
-}
+type Merchant = any;
+type Transaction = any;
+type WithdrawalWithMerchant = Transaction & { merchant?: Merchant };
 
 export default function AdminWithdrawals() {
   const { toast } = useToast();
@@ -59,47 +36,27 @@ export default function AdminWithdrawals() {
   const [selectedMerchant, setSelectedMerchant] = useState<Merchant | null>(null);
 
   const { data: merchants = [], isLoading: loadingMerchants } = useQuery<Merchant[]>({
-    queryKey: ["/api/admin/merchants"],
-    queryFn: async () => {
-      const res = await fetch("/api/admin/merchants", { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to fetch merchants");
-      return res.json();
-    }
+    queryKey: ["admin-merchants", "all"],
+    queryFn: () => getMerchantsByStatus()
   });
 
   const { data: withdrawals = [], isLoading: loadingWithdrawals } = useQuery<Transaction[]>({
-    queryKey: ["/api/admin/withdrawals"],
-    queryFn: async () => {
-      const res = await fetch("/api/admin/withdrawals", { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to fetch withdrawals");
-      return res.json();
-    }
+    queryKey: ["admin-withdrawals"],
+    queryFn: () => getWithdrawals()
   });
 
   const { data: allTransactions = [] } = useQuery<Transaction[]>({
-    queryKey: ["/api/admin/transactions"],
-    queryFn: async () => {
-      const res = await fetch("/api/admin/transactions", { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to fetch transactions");
-      return res.json();
-    }
+    queryKey: ["admin-transactions"],
+    queryFn: () => getTransactions()
   });
 
   const updateWithdrawalMutation = useMutation({
-    mutationFn: async ({ id, status }: { id: number; status: string }) => {
-      const res = await fetch(`/api/admin/withdrawals/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ status })
-      });
-      if (!res.ok) throw new Error("Failed to update withdrawal");
-      return res.json();
-    },
+    mutationFn: ({ id, status }: { id: string; status: "completed" | "rejected" }) =>
+      updateWithdrawalStatus(id, status),
     onSuccess: (_, { status }) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/withdrawals"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/transactions"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/merchants"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-withdrawals"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-merchants", "all"] });
       toast({ 
         title: status === "completed" ? "تم الموافقة على طلب السحب" : "تم رفض طلب السحب",
         className: status === "completed" ? "bg-emerald-50 border-emerald-200 text-emerald-800" : ""
@@ -111,9 +68,9 @@ export default function AdminWithdrawals() {
     }
   });
 
-  const withdrawalsWithMerchants: WithdrawalWithMerchant[] = withdrawals.map(w => ({
+  const withdrawalsWithMerchants: WithdrawalWithMerchant[] = withdrawals.map((w: any) => ({
     ...w,
-    merchant: merchants.find(m => m.id === w.merchantId)
+    merchant: merchants.find((m: any) => m.id === w.merchantId)
   }));
 
   const activeMerchants = merchants.filter(m => m.status === "active");

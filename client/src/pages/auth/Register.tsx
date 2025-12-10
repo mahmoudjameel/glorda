@@ -21,9 +21,13 @@ import { useQuery } from "@tanstack/react-query";
 import logoUrl from "@assets/شعار_غلوردا_1764881546720.jpg";
 import { cn } from "@/lib/utils";
 import { saudiBanks } from "@/constants/saudiBanks";
+import { uploadToStorage } from "@/lib/storage-upload";
+import { auth } from "@/lib/firebase";
+import { createUserWithEmailAndPassword } from "firebase/auth";
+import { getCollectionAll, getDocData, setDocData } from "@/lib/firestore";
 
 interface City {
-  id: number;
+  id: string;
   name: string;
   nameEn: string | null;
   isActive: boolean;
@@ -81,44 +85,30 @@ export default function Register() {
   const [nationalIdImage, setNationalIdImage] = useState<File | null>(null);
   const [freelanceCertImage, setFreelanceCertImage] = useState<File | null>(null);
 
+  const fetchSetting = async (key: string) => (await getDocData<{ value?: string }>(`settings/${key}`)) || { value: "" };
+
   const { data: termsData } = useQuery({
-    queryKey: ["/api/public/settings/merchant_terms_conditions"],
-    queryFn: async () => {
-      const res = await fetch("/api/public/settings/merchant_terms_conditions");
-      if (!res.ok) return { value: "" };
-      return res.json();
-    },
+    queryKey: ["settings", "merchant_terms_conditions"],
+    queryFn: () => fetchSetting("merchant_terms_conditions"),
     staleTime: 0,
     refetchOnMount: "always"
   });
 
   const { data: cities = [] } = useQuery<City[]>({
-    queryKey: ["/api/public/cities"],
-    queryFn: async () => {
-      const res = await fetch("/api/public/cities");
-      if (!res.ok) throw new Error("Failed to fetch cities");
-      return res.json();
-    }
+    queryKey: ["cities"],
+    queryFn: () => getCollectionAll<City>("cities"),
   });
 
   const { data: privacyData } = useQuery({
-    queryKey: ["/api/public/settings/merchant_privacy_policy"],
-    queryFn: async () => {
-      const res = await fetch("/api/public/settings/merchant_privacy_policy");
-      if (!res.ok) return { value: "" };
-      return res.json();
-    },
+    queryKey: ["settings", "merchant_privacy_policy"],
+    queryFn: () => fetchSetting("merchant_privacy_policy"),
     staleTime: 0,
     refetchOnMount: "always"
   });
 
   const { data: aboutData } = useQuery({
-    queryKey: ["/api/public/settings/merchant_about_us"],
-    queryFn: async () => {
-      const res = await fetch("/api/public/settings/merchant_about_us");
-      if (!res.ok) return { value: "" };
-      return res.json();
-    },
+    queryKey: ["settings", "merchant_about_us"],
+    queryFn: () => fetchSetting("merchant_about_us"),
     staleTime: 0,
     refetchOnMount: "always"
   });
@@ -153,10 +143,10 @@ export default function Register() {
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsSubmitting(true);
-    
+
     try {
       const { confirmPassword, acceptTerms, ...registerData } = values;
-      
+
       // Validate required documents based on store type
       if (values.storeType === "company" || values.storeType === "institution") {
         if (!commercialRegDoc) {
@@ -179,57 +169,56 @@ export default function Register() {
           return;
         }
       }
-      
-      const formData = new FormData();
-      Object.entries(registerData).forEach(([key, value]) => {
-        if (value !== undefined && value !== null) {
-          if (Array.isArray(value)) {
-            formData.append(key, JSON.stringify(value));
-          } else {
-            formData.append(key, String(value));
-          }
-        }
-      });
-      
-      // Set default category value
-      formData.append("category", "all");
-      
-      // Add document files based on store type
-      if (values.storeType === "company" || values.storeType === "institution") {
-        if (commercialRegDoc) formData.append("commercialRegDoc", commercialRegDoc);
-      } else if (values.storeType === "individual") {
-        if (nationalIdImage) formData.append("nationalIdImage", nationalIdImage);
-        if (freelanceCertImage) formData.append("freelanceCertImage", freelanceCertImage);
+
+      // Upload required documents to Firebase Storage
+      const uploadedDocs: Record<string, string | undefined> = {};
+      if (commercialRegDoc) {
+        uploadedDocs.commercialRegistrationDoc = await uploadToStorage(commercialRegDoc, "documents");
       }
-      
-      const response = await fetch("/api/auth/register", {
-        method: "POST",
-        credentials: "include",
-        body: formData,
-      });
-      
-      const data = await response.json();
-      
-      if (!response.ok) {
-        toast({
-          variant: "destructive",
-          title: "خطأ في التسجيل",
-          description: data.error || "حدث خطأ ما",
-        });
-        return;
+      if (nationalIdImage) {
+        uploadedDocs.nationalIdImage = await uploadToStorage(nationalIdImage, "documents");
       }
-      
+      if (freelanceCertImage) {
+        uploadedDocs.freelanceCertificateImage = await uploadToStorage(freelanceCertImage, "documents");
+      }
+
+      // Create Firebase Auth user
+      const credential = await createUserWithEmailAndPassword(auth, values.email, values.password);
+      const uid = credential.user.uid;
+
+      // Prepare merchant data
+      const { password, ...merchantFields } = registerData;
+
+      const merchantData = {
+        ...merchantFields,
+        category: "all",
+        branches: merchantFields.branches || [],
+        status: "pending",
+        balance: 0,
+        ...uploadedDocs,
+      };
+
+      await setDocData(`merchants/${uid}`, merchantData);
+      await setDocData(`users/${uid}`, {
+        role: "merchant",
+        email: values.email,
+        merchantId: uid,
+        name: values.ownerName,
+        storeName: values.storeName,
+      });
+
       toast({
         title: "تم استلام طلبك بنجاح",
         description: "حسابك قيد المراجعة الآن. سيتم إشعارك عند التفعيل.",
       });
-      
+
       setLocation("/");
-    } catch (error) {
+    } catch (error: any) {
+      console.error("Register error:", error);
       toast({
         variant: "destructive",
-        title: "خطأ",
-        description: "فشل الاتصال بالخادم",
+        title: "خطأ في التسجيل",
+        description: error?.message || "حدث خطأ ما",
       });
     } finally {
       setIsSubmitting(false);

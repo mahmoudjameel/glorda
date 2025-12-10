@@ -11,10 +11,13 @@ import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import logoUrl from "@assets/شعار_غلوردا_1764881546720.jpg";
+import { auth } from "@/lib/firebase";
+import { signInWithEmailAndPassword, signOut, createUserWithEmailAndPassword } from "firebase/auth";
+import { getDocData, setDocData } from "@/lib/firestore";
 
 const formSchema = z.object({
-  email: z.string().email({ message: "البريد الإلكتروني غير صالح" }),
-  password: z.string().min(1, { message: "كلمة المرور مطلوبة" }),
+  email: z.literal("admin@admin.com", { errorMap: () => ({ message: "يجب استخدام حساب الأدمن الثابت" }) }),
+  password: z.literal("123456", { errorMap: () => ({ message: "كلمة المرور الثابتة للأدمن هي 123456" }) }),
 });
 
 export default function AdminLogin() {
@@ -34,40 +37,42 @@ export default function AdminLogin() {
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsSubmitting(true);
-    
+
     try {
-      const response = await fetch("/api/auth/login/admin", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify(values),
-      });
-      
-      const data = await response.json();
-      
-      if (!response.ok) {
-        toast({
-          variant: "destructive",
-          title: "خطأ في تسجيل الدخول",
-          description: data.error || "حدث خطأ ما",
-        });
-        return;
+      const fixedEmail = "admin@admin.com";
+      const fixedPassword = "123456";
+
+      // جرّب تسجيل الدخول، وإن لم يوجد الحساب يتم إنشاؤه آلياً
+      let uid: string | null = null;
+      try {
+        const credential = await signInWithEmailAndPassword(auth, fixedEmail, fixedPassword);
+        uid = credential.user.uid;
+      } catch {
+        const credential = await createUserWithEmailAndPassword(auth, fixedEmail, fixedPassword);
+        uid = credential.user.uid;
       }
-      
+
+      // ضمان وجود وثيقة الدور في Firestore
+      await setDocData(`users/${uid}`, {
+        role: "admin",
+        email: fixedEmail,
+        name: "Admin",
+      });
+
       toast({
         title: "تم تسجيل الدخول بنجاح",
-        description: `مرحباً ${data.admin.name}`,
+        description: "مرحباً أيها المشرف",
       });
-      
-      await refetch();
+
       setTimeout(() => {
         setLocation("/admin");
       }, 100);
-    } catch (error) {
+    } catch (error: any) {
+      console.error("Admin login error:", error);
       toast({
         variant: "destructive",
-        title: "خطأ",
-        description: "فشل الاتصال بالخادم",
+        title: "خطأ في تسجيل الدخول",
+        description: error?.message || "حدث خطأ ما",
       });
     } finally {
       setIsSubmitting(false);
@@ -116,12 +121,12 @@ export default function AdminLogin() {
                       <FormLabel>كلمة المرور</FormLabel>
                       <FormControl>
                         <div className="relative">
-                          <Input 
-                            type={showPassword ? "text" : "password"} 
-                            placeholder="••••••••" 
-                            {...field} 
-                            className="pl-10" 
-                            data-testid="input-admin-password" 
+                          <Input
+                            type={showPassword ? "text" : "password"}
+                            placeholder="••••••••"
+                            {...field}
+                            className="pl-10"
+                            data-testid="input-admin-password"
                           />
                           <Button
                             type="button"
@@ -146,7 +151,7 @@ export default function AdminLogin() {
             </Form>
           </CardContent>
         </Card>
-        
+
         <div className="text-center">
           <p className="text-xs text-muted-foreground">
             هذه الصفحة مخصصة للموظفين المصرح لهم فقط.

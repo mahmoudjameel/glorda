@@ -3,13 +3,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow
 } from "@/components/ui/table";
 import {
   Dialog,
@@ -23,6 +23,31 @@ import { useState } from "react";
 import { format } from "date-fns";
 import { ar } from "date-fns/locale";
 import { getAllOrders } from "@/lib/admin-ops";
+
+// Helper function to format Firebase Timestamp or Date
+const formatFirebaseDate = (date: any, formatStr: string = "dd/MM/yyyy"): string => {
+  if (!date) return 'غير محدد';
+
+  try {
+    let dateObj: Date;
+
+    if (date && typeof date === 'object' && 'seconds' in date) {
+      dateObj = new Date(date.seconds * 1000);
+    } else if (date && typeof date.toDate === 'function') {
+      dateObj = date.toDate();
+    } else {
+      dateObj = new Date(date);
+    }
+
+    if (isNaN(dateObj.getTime())) {
+      return 'غير محدد';
+    }
+
+    return format(dateObj, formatStr, { locale: ar });
+  } catch {
+    return 'غير محدد';
+  }
+};
 
 interface OptionSelection {
   id: number;
@@ -57,7 +82,7 @@ export default function AdminOrders() {
     queryFn: () => getAllOrders()
   });
 
-  const filteredOrders = orders.filter(order => 
+  const filteredOrders = orders.filter(order =>
     (order.orderNumber && order.orderNumber.toLowerCase().includes(searchQuery.toLowerCase())) ||
     (order.customer?.name && order.customer.name.toLowerCase().includes(searchQuery.toLowerCase())) ||
     (order.merchant?.storeName && order.merchant.storeName.toLowerCase().includes(searchQuery.toLowerCase())) ||
@@ -167,7 +192,7 @@ export default function AdminOrders() {
                           </Badge>
                         </TableCell>
                         <TableCell className="text-muted-foreground text-sm" data-testid={`text-date-${order.id}`}>
-                          {format(new Date(order.createdAt), "dd/MM/yyyy", { locale: ar })}
+                          {formatFirebaseDate(order.createdAt)}
                         </TableCell>
                         <TableCell>
                           <Button
@@ -264,7 +289,7 @@ export default function AdminOrders() {
                       تاريخ الطلب
                     </h4>
                     <p className="text-sm text-muted-foreground">
-                      {format(new Date(selectedOrder.createdAt), "dd MMMM yyyy - HH:mm", { locale: ar })}
+                      {formatFirebaseDate(selectedOrder.createdAt, "dd MMMM yyyy - HH:mm")}
                     </p>
                   </div>
                 </div>

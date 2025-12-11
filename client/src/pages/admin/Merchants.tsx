@@ -1,13 +1,13 @@
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow
 } from "@/components/ui/table";
 import { Search, MoreHorizontal, ShieldCheck, Ban, CheckCircle, Loader2, Store, Eye, FileText, ExternalLink, Image } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -35,6 +35,30 @@ const deliveryMethodLabels: Record<string, string> = {
   representative: "مندوب توصيل",
   pickup: "استلام من الفرع",
   all: "الكل"
+};
+
+// Helper function to format Firebase Timestamp or Date
+const formatFirebaseDate = (date: any): string => {
+  if (!date) return 'غير محدد';
+
+  try {
+    // Handle Firestore Timestamp (has seconds and nanoseconds)
+    if (date && typeof date === 'object' && 'seconds' in date) {
+      return new Date(date.seconds * 1000).toLocaleDateString('ar-SA');
+    }
+    // Handle Firestore Timestamp with toDate method
+    if (date && typeof date.toDate === 'function') {
+      return date.toDate().toLocaleDateString('ar-SA');
+    }
+    // Handle regular Date object or string
+    const parsed = new Date(date);
+    if (isNaN(parsed.getTime())) {
+      return 'غير محدد';
+    }
+    return parsed.toLocaleDateString('ar-SA');
+  } catch {
+    return 'غير محدد';
+  }
 };
 
 export default function AdminMerchants() {
@@ -94,8 +118,8 @@ export default function AdminMerchants() {
 
         <div className="flex items-center gap-4 bg-card p-4 rounded-lg border">
           <Search className="w-5 h-5 text-muted-foreground" />
-          <Input 
-            placeholder="بحث عن تاجر بالاسم أو البريد..." 
+          <Input
+            placeholder="بحث عن تاجر بالاسم أو البريد..."
             className="max-w-sm border-none shadow-none focus-visible:ring-0"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
@@ -146,20 +170,20 @@ export default function AdminMerchants() {
                     <TableCell>{merchant.city}</TableCell>
                     <TableCell className="font-mono">{(merchant.balance / 100).toFixed(2)} ر.س</TableCell>
                     <TableCell className="font-mono text-sm">
-                      {new Date(merchant.createdAt).toLocaleDateString('ar-SA')}
+                      {formatFirebaseDate(merchant.createdAt)}
                     </TableCell>
                     <TableCell>
-                      <Badge 
+                      <Badge
                         variant="outline"
                         className={
-                          merchant.status === 'active' ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 
-                          merchant.status === 'suspended' ? 'border-red-200 bg-red-50 text-red-700' : 
-                          'border-amber-200 bg-amber-50 text-amber-700'
+                          merchant.status === 'active' ? 'border-emerald-200 bg-emerald-50 text-emerald-700' :
+                            merchant.status === 'suspended' ? 'border-red-200 bg-red-50 text-red-700' :
+                              'border-amber-200 bg-amber-50 text-amber-700'
                         }
                       >
                         {
-                          merchant.status === 'active' ? 'نشط' : 
-                          merchant.status === 'suspended' ? 'موقوف' : 'قيد المراجعة'
+                          merchant.status === 'active' ? 'نشط' :
+                            merchant.status === 'suspended' ? 'موقوف' : 'قيد المراجعة'
                         }
                       </Badge>
                     </TableCell>
@@ -172,15 +196,15 @@ export default function AdminMerchants() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem 
+                          <DropdownMenuItem
                             className="gap-2 cursor-pointer"
                             onClick={() => handleViewDetails(merchant)}
                           >
                             <Eye className="w-4 h-4" /> تفاصيل الحساب
                           </DropdownMenuItem>
-                          
+
                           {merchant.status === 'pending' && (
-                            <DropdownMenuItem 
+                            <DropdownMenuItem
                               className="gap-2 cursor-pointer text-emerald-600 focus:text-emerald-700"
                               onClick={() => updateStatusMutation.mutate({ id: merchant.id, status: "active" })}
                             >
@@ -189,7 +213,7 @@ export default function AdminMerchants() {
                           )}
 
                           {merchant.status === 'active' && (
-                            <DropdownMenuItem 
+                            <DropdownMenuItem
                               className="gap-2 cursor-pointer text-destructive focus:text-destructive"
                               onClick={() => updateStatusMutation.mutate({ id: merchant.id, status: "suspended" })}
                             >
@@ -198,7 +222,7 @@ export default function AdminMerchants() {
                           )}
 
                           {merchant.status === 'suspended' && (
-                            <DropdownMenuItem 
+                            <DropdownMenuItem
                               className="gap-2 cursor-pointer text-emerald-600 focus:text-emerald-700"
                               onClick={() => updateStatusMutation.mutate({ id: merchant.id, status: "active" })}
                             >
@@ -262,7 +286,7 @@ export default function AdminMerchants() {
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">تاريخ التسجيل</p>
-                    <p className="font-medium">{new Date(selectedMerchant.createdAt).toLocaleDateString('ar-SA')}</p>
+                    <p className="font-medium">{formatFirebaseDate(selectedMerchant.createdAt)}</p>
                   </div>
                 </div>
                 {/* Documents Section */}
@@ -274,9 +298,9 @@ export default function AdminMerchants() {
                   {(selectedMerchant.storeType === "company" || selectedMerchant.storeType === "institution") && (
                     <div className="space-y-2">
                       {selectedMerchant.commercialRegistrationDoc ? (
-                        <a 
-                          href={selectedMerchant.commercialRegistrationDoc} 
-                          target="_blank" 
+                        <a
+                          href={selectedMerchant.commercialRegistrationDoc}
+                          target="_blank"
                           rel="noopener noreferrer"
                           className="flex items-center gap-2 p-2 border rounded bg-green-50 border-green-200 hover:bg-green-100 transition-colors w-fit"
                           data-testid="link-commercial-doc"
@@ -290,13 +314,13 @@ export default function AdminMerchants() {
                       )}
                     </div>
                   )}
-                  
+
                   {selectedMerchant.storeType === "individual" && (
                     <div className="flex flex-wrap gap-2">
                       {selectedMerchant.nationalIdImage ? (
-                        <a 
-                          href={selectedMerchant.nationalIdImage} 
-                          target="_blank" 
+                        <a
+                          href={selectedMerchant.nationalIdImage}
+                          target="_blank"
                           rel="noopener noreferrer"
                           className="flex items-center gap-2 p-2 border rounded bg-green-50 border-green-200 hover:bg-green-100 transition-colors"
                           data-testid="link-national-id"
@@ -309,9 +333,9 @@ export default function AdminMerchants() {
                         <p className="text-sm text-muted-foreground">لم يتم رفع الهوية</p>
                       )}
                       {selectedMerchant.freelanceCertificateImage ? (
-                        <a 
-                          href={selectedMerchant.freelanceCertificateImage} 
-                          target="_blank" 
+                        <a
+                          href={selectedMerchant.freelanceCertificateImage}
+                          target="_blank"
                           rel="noopener noreferrer"
                           className="flex items-center gap-2 p-2 border rounded bg-green-50 border-green-200 hover:bg-green-100 transition-colors"
                           data-testid="link-freelance-cert"

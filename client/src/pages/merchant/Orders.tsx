@@ -3,13 +3,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow
 } from "@/components/ui/table";
 import {
   Dialog,
@@ -33,6 +33,31 @@ import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
 import { getMerchantOrders, updateOrderStatus, type Order } from "@/lib/merchant-data";
+
+// Helper function to format Firebase Timestamp or Date
+const formatFirebaseDate = (date: any, formatStr: string = "dd/MM/yyyy"): string => {
+  if (!date) return 'غير محدد';
+
+  try {
+    let dateObj: Date;
+
+    if (date && typeof date === 'object' && 'seconds' in date) {
+      dateObj = new Date(date.seconds * 1000);
+    } else if (date && typeof date.toDate === 'function') {
+      dateObj = date.toDate();
+    } else {
+      dateObj = new Date(date);
+    }
+
+    if (isNaN(dateObj.getTime())) {
+      return 'غير محدد';
+    }
+
+    return format(dateObj, formatStr, { locale: ar });
+  } catch {
+    return 'غير محدد';
+  }
+};
 
 type OrderWithDetails = Order;
 
@@ -87,7 +112,7 @@ export default function MerchantOrders() {
     }
   });
 
-  const filteredOrders = orders.filter(order => 
+  const filteredOrders = orders.filter(order =>
     order.orderNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
     (order.customer?.name && order.customer.name.toLowerCase().includes(searchQuery.toLowerCase())) ||
     (order.product?.name && order.product.name.toLowerCase().includes(searchQuery.toLowerCase()))
@@ -232,7 +257,7 @@ export default function MerchantOrders() {
                           </Badge>
                         </TableCell>
                         <TableCell className="text-muted-foreground text-sm" data-testid={`text-date-${order.id}`}>
-                          {format(new Date(order.createdAt), "dd/MM/yyyy", { locale: ar })}
+                          {formatFirebaseDate(order.createdAt)}
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-1">
@@ -336,7 +361,7 @@ export default function MerchantOrders() {
                       التاريخ
                     </h4>
                     <p className="text-sm text-muted-foreground">
-                      {format(new Date(selectedOrder.createdAt), "dd MMM yyyy", { locale: ar })}
+                      {formatFirebaseDate(selectedOrder.createdAt, "dd MMM yyyy")}
                     </p>
                   </div>
                 </div>

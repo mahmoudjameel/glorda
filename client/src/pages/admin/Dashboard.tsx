@@ -5,6 +5,31 @@ import { useQuery } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
 import { getMerchantsByStatus, getWithdrawals } from "@/lib/admin-ops";
 
+// Helper function to format Firebase Timestamp or Date
+const formatFirebaseDate = (date: any): string => {
+  if (!date) return 'غير محدد';
+
+  try {
+    let dateObj: Date;
+
+    if (date && typeof date === 'object' && 'seconds' in date) {
+      dateObj = new Date(date.seconds * 1000);
+    } else if (date && typeof date.toDate === 'function') {
+      dateObj = date.toDate();
+    } else {
+      dateObj = new Date(date);
+    }
+
+    if (isNaN(dateObj.getTime())) {
+      return 'غير محدد';
+    }
+
+    return dateObj.toLocaleDateString('ar-SA');
+  } catch {
+    return 'غير محدد';
+  }
+};
+
 const StatsCard = ({ title, value, icon: Icon, description, loading }: any) => (
   <Card>
     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -52,29 +77,29 @@ export default function AdminDashboard() {
         </div>
 
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          <StatsCard 
-            title="إجمالي التجار" 
+          <StatsCard
+            title="إجمالي التجار"
             value={merchants.length}
             icon={Store}
             description={`${activeMerchants} نشط`}
             loading={loadingMerchants}
           />
-          <StatsCard 
-            title="طلبات معلقة" 
+          <StatsCard
+            title="طلبات معلقة"
             value={pendingMerchants}
             icon={Clock}
             description="بانتظار المراجعة"
             loading={loadingMerchants}
           />
-          <StatsCard 
-            title="طلبات سحب معلقة" 
+          <StatsCard
+            title="طلبات سحب معلقة"
             value={withdrawals.length}
             icon={Activity}
             description="بانتظار التحويل"
             loading={loadingWithdrawals}
           />
-          <StatsCard 
-            title="إجمالي الأرصدة" 
+          <StatsCard
+            title="إجمالي الأرصدة"
             value={`${(totalBalance / 100).toFixed(2)} ر.س`}
             icon={TrendingUp}
             description="أرصدة التجار"
@@ -108,12 +133,12 @@ export default function AdminDashboard() {
                           <p className="text-xs text-muted-foreground">{merchant.ownerName}</p>
                         </div>
                       </div>
-                      <Badge 
+                      <Badge
                         variant="outline"
                         className={
-                          merchant.status === 'active' ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 
-                          merchant.status === 'suspended' ? 'border-red-200 bg-red-50 text-red-700' : 
-                          'border-amber-200 bg-amber-50 text-amber-700'
+                          merchant.status === 'active' ? 'border-emerald-200 bg-emerald-50 text-emerald-700' :
+                            merchant.status === 'suspended' ? 'border-red-200 bg-red-50 text-red-700' :
+                              'border-amber-200 bg-amber-50 text-amber-700'
                         }
                       >
                         {merchant.status === 'active' ? 'نشط' : merchant.status === 'suspended' ? 'موقوف' : 'معلق'}
@@ -147,7 +172,7 @@ export default function AdminDashboard() {
                       <div>
                         <p className="font-medium">طلب سحب #{withdrawal.id}</p>
                         <p className="text-xs text-muted-foreground">
-                          {new Date(withdrawal.createdAt).toLocaleDateString('ar-SA')}
+                          {formatFirebaseDate(withdrawal.createdAt)}
                         </p>
                       </div>
                       <p className="font-mono font-bold text-amber-700">

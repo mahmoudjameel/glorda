@@ -3,15 +3,15 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow
 } from "@/components/ui/table";
-import { 
+import {
   Dialog,
   DialogContent,
   DialogHeader,
@@ -24,6 +24,31 @@ import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { getMerchantsByStatus, getWithdrawals, getTransactions, updateWithdrawalStatus } from "@/lib/admin-ops";
+
+// Helper function to format Firebase Timestamp or Date
+const formatFirebaseDate = (date: any): string => {
+  if (!date) return 'غير محدد';
+
+  try {
+    let dateObj: Date;
+
+    if (date && typeof date === 'object' && 'seconds' in date) {
+      dateObj = new Date(date.seconds * 1000);
+    } else if (date && typeof date.toDate === 'function') {
+      dateObj = date.toDate();
+    } else {
+      dateObj = new Date(date);
+    }
+
+    if (isNaN(dateObj.getTime())) {
+      return 'غير محدد';
+    }
+
+    return dateObj.toLocaleDateString('ar-SA');
+  } catch {
+    return 'غير محدد';
+  }
+};
 
 type Merchant = any;
 type Transaction = any;
@@ -57,7 +82,7 @@ export default function AdminWithdrawals() {
       queryClient.invalidateQueries({ queryKey: ["admin-withdrawals"] });
       queryClient.invalidateQueries({ queryKey: ["admin-transactions"] });
       queryClient.invalidateQueries({ queryKey: ["admin-merchants", "all"] });
-      toast({ 
+      toast({
         title: status === "completed" ? "تم الموافقة على طلب السحب" : "تم رفض طلب السحب",
         className: status === "completed" ? "bg-emerald-50 border-emerald-200 text-emerald-800" : ""
       });
@@ -204,15 +229,15 @@ export default function AdminWithdrawals() {
                               </div>
                             </TableCell>
                             <TableCell className="text-muted-foreground">
-                              {new Date(withdrawal.createdAt).toLocaleDateString('ar-SA')}
+                              {formatFirebaseDate(withdrawal.createdAt)}
                             </TableCell>
                             <TableCell>
                               {getStatusBadge(withdrawal.status)}
                             </TableCell>
                             <TableCell>
                               <div className="flex gap-2">
-                                <Button 
-                                  variant="outline" 
+                                <Button
+                                  variant="outline"
                                   size="sm"
                                   onClick={() => setSelectedWithdrawal(withdrawal)}
                                   data-testid={`button-view-withdrawal-${withdrawal.id}`}
@@ -220,7 +245,7 @@ export default function AdminWithdrawals() {
                                   <Eye className="w-4 h-4 ml-1" />
                                   التفاصيل
                                 </Button>
-                                <Button 
+                                <Button
                                   size="sm"
                                   className="bg-emerald-600 hover:bg-emerald-700"
                                   onClick={() => updateWithdrawalMutation.mutate({ id: withdrawal.id, status: "completed" })}
@@ -229,7 +254,7 @@ export default function AdminWithdrawals() {
                                 >
                                   <Check className="w-4 h-4" />
                                 </Button>
-                                <Button 
+                                <Button
                                   variant="destructive"
                                   size="sm"
                                   onClick={() => updateWithdrawalMutation.mutate({ id: withdrawal.id, status: "rejected" })}
@@ -290,52 +315,53 @@ export default function AdminWithdrawals() {
                           const fees = Math.floor(merchant.balance * 5 / 100);
                           const netBalance = merchant.balance - fees;
                           return (
-                          <TableRow key={merchant.id} data-testid={`row-wallet-${merchant.id}`}>
-                            <TableCell>
-                              <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                                  <Store className="w-5 h-5 text-primary" />
+                            <TableRow key={merchant.id} data-testid={`row-wallet-${merchant.id}`}>
+                              <TableCell>
+                                <div className="flex items-center gap-3">
+                                  <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                                    <Store className="w-5 h-5 text-primary" />
+                                  </div>
+                                  <div>
+                                    <div className="font-medium">{merchant.storeName}</div>
+                                    <div className="text-sm text-muted-foreground">{merchant.ownerName}</div>
+                                  </div>
                                 </div>
-                                <div>
-                                  <div className="font-medium">{merchant.storeName}</div>
-                                  <div className="text-sm text-muted-foreground">{merchant.ownerName}</div>
-                                </div>
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <span className={`font-bold text-lg ${merchant.balance > 0 ? 'text-muted-foreground' : ''}`}>
-                                {formatCurrency(merchant.balance)}
-                              </span>
-                            </TableCell>
-                            <TableCell>
-                              <span className={`font-bold text-lg ${netBalance > 0 ? 'text-emerald-600' : ''}`}>
-                                {formatCurrency(netBalance)}
-                              </span>
-                            </TableCell>
-                            <TableCell>
-                              {merchant.bankName ? (
-                                <div className="flex items-center gap-2">
-                                  <Building2 className="w-4 h-4 text-muted-foreground" />
-                                  <span>{merchant.bankName}</span>
-                                </div>
-                              ) : (
-                                <span className="text-muted-foreground">غير محدد</span>
-                              )}
-                            </TableCell>
-                            <TableCell className="text-muted-foreground">{merchant.city}</TableCell>
-                            <TableCell>
-                              <Button 
-                                variant="outline" 
-                                size="sm"
-                                onClick={() => setSelectedMerchant(merchant)}
-                                data-testid={`button-view-merchant-${merchant.id}`}
-                              >
-                                <Eye className="w-4 h-4 ml-1" />
-                                التفاصيل
-                              </Button>
-                            </TableCell>
-                          </TableRow>
-                        );})}
+                              </TableCell>
+                              <TableCell>
+                                <span className={`font-bold text-lg ${merchant.balance > 0 ? 'text-muted-foreground' : ''}`}>
+                                  {formatCurrency(merchant.balance)}
+                                </span>
+                              </TableCell>
+                              <TableCell>
+                                <span className={`font-bold text-lg ${netBalance > 0 ? 'text-emerald-600' : ''}`}>
+                                  {formatCurrency(netBalance)}
+                                </span>
+                              </TableCell>
+                              <TableCell>
+                                {merchant.bankName ? (
+                                  <div className="flex items-center gap-2">
+                                    <Building2 className="w-4 h-4 text-muted-foreground" />
+                                    <span>{merchant.bankName}</span>
+                                  </div>
+                                ) : (
+                                  <span className="text-muted-foreground">غير محدد</span>
+                                )}
+                              </TableCell>
+                              <TableCell className="text-muted-foreground">{merchant.city}</TableCell>
+                              <TableCell>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => setSelectedMerchant(merchant)}
+                                  data-testid={`button-view-merchant-${merchant.id}`}
+                                >
+                                  <Eye className="w-4 h-4 ml-1" />
+                                  التفاصيل
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
                       </TableBody>
                     </Table>
                   </div>
@@ -352,7 +378,7 @@ export default function AdminWithdrawals() {
             <DialogTitle>تفاصيل طلب السحب</DialogTitle>
             <DialogDescription>معلومات الطلب والبيانات البنكية للتاجر</DialogDescription>
           </DialogHeader>
-          
+
           {selectedWithdrawal && (
             <div className="space-y-6">
               <div className="grid grid-cols-3 gap-4">
@@ -437,7 +463,7 @@ export default function AdminWithdrawals() {
                 </Button>
                 {selectedWithdrawal.status === "pending" && (
                   <>
-                    <Button 
+                    <Button
                       variant="destructive"
                       onClick={() => updateWithdrawalMutation.mutate({ id: selectedWithdrawal.id, status: "rejected" })}
                       disabled={updateWithdrawalMutation.isPending}
@@ -445,7 +471,7 @@ export default function AdminWithdrawals() {
                       <X className="w-4 h-4 ml-1" />
                       رفض
                     </Button>
-                    <Button 
+                    <Button
                       className="bg-emerald-600 hover:bg-emerald-700"
                       onClick={() => updateWithdrawalMutation.mutate({ id: selectedWithdrawal.id, status: "completed" })}
                       disabled={updateWithdrawalMutation.isPending}
@@ -471,7 +497,7 @@ export default function AdminWithdrawals() {
             <DialogTitle>تفاصيل المحفظة</DialogTitle>
             <DialogDescription>معلومات التاجر والبيانات البنكية</DialogDescription>
           </DialogHeader>
-          
+
           {selectedMerchant && (
             <div className="space-y-6">
               <div className="text-center p-4 bg-primary/5 rounded-lg">

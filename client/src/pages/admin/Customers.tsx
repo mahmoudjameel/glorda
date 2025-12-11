@@ -2,13 +2,13 @@ import DashboardLayout from "@/components/layout/DashboardLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow
 } from "@/components/ui/table";
 import { Users, Search, Loader2, MapPin, Phone, Mail, Calendar } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
@@ -16,6 +16,36 @@ import { useState } from "react";
 import { format } from "date-fns";
 import { ar } from "date-fns/locale";
 import { getCustomers } from "@/lib/admin-ops";
+
+// Helper function to format Firebase Timestamp or Date
+const formatFirebaseDate = (date: any): string => {
+  if (!date) return 'غير محدد';
+
+  try {
+    let dateObj: Date;
+
+    // Handle Firestore Timestamp (has seconds and nanoseconds)
+    if (date && typeof date === 'object' && 'seconds' in date) {
+      dateObj = new Date(date.seconds * 1000);
+    }
+    // Handle Firestore Timestamp with toDate method
+    else if (date && typeof date.toDate === 'function') {
+      dateObj = date.toDate();
+    }
+    // Handle regular Date object or string
+    else {
+      dateObj = new Date(date);
+    }
+
+    if (isNaN(dateObj.getTime())) {
+      return 'غير محدد';
+    }
+
+    return format(dateObj, "dd MMM yyyy", { locale: ar });
+  } catch {
+    return 'غير محدد';
+  }
+};
 
 interface Customer {
   id: string;
@@ -146,7 +176,7 @@ export default function AdminCustomers() {
                         <TableCell>
                           <div className="flex items-center gap-1 text-muted-foreground text-sm">
                             <Calendar className="w-3 h-3" />
-                            <span data-testid={`text-date-${customer.id}`}>{format(new Date(customer.createdAt), "dd MMM yyyy", { locale: ar })}</span>
+                            <span data-testid={`text-date-${customer.id}`}>{formatFirebaseDate(customer.createdAt)}</span>
                           </div>
                         </TableCell>
                       </TableRow>

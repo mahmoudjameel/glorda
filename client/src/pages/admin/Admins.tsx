@@ -2,15 +2,15 @@ import DashboardLayout from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow
 } from "@/components/ui/table";
-import { 
+import {
   Dialog,
   DialogContent,
   DialogHeader,
@@ -25,6 +25,31 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { getAdmins, addAdmin, deleteAdmin } from "@/lib/admin-ops";
+
+// Helper function to format Firebase Timestamp or Date
+const formatFirebaseDate = (date: any): string => {
+  if (!date) return 'غير محدد';
+
+  try {
+    let dateObj: Date;
+
+    if (date && typeof date === 'object' && 'seconds' in date) {
+      dateObj = new Date(date.seconds * 1000);
+    } else if (date && typeof date.toDate === 'function') {
+      dateObj = date.toDate();
+    } else {
+      dateObj = new Date(date);
+    }
+
+    if (isNaN(dateObj.getTime())) {
+      return 'غير محدد';
+    }
+
+    return dateObj.toLocaleDateString('ar-SA');
+  } catch {
+    return 'غير محدد';
+  }
+};
 
 type Admin = any;
 
@@ -84,7 +109,7 @@ export default function AdminAdmins() {
             <h2 className="text-3xl font-bold tracking-tight font-display">المسؤولين</h2>
             <p className="text-muted-foreground mt-2">إدارة حسابات مسؤولي لوحة التحكم</p>
           </div>
-          
+
           <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
             <DialogTrigger asChild>
               <Button className="gap-2" data-testid="button-add-admin">
@@ -177,7 +202,7 @@ export default function AdminAdmins() {
                     </TableCell>
                     <TableCell className="font-mono text-sm">{admin.email}</TableCell>
                     <TableCell className="font-mono text-sm">
-                      {new Date(admin.createdAt).toLocaleDateString('ar-SA')}
+                      {formatFirebaseDate(admin.createdAt)}
                     </TableCell>
                     <TableCell>
                       <Button

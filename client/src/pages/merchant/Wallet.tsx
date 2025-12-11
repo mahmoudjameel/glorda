@@ -9,48 +9,65 @@ import { Wallet, ArrowUpRight, ArrowDownLeft, CreditCard, DollarSign, Loader2, A
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
-import type { Transaction, Merchant } from "@shared/schema";
+import { useAuth } from "@/hooks/useAuth";
+import {
+  getMerchantProfile,
+  getMerchantTransactions,
+  requestWithdrawal,
+  type Transaction
+} from "@/lib/merchant-data";
+
+// Helper function to format Firebase Timestamp or Date
+const formatFirebaseDate = (date: any): string => {
+  if (!date) return 'غير محدد';
+
+  try {
+    let dateObj: Date;
+
+    if (date && typeof date === 'object' && 'seconds' in date) {
+      dateObj = new Date(date.seconds * 1000);
+    } else if (date && typeof date.toDate === 'function') {
+      dateObj = date.toDate();
+    } else {
+      dateObj = new Date(date);
+    }
+
+    if (isNaN(dateObj.getTime())) {
+      return 'غير محدد';
+    }
+
+    return dateObj.toLocaleDateString('ar-SA');
+  } catch {
+    return 'غير محدد';
+  }
+};
 
 export default function MerchantWallet() {
   const [withdrawAmount, setWithdrawAmount] = useState("");
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const merchantId = user?.id;
 
-  const { data: profile } = useQuery<Merchant>({
-    queryKey: ["/api/merchant/profile"],
-    queryFn: async () => {
-      const res = await fetch("/api/merchant/profile", { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to fetch profile");
-      return res.json();
-    }
+  const { data: profile } = useQuery({
+    queryKey: ["merchant-profile", merchantId],
+    queryFn: () => getMerchantProfile(merchantId!),
+    enabled: !!merchantId,
   });
 
   const { data: transactions = [], isLoading } = useQuery<Transaction[]>({
-    queryKey: ["/api/merchant/transactions"],
-    queryFn: async () => {
-      const res = await fetch("/api/merchant/transactions", { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to fetch transactions");
-      return res.json();
-    }
+    queryKey: ["merchant-transactions", merchantId],
+    queryFn: () => getMerchantTransactions(merchantId!),
+    enabled: !!merchantId,
   });
 
   const withdrawMutation = useMutation({
     mutationFn: async (amount: number) => {
-      const res = await fetch("/api/merchant/withdraw", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ amount })
-      });
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || "Failed to request withdrawal");
-      }
-      return res.json();
+      await requestWithdrawal(merchantId!, amount);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/merchant/transactions"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/merchant/profile"] });
+      queryClient.invalidateQueries({ queryKey: ["merchant-transactions", merchantId] });
+      queryClient.invalidateQueries({ queryKey: ["merchant-profile", merchantId] });
       setWithdrawAmount("");
       toast({ title: "تم إرسال طلب السحب بنجاح" });
     },
@@ -64,7 +81,7 @@ export default function MerchantWallet() {
 
   const handleWithdraw = (e: React.FormEvent) => {
     e.preventDefault();
-    const amount = Math.round(parseFloat(withdrawAmount) * 100);
+    const amount = parseFloat(withdrawAmount);
     if (isNaN(amount) || amount <= 0) {
       toast({ variant: "destructive", title: "المبلغ غير صالح" });
       return;
@@ -73,13 +90,14 @@ export default function MerchantWallet() {
     const netAmount = Math.floor(amount * (100 - feePercentage) / 100);
     withdrawMutation.mutate(netAmount);
   };
+
   const fees = Math.floor(balance * feePercentage / 100);
   const netBalance = balance - fees;
   const pendingWithdrawals = transactions
-    .filter(t => t.type === "withdrawal" && t.status === "pending")
+    .filter(t => t.type === "debit" && t.status === "pending")
     .reduce((sum, t) => sum + Math.abs(t.amount), 0);
   const completedWithdrawals = transactions
-    .filter(t => t.type === "withdrawal" && t.status === "completed")
+    .filter(t => t.type === "debit" && t.status === "completed")
     .reduce((sum, t) => sum + Math.abs(t.amount), 0);
 
   return (
@@ -97,16 +115,16 @@ export default function MerchantWallet() {
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold font-mono" data-testid="text-balance">
-                {(balance / 100).toFixed(2)} ر.س
+                {balance.toFixed(2)} ر.س
               </div>
               <div className="mt-3 pt-3 border-t border-primary-foreground/20 space-y-1">
                 <div className="flex justify-between text-xs text-primary-foreground/70">
                   <span>رسوم ({feePercentage}%)</span>
-                  <span className="font-mono">- {(fees / 100).toFixed(2)} ر.س</span>
+                  <span className="font-mono">- {fees.toFixed(2)} ر.س</span>
                 </div>
                 <div className="flex justify-between text-sm font-semibold">
                   <span>الصافي بعد الخصم</span>
-                  <span className="font-mono" data-testid="text-net-balance">{(netBalance / 100).toFixed(2)} ر.س</span>
+                  <span className="font-mono" data-testid="text-net-balance">{netBalance.toFixed(2)} ر.س</span>
                 </div>
               </div>
               <p className="text-xs mt-2 text-primary-foreground/60 flex items-center">
@@ -121,7 +139,7 @@ export default function MerchantWallet() {
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold font-mono" data-testid="text-completed-withdrawals">
-                {(completedWithdrawals / 100).toFixed(2)} ر.س
+                {completedWithdrawals.toFixed(2)} ر.س
               </div>
               <p className="text-xs mt-2 text-muted-foreground flex items-center">
                 <ArrowUpRight className="w-3 h-3 ml-1 text-emerald-500" />
@@ -135,7 +153,7 @@ export default function MerchantWallet() {
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold font-mono" data-testid="text-pending-withdrawals">
-                {(pendingWithdrawals / 100).toFixed(2)} ر.س
+                {pendingWithdrawals.toFixed(2)} ر.س
               </div>
               <p className="text-xs mt-2 text-muted-foreground flex items-center">
                 <Activity className="w-3 h-3 ml-1 text-amber-500" />
@@ -176,28 +194,28 @@ export default function MerchantWallet() {
                         <TableRow key={trx.id} data-testid={`row-transaction-${trx.id}`}>
                           <TableCell>
                             <div className="flex items-center gap-2">
-                              <div className={`p-2 rounded-full ${trx.type === 'sale' ? 'bg-emerald-100 text-emerald-600' : 'bg-amber-100 text-amber-600'}`}>
-                                {trx.type === 'sale' ? <ArrowDownLeft className="w-4 h-4" /> : <ArrowUpRight className="w-4 h-4" />}
+                              <div className={`p-2 rounded-full ${trx.type === 'credit' ? 'bg-emerald-100 text-emerald-600' : 'bg-amber-100 text-amber-600'}`}>
+                                {trx.type === 'credit' ? <ArrowDownLeft className="w-4 h-4" /> : <ArrowUpRight className="w-4 h-4" />}
                               </div>
                               <div className="flex flex-col">
-                                <span className="font-medium text-sm">{trx.description}</span>
+                                <span className="font-medium text-sm">{trx.description || (trx.type === 'credit' ? 'إيداع' : 'سحب')}</span>
                                 <span className="text-xs text-muted-foreground font-mono">#{trx.id}</span>
                               </div>
                             </div>
                           </TableCell>
                           <TableCell className="font-mono text-sm text-muted-foreground">
-                            {new Date(trx.createdAt).toLocaleDateString('ar-SA')}
+                            {formatFirebaseDate(trx.createdAt)}
                           </TableCell>
                           <TableCell>
-                            <Badge 
-                              variant={trx.status === 'completed' ? 'outline' : 'secondary'} 
+                            <Badge
+                              variant={trx.status === 'completed' ? 'outline' : 'secondary'}
                               className={trx.status === 'completed' ? 'text-emerald-600 border-emerald-200 bg-emerald-50' : 'text-amber-600 bg-amber-50'}
                             >
                               {trx.status === 'completed' ? 'مكتمل' : 'قيد المعالجة'}
                             </Badge>
                           </TableCell>
-                          <TableCell className={`text-right font-mono font-medium ${trx.amount > 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                            {trx.amount > 0 ? '+' : ''}{(trx.amount / 100).toFixed(2)} ر.س
+                          <TableCell className={`text-right font-mono font-medium ${trx.type === 'credit' ? 'text-emerald-600' : 'text-red-600'}`}>
+                            {trx.type === 'credit' ? '+' : '-'}{Math.abs(trx.amount).toFixed(2)} ر.س
                           </TableCell>
                         </TableRow>
                       ))}
@@ -220,8 +238,8 @@ export default function MerchantWallet() {
                     <Label>المبلغ المراد سحبه (ر.س)</Label>
                     <div className="relative">
                       <DollarSign className="absolute right-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                      <Input 
-                        placeholder="0.00" 
+                      <Input
+                        placeholder="0.00"
                         className="pr-9 font-mono"
                         type="number"
                         value={withdrawAmount}
@@ -262,8 +280,8 @@ export default function MerchantWallet() {
                       </div>
                     )}
                   </div>
-                  <Button 
-                    className="w-full mt-2" 
+                  <Button
+                    className="w-full mt-2"
                     type="submit"
                     disabled={withdrawMutation.isPending}
                     data-testid="button-withdraw"

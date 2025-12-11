@@ -8,40 +8,48 @@ import { Textarea } from "@/components/ui/textarea";
 import { MessageCircle, Search, Loader2, Send, User, Package, ArrowLeft } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState, useEffect, useRef } from "react";
-import { format } from "date-fns";
-import { ar } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
 import { useSearch, useLocation } from "wouter";
+import { useAuth } from "@/hooks/useAuth";
+import {
+  getMerchantOrders,
+  getOrderMessages,
+  addOrderMessage,
+  type Order,
+  type OrderMessage
+} from "@/lib/merchant-data";
 
-interface Conversation {
-  id: number;
-  orderNumber: string;
-  status: string;
-  customer: {
-    id: number;
-    name: string;
-    mobile: string;
-  } | null;
-  product: {
-    id: number;
-    name: string;
-  } | null;
-  messagesCount: number;
-  lastMessage: {
-    id: number;
-    message: string;
-    senderType: string;
-    createdAt: string;
-  } | null;
-}
+// Helper function to format Firebase Timestamp or Date
+const formatFirebaseDate = (date: any, format: 'time' | 'date' = 'time'): string => {
+  if (!date) return 'غير محدد';
 
-interface Message {
-  id: number;
-  orderId: number;
-  senderId: number;
-  senderType: string;
-  message: string;
-  createdAt: string;
+  try {
+    let dateObj: Date;
+
+    if (date && typeof date === 'object' && 'seconds' in date) {
+      dateObj = new Date(date.seconds * 1000);
+    } else if (date && typeof date.toDate === 'function') {
+      dateObj = date.toDate();
+    } else {
+      dateObj = new Date(date);
+    }
+
+    if (isNaN(dateObj.getTime())) {
+      return 'غير محدد';
+    }
+
+    if (format === 'time') {
+      return dateObj.toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' });
+    }
+    return dateObj.toLocaleDateString('ar-SA');
+  } catch {
+    return 'غير محدد';
+  }
+};
+
+interface Conversation extends Order {
+  messagesCount?: number;
+  lastMessage?: OrderMessage | null;
 }
 
 export default function MerchantMessages() {
@@ -53,22 +61,29 @@ export default function MerchantMessages() {
   const queryClient = useQueryClient();
   const searchString = useSearch();
   const [, setLocation] = useLocation();
+  const { user } = useAuth();
+  const merchantId = user?.id;
 
-  const { data: conversations = [], isLoading } = useQuery<Conversation[]>({
-    queryKey: ["/api/merchant/conversations"],
-    queryFn: async () => {
-      const res = await fetch("/api/merchant/conversations", { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to fetch conversations");
-      return res.json();
-    }
+  // Fetch orders as conversations
+  const { data: orders = [], isLoading } = useQuery<Order[]>({
+    queryKey: ["merchant-orders", merchantId],
+    queryFn: () => getMerchantOrders(merchantId!),
+    enabled: !!merchantId,
   });
+
+  // Convert orders to conversations
+  const conversations: Conversation[] = orders.map(order => ({
+    ...order,
+    messagesCount: 0,
+    lastMessage: null,
+  }));
 
   useEffect(() => {
     if (conversations.length > 0 && searchString) {
       const params = new URLSearchParams(searchString);
       const orderId = params.get("orderId");
       if (orderId) {
-        const conversation = conversations.find(c => c.id === parseInt(orderId));
+        const conversation = conversations.find(c => c.id === orderId);
         if (conversation) {
           setSelectedConversation(conversation);
           setLocation("/dashboard/messages", { replace: true });
@@ -77,31 +92,19 @@ export default function MerchantMessages() {
     }
   }, [conversations, searchString, setLocation]);
 
-  const { data: messages = [], isLoading: isLoadingMessages } = useQuery<Message[]>({
-    queryKey: ["/api/merchant/orders", selectedConversation?.id, "messages"],
-    queryFn: async () => {
-      if (!selectedConversation) return [];
-      const res = await fetch(`/api/merchant/orders/${selectedConversation.id}/messages`, { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to fetch messages");
-      return res.json();
-    },
+  // Fetch messages for selected conversation
+  const { data: messages = [], isLoading: isLoadingMessages } = useQuery<OrderMessage[]>({
+    queryKey: ["order-messages", selectedConversation?.id],
+    queryFn: () => getOrderMessages(selectedConversation!.id),
     enabled: !!selectedConversation,
   });
 
   const sendMessageMutation = useMutation({
-    mutationFn: async ({ orderId, message }: { orderId: number; message: string }) => {
-      const res = await fetch(`/api/merchant/orders/${orderId}/messages`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ message })
-      });
-      if (!res.ok) throw new Error("Failed to send message");
-      return res.json();
+    mutationFn: async ({ orderId, message }: { orderId: string; message: string }) => {
+      await addOrderMessage(orderId, merchantId!, "merchant", message);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/merchant/orders", selectedConversation?.id, "messages"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/merchant/conversations"] });
+      queryClient.invalidateQueries({ queryKey: ["order-messages", selectedConversation?.id] });
       setNewMessage("");
     },
     onError: () => {
@@ -113,10 +116,9 @@ export default function MerchantMessages() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  const filteredConversations = conversations.filter(conv => 
-    conv.orderNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (conv.customer?.name && conv.customer.name.toLowerCase().includes(searchQuery.toLowerCase())) ||
-    (conv.product?.name && conv.product.name.toLowerCase().includes(searchQuery.toLowerCase()))
+  const filteredConversations = conversations.filter(conv =>
+    conv.orderNumber?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    conv.customerId?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const handleSendMessage = () => {
@@ -170,37 +172,30 @@ export default function MerchantMessages() {
                       <button
                         key={conv.id}
                         onClick={() => setSelectedConversation(conv)}
-                        className={`w-full p-3 rounded-lg text-right transition-colors ${
-                          selectedConversation?.id === conv.id
+                        className={`w-full p-3 rounded-lg text-right transition-colors ${selectedConversation?.id === conv.id
                             ? "bg-primary/10 border border-primary/20"
                             : "hover:bg-muted/50"
-                        }`}
+                          }`}
                         data-testid={`button-conversation-${conv.id}`}
                       >
                         <div className="flex items-start justify-between gap-2">
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2">
                               <User className="w-4 h-4 text-muted-foreground shrink-0" />
-                              <span className="font-medium truncate" data-testid={`text-customer-name-${conv.id}`}>{conv.customer?.name || "عميل"}</span>
+                              <span className="font-medium truncate" data-testid={`text-customer-name-${conv.id}`}>
+                                طلب #{conv.orderNumber || conv.id}
+                              </span>
                             </div>
                             <div className="flex items-center gap-2 mt-1">
                               <Package className="w-3 h-3 text-muted-foreground shrink-0" />
                               <span className="text-xs text-muted-foreground truncate" data-testid={`text-order-info-${conv.id}`}>
-                                #{conv.orderNumber} - {conv.product?.name}
+                                {conv.status} - {(conv.totalAmount || 0).toFixed(2)} ر.س
                               </span>
                             </div>
-                            {conv.lastMessage && (
-                              <p className="text-xs text-muted-foreground mt-2 truncate" data-testid={`text-last-message-${conv.id}`}>
-                                {conv.lastMessage.senderType === "merchant" ? "أنت: " : ""}
-                                {conv.lastMessage.message}
-                              </p>
-                            )}
                           </div>
-                          {conv.messagesCount > 0 && (
-                            <Badge variant="secondary" className="shrink-0" data-testid={`badge-count-${conv.id}`}>
-                              {conv.messagesCount}
-                            </Badge>
-                          )}
+                          <Badge variant="secondary" className="shrink-0">
+                            {conv.status}
+                          </Badge>
                         </div>
                       </button>
                     ))}
@@ -228,9 +223,9 @@ export default function MerchantMessages() {
                         <User className="w-5 h-5 text-primary" />
                       </div>
                       <div>
-                        <CardTitle className="text-base">{selectedConversation.customer?.name}</CardTitle>
+                        <CardTitle className="text-base">طلب #{selectedConversation.orderNumber || selectedConversation.id}</CardTitle>
                         <CardDescription className="text-xs">
-                          طلب #{selectedConversation.orderNumber} - {selectedConversation.product?.name}
+                          {selectedConversation.status} - {(selectedConversation.totalAmount || 0).toFixed(2)} ر.س
                         </CardDescription>
                       </div>
                     </div>
@@ -258,17 +253,15 @@ export default function MerchantMessages() {
                             data-testid={`message-${msg.id}`}
                           >
                             <div
-                              className={`max-w-[70%] p-3 rounded-2xl ${
-                                msg.senderType === "merchant"
+                              className={`max-w-[70%] p-3 rounded-2xl ${msg.senderType === "merchant"
                                   ? "bg-primary text-primary-foreground rounded-tr-sm"
                                   : "bg-muted rounded-tl-sm"
-                              }`}
+                                }`}
                             >
                               <p className="text-sm" data-testid={`text-message-content-${msg.id}`}>{msg.message}</p>
-                              <p className={`text-[10px] mt-1 ${
-                                msg.senderType === "merchant" ? "text-primary-foreground/70" : "text-muted-foreground"
-                              }`} data-testid={`text-message-time-${msg.id}`}>
-                                {format(new Date(msg.createdAt), "HH:mm", { locale: ar })}
+                              <p className={`text-[10px] mt-1 ${msg.senderType === "merchant" ? "text-primary-foreground/70" : "text-muted-foreground"
+                                }`} data-testid={`text-message-time-${msg.id}`}>
+                                {formatFirebaseDate(msg.createdAt, 'time')}
                               </p>
                             </div>
                           </div>

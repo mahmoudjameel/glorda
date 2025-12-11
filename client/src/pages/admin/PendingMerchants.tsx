@@ -1,7 +1,7 @@
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { 
+import {
   Dialog,
   DialogContent,
   DialogHeader,
@@ -18,6 +18,31 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useLocation } from "wouter";
 import { getMerchantsByStatus, updateMerchantStatus } from "@/lib/admin-ops";
+
+// Helper function to format Firebase Timestamp or Date
+const formatFirebaseDate = (date: any, useLocaleString: boolean = false): string => {
+  if (!date) return 'غير محدد';
+
+  try {
+    let dateObj: Date;
+
+    if (date && typeof date === 'object' && 'seconds' in date) {
+      dateObj = new Date(date.seconds * 1000);
+    } else if (date && typeof date.toDate === 'function') {
+      dateObj = date.toDate();
+    } else {
+      dateObj = new Date(date);
+    }
+
+    if (isNaN(dateObj.getTime())) {
+      return 'غير محدد';
+    }
+
+    return useLocaleString ? dateObj.toLocaleString('ar-SA') : dateObj.toLocaleDateString('ar-SA');
+  } catch {
+    return 'غير محدد';
+  }
+};
 
 const storeTypeLabels: Record<string, string> = {
   company: "شركة",
@@ -80,8 +105,8 @@ export default function PendingMerchants() {
 
   const handleReject = () => {
     if (selectedMerchant) {
-      updateStatusMutation.mutate({ 
-        id: selectedMerchant.id, 
+      updateStatusMutation.mutate({
+        id: selectedMerchant.id,
         status: "rejected",
         reason: rejectReason || undefined
       });
@@ -138,7 +163,7 @@ export default function PendingMerchants() {
                       قيد المراجعة
                     </Badge>
                     <span className="text-xs text-muted-foreground">
-                      {new Date(merchant.createdAt).toLocaleDateString('ar-SA')}
+                      {formatFirebaseDate(merchant.createdAt)}
                     </span>
                   </div>
                   <CardTitle className="mt-3 flex items-center gap-2">
@@ -174,8 +199,8 @@ export default function PendingMerchants() {
                   </div>
 
                   <div className="pt-4 flex gap-2">
-                    <Button 
-                      variant="outline" 
+                    <Button
+                      variant="outline"
                       className="flex-1"
                       onClick={() => handleViewDetails(merchant)}
                       data-testid={`button-view-${merchant.id}`}
@@ -183,7 +208,7 @@ export default function PendingMerchants() {
                       <Eye className="w-4 h-4 ml-1" />
                       التفاصيل
                     </Button>
-                    <Button 
+                    <Button
                       className="flex-1 bg-emerald-600 hover:bg-emerald-700"
                       onClick={() => handleApprove(merchant)}
                       disabled={updateStatusMutation.isPending}
@@ -192,7 +217,7 @@ export default function PendingMerchants() {
                       <CheckCircle className="w-4 h-4 ml-1" />
                       قبول
                     </Button>
-                    <Button 
+                    <Button
                       variant="destructive"
                       onClick={() => openRejectDialog(merchant)}
                       disabled={updateStatusMutation.isPending}
@@ -252,8 +277,8 @@ export default function PendingMerchants() {
                     </div>
                     <div className="space-y-1">
                       <p className="text-sm text-muted-foreground">
-                        {(selectedMerchant.storeType === "company" || selectedMerchant.storeType === "institution") 
-                          ? "رقم السجل التجاري" 
+                        {(selectedMerchant.storeType === "company" || selectedMerchant.storeType === "institution")
+                          ? "رقم السجل التجاري"
                           : "رقم وثيقة العمل الحر"}
                       </p>
                       <p className="font-mono">{selectedMerchant.registrationNumber}</p>
@@ -279,9 +304,9 @@ export default function PendingMerchants() {
                     <div className="space-y-2">
                       <p className="text-sm text-muted-foreground">صورة السجل التجاري</p>
                       {selectedMerchant.commercialRegistrationDoc ? (
-                        <a 
-                          href={selectedMerchant.commercialRegistrationDoc} 
-                          target="_blank" 
+                        <a
+                          href={selectedMerchant.commercialRegistrationDoc}
+                          target="_blank"
                           rel="noopener noreferrer"
                           className="flex items-center gap-2 p-3 border rounded-lg bg-green-50 border-green-200 hover:bg-green-100 transition-colors w-fit"
                           data-testid="link-commercial-doc"
@@ -295,15 +320,15 @@ export default function PendingMerchants() {
                       )}
                     </div>
                   )}
-                  
+
                   {selectedMerchant.storeType === "individual" && (
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <p className="text-sm text-muted-foreground">صورة الهوية الوطنية</p>
                         {selectedMerchant.nationalIdImage ? (
-                          <a 
-                            href={selectedMerchant.nationalIdImage} 
-                            target="_blank" 
+                          <a
+                            href={selectedMerchant.nationalIdImage}
+                            target="_blank"
                             rel="noopener noreferrer"
                             className="flex items-center gap-2 p-3 border rounded-lg bg-green-50 border-green-200 hover:bg-green-100 transition-colors"
                             data-testid="link-national-id"
@@ -319,9 +344,9 @@ export default function PendingMerchants() {
                       <div className="space-y-2">
                         <p className="text-sm text-muted-foreground">شهادة العمل الحر</p>
                         {selectedMerchant.freelanceCertificateImage ? (
-                          <a 
-                            href={selectedMerchant.freelanceCertificateImage} 
-                            target="_blank" 
+                          <a
+                            href={selectedMerchant.freelanceCertificateImage}
+                            target="_blank"
                             rel="noopener noreferrer"
                             className="flex items-center gap-2 p-3 border rounded-lg bg-green-50 border-green-200 hover:bg-green-100 transition-colors"
                             data-testid="link-freelance-cert"
@@ -345,10 +370,10 @@ export default function PendingMerchants() {
                       {selectedMerchant.branches.map((branch: any, idx: number) => (
                         <div key={idx} className="p-3 bg-muted/50 rounded-lg">
                           <p className="font-medium">{branch.name}</p>
-                          <a 
-                            href={branch.mapLink} 
-                            target="_blank" 
-                            rel="noopener noreferrer" 
+                          <a
+                            href={branch.mapLink}
+                            target="_blank"
+                            rel="noopener noreferrer"
                             className="text-xs text-primary hover:underline flex items-center gap-1"
                           >
                             <MapPin className="w-3 h-3" />
@@ -362,19 +387,19 @@ export default function PendingMerchants() {
 
                 <div className="border-t pt-4">
                   <p className="text-sm text-muted-foreground">تاريخ التسجيل</p>
-                  <p className="font-mono">{new Date(selectedMerchant.createdAt).toLocaleString('ar-SA')}</p>
+                  <p className="font-mono">{formatFirebaseDate(selectedMerchant.createdAt, true)}</p>
                 </div>
 
                 <DialogFooter className="gap-2 sm:gap-0">
-                  <Button 
-                    variant="outline" 
+                  <Button
+                    variant="outline"
                     onClick={() => openRejectDialog(selectedMerchant)}
                     className="text-destructive hover:text-destructive"
                   >
                     <XCircle className="w-4 h-4 ml-1" />
                     رفض الطلب
                   </Button>
-                  <Button 
+                  <Button
                     className="bg-emerald-600 hover:bg-emerald-700"
                     onClick={() => handleApprove(selectedMerchant)}
                     disabled={updateStatusMutation.isPending}
@@ -413,7 +438,7 @@ export default function PendingMerchants() {
                   <Button variant="outline" onClick={() => setIsRejectOpen(false)}>
                     إلغاء
                   </Button>
-                  <Button 
+                  <Button
                     variant="destructive"
                     onClick={handleReject}
                     disabled={updateStatusMutation.isPending}

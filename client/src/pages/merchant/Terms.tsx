@@ -5,45 +5,39 @@ import { Button } from "@/components/ui/button";
 import { Loader2, FileText, Shield, BookOpen, AlertCircle, RefreshCw, ArrowRight } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
+import { getDocData } from "@/lib/firestore";
 
 interface SettingData {
-  key: string;
-  value: string | null;
+  value?: string | null;
 }
 
 export default function MerchantTerms() {
+  const fetchSetting = async (key: string): Promise<SettingData> => {
+    const doc = await getDocData<{ value?: string }>(`settings/${key}`);
+    return { value: doc?.value || null };
+  };
+
   const { data: termsData, isLoading: termsLoading, error: termsError, refetch: refetchTerms } = useQuery<SettingData>({
-    queryKey: ["/api/public/settings/merchant_terms_conditions"],
-    queryFn: async () => {
-      const res = await fetch("/api/public/settings/merchant_terms_conditions");
-      if (!res.ok) throw new Error("Failed to fetch terms");
-      return res.json();
-    },
+    queryKey: ["settings", "merchant_terms_conditions"],
+    queryFn: () => fetchSetting("merchant_terms_conditions"),
     staleTime: 0,
     refetchOnMount: "always"
   });
 
   const { data: privacyData, isLoading: privacyLoading } = useQuery<SettingData>({
-    queryKey: ["/api/public/settings/merchant_privacy_policy"],
-    queryFn: async () => {
-      const res = await fetch("/api/public/settings/merchant_privacy_policy");
-      if (!res.ok) throw new Error("Failed to fetch privacy");
-      return res.json();
-    },
+    queryKey: ["settings", "merchant_privacy_policy"],
+    queryFn: () => fetchSetting("merchant_privacy_policy"),
     staleTime: 0,
     refetchOnMount: "always"
   });
 
   const { data: aboutData, isLoading: aboutLoading } = useQuery<SettingData>({
-    queryKey: ["/api/public/settings/merchant_about_us"],
-    queryFn: async () => {
-      const res = await fetch("/api/public/settings/merchant_about_us");
-      if (!res.ok) throw new Error("Failed to fetch about");
-      return res.json();
-    },
+    queryKey: ["settings", "merchant_about_us"],
+    queryFn: () => fetchSetting("merchant_about_us"),
     staleTime: 0,
     refetchOnMount: "always"
   });
+
 
   const isLoading = termsLoading || privacyLoading || aboutLoading;
 
@@ -125,7 +119,7 @@ export default function MerchantTerms() {
               </CardHeader>
               <CardContent>
                 <div className="bg-muted/30 rounded-lg p-6 border min-h-[300px]">
-                  <div 
+                  <div
                     className="prose prose-sm max-w-none text-foreground leading-relaxed whitespace-pre-wrap"
                     data-testid="text-terms-content"
                   >
@@ -151,7 +145,7 @@ export default function MerchantTerms() {
               </CardHeader>
               <CardContent>
                 <div className="bg-muted/30 rounded-lg p-6 border min-h-[300px]">
-                  <div 
+                  <div
                     className="prose prose-sm max-w-none text-foreground leading-relaxed whitespace-pre-wrap"
                     data-testid="text-privacy-content"
                   >
@@ -177,7 +171,7 @@ export default function MerchantTerms() {
               </CardHeader>
               <CardContent>
                 <div className="bg-muted/30 rounded-lg p-6 border min-h-[300px]">
-                  <div 
+                  <div
                     className="prose prose-sm max-w-none text-foreground leading-relaxed whitespace-pre-wrap"
                     data-testid="text-about-content"
                   >

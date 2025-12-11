@@ -1,17 +1,49 @@
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { 
-  BarChart, 
-  Bar, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
   ResponsiveContainer
 } from "recharts";
 import { DollarSign, ShoppingBag, Package, Loader2, Clock } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
+import { useAuth } from "@/hooks/useAuth";
+import {
+  getMerchantProducts,
+  getMerchantOrders,
+  getMerchantTransactions,
+  getMerchantProfile
+} from "@/lib/merchant-data";
+
+// Helper function to format Firebase Timestamp or Date
+const formatFirebaseDate = (date: any): string => {
+  if (!date) return 'غير محدد';
+
+  try {
+    let dateObj: Date;
+
+    if (date && typeof date === 'object' && 'seconds' in date) {
+      dateObj = new Date(date.seconds * 1000);
+    } else if (date && typeof date.toDate === 'function') {
+      dateObj = date.toDate();
+    } else {
+      dateObj = new Date(date);
+    }
+
+    if (isNaN(dateObj.getTime())) {
+      return 'غير محدد';
+    }
+
+    return dateObj.toLocaleDateString('ar-SA');
+  } catch {
+    return 'غير محدد';
+  }
+};
 
 interface MerchantStats {
   productsCount: number;
@@ -21,7 +53,6 @@ interface MerchantStats {
   totalSales: number;
   balance: number;
   recentOrders: any[];
-  recentTransactions: any[];
 }
 
 const StatsCard = ({ title, value, icon: Icon, description, loading }: any) => (
@@ -68,20 +99,56 @@ const orderStatusColors: Record<string, string> = {
 };
 
 export default function MerchantDashboard() {
-  const { data: stats, isLoading } = useQuery<MerchantStats>({
-    queryKey: ["/api/merchant/stats"],
-    queryFn: async () => {
-      const res = await fetch("/api/merchant/stats", { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to fetch stats");
-      return res.json();
-    }
+  const { user } = useAuth();
+  const merchantId = user?.id;
+
+  // Fetch products
+  const { data: products = [], isLoading: loadingProducts } = useQuery({
+    queryKey: ["merchant-products", merchantId],
+    queryFn: () => getMerchantProducts(merchantId!),
+    enabled: !!merchantId,
   });
 
+  // Fetch orders
+  const { data: orders = [], isLoading: loadingOrders } = useQuery({
+    queryKey: ["merchant-orders", merchantId],
+    queryFn: () => getMerchantOrders(merchantId!),
+    enabled: !!merchantId,
+  });
+
+  // Fetch profile for balance
+  const { data: profile, isLoading: loadingProfile } = useQuery({
+    queryKey: ["merchant-profile", merchantId],
+    queryFn: () => getMerchantProfile(merchantId!),
+    enabled: !!merchantId,
+  });
+
+  const isLoading = loadingProducts || loadingOrders || loadingProfile;
+
+  // Calculate stats
+  const stats: MerchantStats = {
+    productsCount: products.length,
+    ordersCount: orders.length,
+    pendingOrders: orders.filter((o: any) => o.status === "pending").length,
+    completedOrders: orders.filter((o: any) => o.status === "completed").length,
+    totalSales: orders
+      .filter((o: any) => o.status === "completed")
+      .reduce((sum: number, o: any) => sum + (o.totalAmount || 0), 0),
+    balance: profile?.balance || 0,
+    recentOrders: orders
+      .sort((a: any, b: any) => {
+        const dateA = a.createdAt?.seconds || 0;
+        const dateB = b.createdAt?.seconds || 0;
+        return dateB - dateA;
+      })
+      .slice(0, 5),
+  };
+
   const chartData = [
-    { name: "المنتجات", total: stats?.productsCount || 0 },
-    { name: "الطلبات", total: stats?.ordersCount || 0 },
-    { name: "المكتملة", total: stats?.completedOrders || 0 },
-    { name: "المعلقة", total: stats?.pendingOrders || 0 }
+    { name: "المنتجات", total: stats.productsCount },
+    { name: "الطلبات", total: stats.ordersCount },
+    { name: "المكتملة", total: stats.completedOrders },
+    { name: "المعلقة", total: stats.pendingOrders }
   ];
 
   return (
@@ -93,32 +160,32 @@ export default function MerchantDashboard() {
         </div>
 
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          <StatsCard 
-            title="إجمالي المبيعات" 
-            value={`${((stats?.totalSales || 0) / 100).toFixed(2)} ر.س`}
+          <StatsCard
+            title="إجمالي المبيعات"
+            value={`${stats.totalSales.toFixed(2)} ر.س`}
             icon={DollarSign}
             description="مجموع المبيعات المكتملة"
             loading={isLoading}
           />
-          <StatsCard 
-            title="الرصيد الحالي" 
-            value={`${((stats?.balance || 0) / 100).toFixed(2)} ر.س`}
+          <StatsCard
+            title="الرصيد الحالي"
+            value={`${(stats.balance || 0).toFixed(2)} ر.س`}
             icon={DollarSign}
             description="المتاح للسحب"
             loading={isLoading}
           />
-          <StatsCard 
-            title="المنتجات" 
-            value={stats?.productsCount || 0}
+          <StatsCard
+            title="المنتجات"
+            value={stats.productsCount}
             icon={Package}
             description="عدد المنتجات في متجرك"
             loading={isLoading}
           />
-          <StatsCard 
-            title="الطلبات" 
-            value={stats?.ordersCount || 0}
+          <StatsCard
+            title="الطلبات"
+            value={stats.ordersCount}
             icon={ShoppingBag}
-            description={`${stats?.pendingOrders || 0} طلبات معلقة`}
+            description={`${stats.pendingOrders} طلبات معلقة`}
             loading={isLoading}
           />
         </div>
@@ -138,20 +205,20 @@ export default function MerchantDashboard() {
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={chartData}>
                       <CartesianGrid strokeDasharray="3 3" className="stroke-muted" vertical={false} />
-                      <XAxis 
-                        dataKey="name" 
-                        stroke="#888888" 
-                        fontSize={12} 
-                        tickLine={false} 
-                        axisLine={false} 
+                      <XAxis
+                        dataKey="name"
+                        stroke="#888888"
+                        fontSize={12}
+                        tickLine={false}
+                        axisLine={false}
                       />
-                      <YAxis 
-                        stroke="#888888" 
-                        fontSize={12} 
-                        tickLine={false} 
-                        axisLine={false} 
+                      <YAxis
+                        stroke="#888888"
+                        fontSize={12}
+                        tickLine={false}
+                        axisLine={false}
                       />
-                      <Tooltip 
+                      <Tooltip
                         contentStyle={{ backgroundColor: 'hsl(var(--popover))', borderRadius: '8px', border: '1px solid hsl(var(--border))' }}
                         itemStyle={{ color: 'hsl(var(--foreground))' }}
                       />
@@ -162,7 +229,7 @@ export default function MerchantDashboard() {
               </div>
             </CardContent>
           </Card>
-          
+
           <Card className="col-span-3">
             <CardHeader>
               <CardTitle>أحدث الطلبات</CardTitle>
@@ -175,7 +242,7 @@ export default function MerchantDashboard() {
                 <div className="flex justify-center py-8">
                   <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
                 </div>
-              ) : stats?.recentOrders && stats.recentOrders.length > 0 ? (
+              ) : stats.recentOrders && stats.recentOrders.length > 0 ? (
                 <div className="space-y-4">
                   {stats.recentOrders.map((order: any) => (
                     <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg" key={order.id} data-testid={`order-card-${order.id}`}>
@@ -184,17 +251,17 @@ export default function MerchantDashboard() {
                           <ShoppingBag className="w-5 h-5" />
                         </div>
                         <div>
-                          <p className="font-medium text-sm">طلب #{order.orderNumber}</p>
+                          <p className="font-medium text-sm">طلب #{order.orderNumber || order.id}</p>
                           <p className="text-xs text-muted-foreground">
-                            {new Date(order.createdAt).toLocaleDateString('ar-SA')}
+                            {formatFirebaseDate(order.createdAt)}
                           </p>
                         </div>
                       </div>
                       <div className="flex flex-col items-end gap-1">
                         <Badge variant="outline" className={orderStatusColors[order.status]}>
-                          {orderStatusLabels[order.status]}
+                          {orderStatusLabels[order.status] || order.status}
                         </Badge>
-                        <span className="text-sm font-mono">{(order.totalAmount / 100).toFixed(2)} ر.س</span>
+                        <span className="text-sm font-mono">{(order.totalAmount || 0).toFixed(2)} ر.س</span>
                       </div>
                     </div>
                   ))}

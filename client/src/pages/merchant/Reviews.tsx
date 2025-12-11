@@ -4,17 +4,35 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Star, Loader2, Package, User, Calendar } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
-import { format } from "date-fns";
-import { ar } from "date-fns/locale";
+import { useAuth } from "@/hooks/useAuth";
+import { getMerchantReviews, type Review } from "@/lib/merchant-data";
 
-interface Review {
-  id: number;
-  orderId: number;
-  customerId: number;
-  productId: number;
-  rating: number;
-  comment: string | null;
-  createdAt: string;
+// Helper function to format Firebase Timestamp or Date
+const formatFirebaseDate = (date: any): string => {
+  if (!date) return 'غير محدد';
+
+  try {
+    let dateObj: Date;
+
+    if (date && typeof date === 'object' && 'seconds' in date) {
+      dateObj = new Date(date.seconds * 1000);
+    } else if (date && typeof date.toDate === 'function') {
+      dateObj = date.toDate();
+    } else {
+      dateObj = new Date(date);
+    }
+
+    if (isNaN(dateObj.getTime())) {
+      return 'غير محدد';
+    }
+
+    return dateObj.toLocaleDateString('ar-SA');
+  } catch {
+    return 'غير محدد';
+  }
+};
+
+interface ReviewWithDetails extends Review {
   customer?: {
     name: string;
     mobile: string;
@@ -26,13 +44,13 @@ interface Review {
 }
 
 export default function MerchantReviews() {
-  const { data: reviews = [], isLoading } = useQuery<Review[]>({
-    queryKey: ["/api/merchant/reviews"],
-    queryFn: async () => {
-      const res = await fetch("/api/merchant/reviews", { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to fetch reviews");
-      return res.json();
-    }
+  const { user } = useAuth();
+  const merchantId = user?.id;
+
+  const { data: reviews = [], isLoading } = useQuery<ReviewWithDetails[]>({
+    queryKey: ["merchant-reviews", merchantId],
+    queryFn: () => getMerchantReviews(merchantId!),
+    enabled: !!merchantId,
   });
 
   const averageRating = reviews.length > 0
@@ -42,7 +60,7 @@ export default function MerchantReviews() {
   const ratingCounts = [5, 4, 3, 2, 1].map(rating => ({
     rating,
     count: reviews.filter(r => r.rating === rating).length,
-    percentage: reviews.length > 0 
+    percentage: reviews.length > 0
       ? Math.round((reviews.filter(r => r.rating === rating).length / reviews.length) * 100)
       : 0
   }));
@@ -101,7 +119,7 @@ export default function MerchantReviews() {
                     <span className="w-3 text-sm">{rating}</span>
                     <Star className="w-3 h-3 fill-yellow-400 text-yellow-400" />
                     <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
-                      <div 
+                      <div
                         className="h-full bg-yellow-400 rounded-full transition-all"
                         style={{ width: `${percentage}%` }}
                       />
@@ -130,8 +148,8 @@ export default function MerchantReviews() {
               ) : (
                 <div className="space-y-4">
                   {reviews.map((review) => (
-                    <div 
-                      key={review.id} 
+                    <div
+                      key={review.id}
                       className="p-4 rounded-lg border bg-card hover:bg-muted/50 transition-colors"
                       data-testid={`review-card-${review.id}`}
                     >
@@ -151,10 +169,10 @@ export default function MerchantReviews() {
                             </div>
                             <span className="text-xs text-muted-foreground flex items-center gap-1">
                               <Calendar className="w-3 h-3" />
-                              {format(new Date(review.createdAt), "d MMM yyyy", { locale: ar })}
+                              {formatFirebaseDate(review.createdAt)}
                             </span>
                           </div>
-                          
+
                           {review.product && (
                             <div className="flex items-center gap-2 mb-2">
                               <Badge variant="outline" className="gap-1 text-xs">
@@ -163,7 +181,7 @@ export default function MerchantReviews() {
                               </Badge>
                             </div>
                           )}
-                          
+
                           {review.comment && (
                             <p className="text-sm text-muted-foreground">
                               {review.comment}

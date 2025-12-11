@@ -203,3 +203,4 @@ export async function getMerchantProfile(merchantId: string) {
   if (!snap.exists()) return null;
   return { id: snap.id, ...snap.data() } as any;
 }
+

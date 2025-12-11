@@ -273,13 +273,13 @@ export default function MerchantProducts() {
   const loadProductOptions = async (productId: string) => {
     try {
       const options = await getProductOptions(productId);
-      setProductOptions(options.map((opt: any) => ({
-        type: opt.type,
-        title: opt.title,
-        placeholder: opt.placeholder,
-        required: opt.required,
-        choices: opt.choices?.map((c: any) => ({ label: c.label }))
-      })));
+        setProductOptions(options.map((opt: any) => ({
+          type: opt.type,
+          title: opt.title,
+          placeholder: opt.placeholder,
+          required: opt.required,
+          choices: opt.choices?.map((c: any) => ({ label: c.label }))
+        })));
     } catch (error) {
       console.error("Failed to load product options:", error);
     }

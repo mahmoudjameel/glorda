@@ -2,6 +2,7 @@ import {
   collection,
   addDoc,
   getDocs,
+  getDoc, // Added import
   updateDoc,
   deleteDoc,
   doc,
@@ -42,34 +43,59 @@ export async function getMerchantsByStatus(status?: string) {
   return mapDocs<any>(snap);
 }
 
+// Notification types
+import { addNotification } from "./notifications";
+
+// ...
+
 export async function updateMerchantStatus(id: string, status: string) {
   await updateDoc(doc(db, "merchants", id), { status, updatedAt: serverTimestamp() });
+
+  // Notify merchant
+  if (status === "active") {
+    await addNotification(
+      id,
+      "merchant",
+      "تم تفعيل حسابك",
+      "تم تفعيل حساب التاجر الخاص بك بنجاح. يمكنك الآن البدء في استخدام لوحة التحكم.",
+      "system",
+      "/dashboard"
+    );
+  } else if (status === "rejected") {
+    await addNotification(
+      id,
+      "merchant",
+      "تم رفض طلب التسجيل",
+      "عذراً، تم رفض طلب تسجيل حساب التاجر الخاص بك. يرجى التواصل مع الإدارة للمزيد من التفاصيل.",
+      "system"
+    );
+  }
 }
 
-// Customers
-export async function getCustomers() {
-  const snap = await getDocs(collection(db, "customers"));
-  return mapDocs<any>(snap);
-}
-
-// Orders
-export async function getAllOrders() {
-  const snap = await getDocs(collection(db, "orders"));
-  return mapDocs<any>(snap);
-}
-
-export async function updateOrderStatusAdmin(orderId: string, status: string) {
-  await updateDoc(doc(db, "orders", orderId), { status, updatedAt: serverTimestamp() });
-}
-
-// Withdrawals
-export async function getWithdrawals() {
-  const snap = await getDocs(collection(db, "withdrawals"));
-  return mapDocs<any>(snap);
-}
+// ...
 
 export async function updateWithdrawalStatus(id: string, status: "completed" | "rejected") {
-  await updateDoc(doc(db, "withdrawals", id), { status, updatedAt: serverTimestamp() });
+  const withdrawalRef = doc(db, "withdrawals", id);
+  await updateDoc(withdrawalRef, { status, updatedAt: serverTimestamp() });
+
+  // Get withdrawal details to notify merchant
+  const wDoc = await getDoc(withdrawalRef);
+  if (wDoc.exists()) {
+    const data = wDoc.data();
+    const title = status === "completed" ? "تم الموافقة على السحب" : "تم رفض طلب السحب";
+    const body = status === "completed"
+      ? `تم تحويل مبلغ ${data.amount} ر.س إلى حسابك البنكي بنجاح.`
+      : `تم رفض طلب سحب مبلغ ${data.amount} ر.س. يرجى مراجعة سبب الرفض او التواصل مع الإدارة.`;
+
+    await addNotification(
+      data.merchantId,
+      "merchant",
+      title,
+      body,
+      "withdrawal",
+      "/dashboard/wallet"
+    );
+  }
 }
 
 // Transactions

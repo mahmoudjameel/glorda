@@ -12,6 +12,7 @@ import {
   type DocumentData,
 } from "firebase/firestore";
 import { db } from "./firebase";
+import { notifyAdmins, addNotification } from "./notifications";
 
 const mapDocs = <T = DocumentData>(snap: any): T[] =>
   snap.docs.map((d: any) => ({ id: d.id, ...d.data() })) as T[];
@@ -165,6 +166,7 @@ export async function getOrderMessages(orderId: string) {
   return mapDocs<OrderMessage>(snap);
 }
 
+
 export async function addOrderMessage(orderId: string, senderId: string, senderType: string, message: string) {
   await addDoc(collection(db, "orders", orderId, "messages"), {
     senderId,
@@ -172,6 +174,25 @@ export async function addOrderMessage(orderId: string, senderId: string, senderT
     message,
     createdAt: serverTimestamp(),
   });
+
+  // If merchant sends message, notify customer
+  if (senderType === "merchant") {
+    // Get order details to find customerId
+    const orderSnap = await getDoc(doc(db, "orders", orderId));
+    if (orderSnap.exists()) {
+      const orderData = orderSnap.data();
+      const customerId = orderData.customerId;
+
+      await addNotification(
+        customerId,
+        "customer",
+        "رسالة جديدة من المتجر",
+        `لديك رسالة جديدة بخصوص الطلب رقم ${orderData.orderNumber}: ${message}`,
+        "order",
+        `/orders/${orderId}` // Assuming customer app route
+      );
+    }
+  }
 }
 
 // Transactions & withdrawals
@@ -188,6 +209,18 @@ export async function requestWithdrawal(merchantId: string, amount: number) {
     status: "pending",
     createdAt: serverTimestamp(),
   });
+
+  // Notify admins
+  // Fetch store name first for better notification
+  const merchantSnap = await getDoc(doc(db, "merchants", merchantId));
+  const storeName = merchantSnap.exists() ? merchantSnap.data().storeName : "تاجر";
+
+  await notifyAdmins(
+    "طلب سحب جديد",
+    `قام ${storeName} بطلب سحب مبلغ ${amount} ر.س`,
+    "withdrawal",
+    "/admin/withdrawals"
+  );
 }
 
 // Reviews
@@ -203,4 +236,7 @@ export async function getMerchantProfile(merchantId: string) {
   if (!snap.exists()) return null;
   return { id: snap.id, ...snap.data() } as any;
 }
+
+
+
 

@@ -62,3 +62,6 @@ export async function getCollectionAll<T = DocumentData>(collectionPath: string)
 
 export { serverTimestamp } from "firebase/firestore";
 
+
+
+

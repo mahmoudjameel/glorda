@@ -25,6 +25,7 @@ import { uploadToStorage } from "@/lib/storage-upload";
 import { auth } from "@/lib/firebase";
 import { createUserWithEmailAndPassword } from "firebase/auth";
 import { getCollectionAll, getDocData, setDocData } from "@/lib/firestore";
+import { notifyAdmins } from "@/lib/notifications";
 
 interface City {
   id: string;
@@ -207,6 +208,14 @@ export default function Register() {
         storeName: values.storeName,
       });
 
+      // Notify admins about new merchant registration
+      await notifyAdmins(
+        "طلب انضمام تاجر جديد",
+        `قام ${values.storeName} بتقديم طلب انضمام جديد. يرجى مراجعة الطلب وتفعيله.`,
+        "verification",
+        "/admin/pending"
+      );
+
       toast({
         title: "تم استلام طلبك بنجاح",
         description: "حسابك قيد المراجعة الآن. سيتم إشعارك عند التفعيل.",
@@ -247,9 +256,9 @@ export default function Register() {
           <CardContent>
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-                
+
                 <div className="grid md:grid-cols-2 gap-6">
-                   <FormField
+                  <FormField
                     control={form.control}
                     name="ownerName"
                     render={({ field }) => (
@@ -282,11 +291,11 @@ export default function Register() {
                       <FormItem>
                         <FormLabel>اسم المستخدم (بالإنجليزي فقط)</FormLabel>
                         <FormControl>
-                          <Input 
-                            placeholder="store_name" 
-                            {...field} 
-                            className="font-mono text-left" 
-                            dir="ltr" 
+                          <Input
+                            placeholder="store_name"
+                            {...field}
+                            className="font-mono text-left"
+                            dir="ltr"
                             data-testid="input-username"
                             onChange={(e) => {
                               const value = e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, '');
@@ -535,9 +544,9 @@ export default function Register() {
                             >
                               {field.value
                                 ? (() => {
-                                    const selectedCity = cities.find((c) => c.name === field.value);
-                                    return selectedCity ? `${selectedCity.name}${selectedCity.nameEn ? ` - ${selectedCity.nameEn}` : ""}` : field.value;
-                                  })()
+                                  const selectedCity = cities.find((c) => c.name === field.value);
+                                  return selectedCity ? `${selectedCity.name}${selectedCity.nameEn ? ` - ${selectedCity.nameEn}` : ""}` : field.value;
+                                })()
                                 : "اختر المدينة"}
                               <ChevronsUpDown className="mr-2 h-4 w-4 shrink-0 opacity-50" />
                             </Button>
@@ -595,7 +604,7 @@ export default function Register() {
                               </FormControl>
                               <FormLabel className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary cursor-pointer transition-all" data-testid="radio-representative">
                                 <div className="mb-3 rounded-full bg-primary/10 p-2 text-primary">
-                                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-truck"><path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2"/><path d="M15 18H9"/><path d="M19 18h2a1 1 0 0 0 1-1v-3.65a1 1 0 0 0-.22-.624l-3.48-4.35A1 1 0 0 0 17.52 8H14"/><circle cx="17" cy="18" r="2"/><circle cx="7" cy="18" r="2"/></svg>
+                                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-truck"><path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2" /><path d="M15 18H9" /><path d="M19 18h2a1 1 0 0 0 1-1v-3.65a1 1 0 0 0-.22-.624l-3.48-4.35A1 1 0 0 0 17.52 8H14" /><circle cx="17" cy="18" r="2" /><circle cx="7" cy="18" r="2" /></svg>
                                 </div>
                                 <div className="text-center">
                                   <span className="block font-semibold text-lg">مندوب توصيل</span>
@@ -623,7 +632,7 @@ export default function Register() {
                               </FormControl>
                               <FormLabel className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary cursor-pointer transition-all" data-testid="radio-all">
                                 <div className="mb-3 rounded-full bg-primary/10 p-2 text-primary">
-                                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-check-circle-2"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>
+                                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-check-circle-2"><circle cx="12" cy="12" r="10" /><path d="m9 12 2 2 4-4" /></svg>
                                 </div>
                                 <div className="text-center">
                                   <span className="block font-semibold text-lg">الكل (توصيل + استلام)</span>
@@ -659,7 +668,7 @@ export default function Register() {
                           <Plus className="w-4 h-4" /> إضافة فرع جديد
                         </Button>
                       </div>
-                      
+
                       {fields.length === 0 ? (
                         <div className="text-center py-12 border-2 border-dashed rounded-lg bg-muted/10">
                           <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center mx-auto mb-3">
@@ -684,7 +693,7 @@ export default function Register() {
                                   <Trash2 className="w-3 h-3" />
                                 </Button>
                               </div>
-                              
+
                               <FormField
                                 control={form.control}
                                 name={`branches.${index}.name`}
@@ -698,7 +707,7 @@ export default function Register() {
                                   </FormItem>
                                 )}
                               />
-                              
+
                               <div className="flex items-end gap-2">
                                 <div className="flex-1">
                                   <FormField
@@ -737,7 +746,7 @@ export default function Register() {
                 <div className="rounded-lg border border-border bg-card p-6 shadow-sm">
                   <div className="mb-6">
                     <h4 className="text-lg font-semibold text-foreground flex items-center gap-2">
-                      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-primary"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/></svg>
+                      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-primary"><rect width="20" height="14" x="2" y="5" rx="2" /><line x1="2" x2="22" y1="10" y2="10" /></svg>
                       البيانات البنكية
                     </h4>
                     <p className="text-sm text-muted-foreground mt-1">لتحويل أرباحك من المبيعات</p>
@@ -749,7 +758,7 @@ export default function Register() {
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>اسم البنك</FormLabel>
-                          <Select 
+                          <Select
                             onValueChange={(value) => {
                               if (value === "other") {
                                 setIsOtherBank(true);
@@ -759,7 +768,7 @@ export default function Register() {
                                 setCustomBankName("");
                                 field.onChange(value);
                               }
-                            }} 
+                            }}
                             value={isOtherBank ? "other" : field.value}
                           >
                             <FormControl>
@@ -829,12 +838,12 @@ export default function Register() {
                         <FormLabel>كلمة المرور</FormLabel>
                         <FormControl>
                           <div className="relative">
-                            <Input 
-                              type={showPassword ? "text" : "password"} 
-                              placeholder="••••••••" 
-                              {...field} 
+                            <Input
+                              type={showPassword ? "text" : "password"}
+                              placeholder="••••••••"
+                              {...field}
                               className="pl-10"
-                              data-testid="input-password" 
+                              data-testid="input-password"
                             />
                             <Button
                               type="button"
@@ -860,12 +869,12 @@ export default function Register() {
                         <FormLabel>تأكيد الكلمة</FormLabel>
                         <FormControl>
                           <div className="relative">
-                            <Input 
-                              type={showConfirmPassword ? "text" : "password"} 
-                              placeholder="••••••••" 
-                              {...field} 
+                            <Input
+                              type={showConfirmPassword ? "text" : "password"}
+                              placeholder="••••••••"
+                              {...field}
                               className="pl-10"
-                              data-testid="input-confirm-password" 
+                              data-testid="input-confirm-password"
                             />
                             <Button
                               type="button"

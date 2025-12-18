@@ -2,7 +2,7 @@ import {
   collection,
   addDoc,
   getDocs,
-  getDoc, // Added import
+  getDoc,
   updateDoc,
   deleteDoc,
   doc,
@@ -75,7 +75,8 @@ export async function updateMerchantStatus(id: string, status: string) {
 // ...
 
 export async function updateWithdrawalStatus(id: string, status: "completed" | "rejected") {
-  const withdrawalRef = doc(db, "withdrawals", id);
+  // Withdrawals are stored in transactions collection with type="withdrawal"
+  const withdrawalRef = doc(db, "transactions", id);
   await updateDoc(withdrawalRef, { status, updatedAt: serverTimestamp() });
 
   // Get withdrawal details to notify merchant
@@ -84,8 +85,8 @@ export async function updateWithdrawalStatus(id: string, status: "completed" | "
     const data = wDoc.data();
     const title = status === "completed" ? "تم الموافقة على السحب" : "تم رفض طلب السحب";
     const body = status === "completed"
-      ? `تم تحويل مبلغ ${data.amount} ر.س إلى حسابك البنكي بنجاح.`
-      : `تم رفض طلب سحب مبلغ ${data.amount} ر.س. يرجى مراجعة سبب الرفض او التواصل مع الإدارة.`;
+      ? `تم تحويل مبلغ ${Math.abs(data.amount)} ر.س إلى حسابك البنكي بنجاح.`
+      : `تم رفض طلب سحب مبلغ ${Math.abs(data.amount)} ر.س. يرجى مراجعة سبب الرفض او التواصل مع الإدارة.`;
 
     await addNotification(
       data.merchantId,
@@ -96,6 +97,68 @@ export async function updateWithdrawalStatus(id: string, status: "completed" | "
       "/dashboard/wallet"
     );
   }
+}
+
+// Helper function to convert Firestore Timestamp to Date
+const getDateFromTimestamp = (timestamp: any): Date => {
+  if (!timestamp) return new Date(0);
+  
+  // Firestore Timestamp object
+  if (timestamp.seconds) {
+    return new Date(timestamp.seconds * 1000 + (timestamp.nanoseconds || 0) / 1000000);
+  }
+  
+  // Firestore Timestamp with toDate method
+  if (typeof timestamp.toDate === 'function') {
+    return timestamp.toDate();
+  }
+  
+  // Regular Date or string
+  return new Date(timestamp);
+};
+
+// Withdrawals
+export async function getWithdrawals() {
+  const q = query(
+    collection(db, "transactions"),
+    where("type", "==", "withdrawal"),
+    where("status", "==", "pending")
+  );
+  const snap = await getDocs(q);
+  const withdrawals = mapDocs<any>(snap);
+  
+  // Sort by createdAt descending (no index required - sorted in memory)
+  return withdrawals.sort((a, b) => {
+    const aDate = getDateFromTimestamp(a.createdAt);
+    const bDate = getDateFromTimestamp(b.createdAt);
+    return bDate.getTime() - aDate.getTime();
+  });
+}
+
+// Customers
+export async function getCustomers() {
+  const snap = await getDocs(collection(db, "customers"));
+  const customers = mapDocs<any>(snap);
+  
+  // Sort by createdAt descending (no index required - sorted in memory)
+  return customers.sort((a, b) => {
+    const aDate = getDateFromTimestamp(a.createdAt);
+    const bDate = getDateFromTimestamp(b.createdAt);
+    return bDate.getTime() - aDate.getTime();
+  });
+}
+
+// Orders
+export async function getAllOrders() {
+  const snap = await getDocs(collection(db, "orders"));
+  const orders = mapDocs<any>(snap);
+  
+  // Sort by createdAt descending (no index required - sorted in memory)
+  return orders.sort((a, b) => {
+    const aDate = getDateFromTimestamp(a.createdAt);
+    const bDate = getDateFromTimestamp(b.createdAt);
+    return bDate.getTime() - aDate.getTime();
+  });
 }
 
 // Transactions

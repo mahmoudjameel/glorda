@@ -414,8 +414,8 @@ export default function MerchantProducts() {
                         </SelectTrigger>
                         <SelectContent>
                           {categories.map((cat) => (
-                            <SelectItem key={cat.id} value={cat.name}>
-                              {cat.name}
+                            <SelectItem key={cat.id} value={cat.id?.toString() || cat.id}>
+                              {cat.name || cat.nameAr || cat.nameEn}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -798,8 +798,8 @@ export default function MerchantProducts() {
                       </SelectTrigger>
                       <SelectContent>
                         {categories.map((cat) => (
-                          <SelectItem key={cat.id} value={cat.name}>
-                            {cat.name}
+                          <SelectItem key={cat.id} value={cat.id?.toString() || cat.id}>
+                            {cat.name || cat.nameAr || cat.nameEn}
                           </SelectItem>
                         ))}
                       </SelectContent>

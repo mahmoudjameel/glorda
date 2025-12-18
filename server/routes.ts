@@ -1,7 +1,8 @@
 import type { Express, RequestHandler } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { auth, bucket } from "./firebaseConfig";
+import { auth, bucket, db } from "./firebaseConfig";
+import { FieldValue } from "firebase-admin/firestore";
 import bcrypt from "bcryptjs";
 import multer from "multer";
 import path from "path";
@@ -1629,6 +1630,438 @@ export async function registerRoutes(
       res.json(setting || { key: req.params.key, value: null });
     } catch (error) {
       res.status(500).json({ error: "فشل جلب الإعداد" });
+    }
+  });
+
+  // ========== PUBLIC PRODUCTS ROUTES (for mobile app) ==========
+  app.get("/api/public/products", async (req, res) => {
+    try {
+      const { category, merchantId, search, status = "active" } = req.query;
+      
+      // Get all products from Firestore
+      const allProducts = await db.collection('products').get();
+      let products = allProducts.docs.map(doc => ({ 
+        id: parseInt(doc.id), 
+        ...doc.data() 
+      }));
+
+      // Filter by status
+      products = products.filter((p: any) => p.status === status);
+
+      // Filter by category
+      if (category) {
+        products = products.filter((p: any) => p.category === category);
+      }
+
+      // Filter by merchant
+      if (merchantId) {
+        products = products.filter((p: any) => p.merchantId === parseInt(merchantId as string));
+      }
+
+      // Search filter
+      if (search) {
+        const searchLower = (search as string).toLowerCase();
+        products = products.filter((p: any) => 
+          p.name?.toLowerCase().includes(searchLower) ||
+          p.description?.toLowerCase().includes(searchLower)
+        );
+      }
+
+      // Sort by createdAt descending
+      products.sort((a: any, b: any) => {
+        const aDate = a.createdAt?.seconds ? new Date(a.createdAt.seconds * 1000) : new Date(0);
+        const bDate = b.createdAt?.seconds ? new Date(b.createdAt.seconds * 1000) : new Date(0);
+        return bDate.getTime() - aDate.getTime();
+      });
+
+      res.json(products);
+    } catch (error) {
+      console.error("Error fetching products:", error);
+      res.status(500).json({ error: "فشل جلب المنتجات" });
+    }
+  });
+
+  app.get("/api/public/products/:id", async (req, res) => {
+    try {
+      const productId = parseInt(req.params.id);
+      const product = await storage.getProduct(productId);
+      
+      if (!product) {
+        return res.status(404).json({ error: "المنتج غير موجود" });
+      }
+
+      // Get product options
+      const options = await storage.getProductOptions(productId);
+      const optionsWithChoices = await Promise.all(
+        options.map(async (option) => {
+          const choices = option.type === "multiple_choice"
+            ? await storage.getProductOptionChoices(option.id)
+            : [];
+          return { ...option, choices };
+        })
+      );
+
+      res.json({ ...product, options: optionsWithChoices });
+    } catch (error) {
+      console.error("Error fetching product:", error);
+      res.status(500).json({ error: "فشل جلب المنتج" });
+    }
+  });
+
+  // ========== CUSTOMER AUTH ROUTES (for mobile app) ==========
+  app.post("/api/public/auth/register", async (req, res) => {
+    try {
+      const { name, email, mobile, password, city } = req.body;
+
+      if (!name || !mobile || !password) {
+        return res.status(400).json({ error: "الاسم والجوال وكلمة المرور مطلوبة" });
+      }
+
+      // Check if customer exists
+      const existingCustomers = await db.collection('customers')
+        .where('mobile', '==', mobile)
+        .limit(1)
+        .get();
+
+      if (!existingCustomers.empty) {
+        return res.status(400).json({ error: "رقم الجوال مستخدم بالفعل" });
+      }
+
+      if (email) {
+        const existingByEmail = await db.collection('customers')
+          .where('email', '==', email)
+          .limit(1)
+          .get();
+
+        if (!existingByEmail.empty) {
+          return res.status(400).json({ error: "البريد الإلكتروني مستخدم بالفعل" });
+        }
+      }
+
+      // Create customer in Firestore
+      const customer = await storage.createCustomer({
+        name,
+        email: email || null,
+        mobile,
+        city: city || null,
+      });
+
+      // Create Firebase user account
+      const firebaseUser = await auth.createUser({
+        email: email || `${mobile}@glorda.com`,
+        password,
+        displayName: name,
+      });
+
+      // Create user document in Firestore
+      await db.collection('users').doc(firebaseUser.uid).set({
+        role: 'customer',
+        customerId: customer.id,
+        email: email || null,
+        name,
+        mobile,
+        createdAt: FieldValue.serverTimestamp(),
+      });
+
+      // Create custom token
+      const customToken = await auth.createCustomToken(firebaseUser.uid, {
+        userId: customer.id,
+        userType: "customer",
+        email: email || null,
+      });
+
+      const { password: _, ...customerData } = customer;
+      res.json({
+        success: true,
+        customer: customerData,
+        token: customToken
+      });
+    } catch (error: any) {
+      console.error("Registration error:", error);
+      if (error.code === 'auth/email-already-exists') {
+        return res.status(400).json({ error: "البريد الإلكتروني مستخدم بالفعل" });
+      }
+      res.status(500).json({ error: "فشل التسجيل" });
+    }
+  });
+
+  app.post("/api/public/auth/login", async (req, res) => {
+    try {
+      const { email, password } = req.body;
+
+      if (!email || !password) {
+        return res.status(400).json({ error: "البريد الإلكتروني أو الجوال وكلمة المرور مطلوبان" });
+      }
+
+      // Try to find customer by email or mobile
+      let customer;
+      if (email.includes('@')) {
+        const customers = await db.collection('customers')
+          .where('email', '==', email)
+          .limit(1)
+          .get();
+        if (!customers.empty) {
+          customer = { id: parseInt(customers.docs[0].id), ...customers.docs[0].data() };
+        }
+      } else {
+        const customers = await db.collection('customers')
+          .where('mobile', '==', email)
+          .limit(1)
+          .get();
+        if (!customers.empty) {
+          customer = { id: parseInt(customers.docs[0].id), ...customers.docs[0].data() };
+        }
+      }
+
+      if (!customer) {
+        return res.status(401).json({ error: "بيانات الدخول غير صحيحة" });
+      }
+
+      // Find Firebase user
+      const userEmail = customer.email || `${customer.mobile}@glorda.com`;
+      let firebaseUser;
+      try {
+        firebaseUser = await auth.getUserByEmail(userEmail);
+      } catch {
+        return res.status(401).json({ error: "بيانات الدخول غير صحيحة" });
+      }
+
+      // Create custom token
+      const customToken = await auth.createCustomToken(firebaseUser.uid, {
+        userId: customer.id,
+        userType: "customer",
+        email: customer.email || null,
+      });
+
+      res.json({
+        success: true,
+        customer: {
+          id: customer.id,
+          name: customer.name,
+          email: customer.email,
+          mobile: customer.mobile,
+          city: customer.city,
+        },
+        token: customToken
+      });
+    } catch (error) {
+      console.error("Login error:", error);
+      res.status(500).json({ error: "فشل تسجيل الدخول" });
+    }
+  });
+
+  app.post("/api/public/auth/forgot-password", async (req, res) => {
+    try {
+      const { email } = req.body;
+
+      if (!email) {
+        return res.status(400).json({ error: "البريد الإلكتروني أو رقم الجوال مطلوب" });
+      }
+
+      // Rate limit check
+      if (!checkRateLimit(email)) {
+        return res.status(429).json({ error: "تم تجاوز الحد المسموح، يرجى المحاولة لاحقاً" });
+      }
+
+      // Find customer by email or mobile
+      let customer;
+      if (email.includes('@')) {
+        const customers = await db.collection('customers')
+          .where('email', '==', email)
+          .limit(1)
+          .get();
+        if (!customers.empty) {
+          customer = { id: parseInt(customers.docs[0].id), ...customers.docs[0].data() };
+        }
+      } else {
+        const customers = await db.collection('customers')
+          .where('mobile', '==', email)
+          .limit(1)
+          .get();
+        if (!customers.empty) {
+          customer = { id: parseInt(customers.docs[0].id), ...customers.docs[0].data() };
+        }
+      }
+
+      if (!customer) {
+        // Don't reveal if email exists or not for security
+        return res.json({ success: true, message: "إذا كان البريد مسجلاً، سيتم إرسال رمز التحقق" });
+      }
+
+      // Generate 6-digit OTP
+      const otp = Math.floor(100000 + Math.random() * 900000).toString();
+      const expires = Date.now() + 10 * 60 * 1000; // 10 minutes
+
+      otpStore.set(email, { otp, expires, attempts: 0 });
+
+      // DEV MODE: Log OTP to console
+      if (process.env.NODE_ENV !== 'production') {
+        console.log(`[DEV OTP] Password reset code for ${email}: ${otp}`);
+      }
+      // TODO: In production, integrate email service to send OTP
+
+      res.json({ success: true, message: "تم إرسال رمز التحقق" });
+    } catch (error) {
+      console.error("Forgot password error:", error);
+      res.status(500).json({ error: "حدث خطأ" });
+    }
+  });
+
+  app.post("/api/public/auth/reset-password", async (req, res) => {
+    try {
+      const { email, token, password } = req.body;
+
+      if (!email || !token || !password) {
+        return res.status(400).json({ error: "جميع الحقول مطلوبة" });
+      }
+
+      if (password.length < 6) {
+        return res.status(400).json({ error: "كلمة المرور يجب أن تكون 6 أحرف على الأقل" });
+      }
+
+      const stored = otpStore.get(email);
+
+      if (!stored || stored.token !== token) {
+        return res.status(400).json({ error: "رابط غير صالح" });
+      }
+
+      if (Date.now() > stored.expires) {
+        otpStore.delete(email);
+        return res.status(400).json({ error: "انتهت صلاحية الرابط" });
+      }
+
+      // Find customer
+      let customer;
+      if (email.includes('@')) {
+        const customers = await db.collection('customers')
+          .where('email', '==', email)
+          .limit(1)
+          .get();
+        if (!customers.empty) {
+          customer = { id: parseInt(customers.docs[0].id), ...customers.docs[0].data() };
+        }
+      } else {
+        const customers = await db.collection('customers')
+          .where('mobile', '==', email)
+          .limit(1)
+          .get();
+        if (!customers.empty) {
+          customer = { id: parseInt(customers.docs[0].id), ...customers.docs[0].data() };
+        }
+      }
+
+      if (!customer) {
+        return res.status(400).json({ error: "الحساب غير موجود" });
+      }
+
+      // Update Firebase user password
+      const userEmail = customer.email || `${customer.mobile}@glorda.com`;
+      try {
+        const firebaseUser = await auth.getUserByEmail(userEmail);
+        await auth.updateUser(firebaseUser.uid, { password });
+      } catch (error) {
+        console.error("Error updating password:", error);
+        return res.status(500).json({ error: "فشل تحديث كلمة المرور" });
+      }
+
+      otpStore.delete(email);
+
+      res.json({ success: true, message: "تم إعادة تعيين كلمة المرور بنجاح" });
+    } catch (error) {
+      console.error("Reset password error:", error);
+      res.status(500).json({ error: "فشل إعادة تعيين كلمة المرور" });
+    }
+  });
+
+  // ========== CUSTOMER ORDERS ROUTES (for mobile app) ==========
+  app.post("/api/public/orders", verifyFirebaseToken, async (req, res) => {
+    try {
+      if (!req.userId || req.userType !== "customer") {
+        return res.status(401).json({ error: "يجب تسجيل الدخول كعميل" });
+      }
+
+      const { merchantId, productId, quantity, totalAmount, customerNote, deliveryAddress, deliveryMethod, optionSelections } = req.body;
+
+      if (!merchantId || !productId || !quantity || !totalAmount) {
+        return res.status(400).json({ error: "بيانات الطلب غير مكتملة" });
+      }
+
+      // Generate order number
+      const orderNumber = `ORD-${Date.now()}-${Math.random().toString(36).substring(7).toUpperCase()}`;
+
+      // Create order
+      const order = await storage.createOrder({
+        orderNumber,
+        customerId: req.userId,
+        merchantId: parseInt(merchantId),
+        productId: parseInt(productId),
+        quantity: parseInt(quantity),
+        totalAmount: parseFloat(totalAmount),
+        status: "pending",
+        customerNote: customerNote || null,
+        deliveryAddress: deliveryAddress || null,
+        deliveryMethod: deliveryMethod || "delivery",
+        isPaid: false,
+      });
+
+      // Create option selections if provided
+      if (optionSelections && Array.isArray(optionSelections)) {
+        for (const selection of optionSelections) {
+          await storage.createOrderOptionSelection({
+            orderId: order.id,
+            optionId: selection.optionId,
+            choiceId: selection.choiceId || null,
+            textValue: selection.textValue || null,
+            booleanValue: selection.booleanValue || null,
+          });
+        }
+      }
+
+      // Notify merchant
+      await storage.createNotification({
+        recipientType: "merchant",
+        recipientId: parseInt(merchantId),
+        title: "طلب جديد",
+        body: `تم استلام طلب جديد #${orderNumber}`,
+        actionType: "new_order",
+        actionRef: { orderId: order.id, orderNumber } as Record<string, any>
+      });
+
+      res.json({
+        success: true,
+        order
+      });
+    } catch (error) {
+      console.error("Create order error:", error);
+      res.status(500).json({ error: "فشل إنشاء الطلب" });
+    }
+  });
+
+  app.get("/api/public/orders", verifyFirebaseToken, async (req, res) => {
+    try {
+      if (!req.userId || req.userType !== "customer") {
+        return res.status(401).json({ error: "يجب تسجيل الدخول كعميل" });
+      }
+
+      const orders = await storage.getOrdersByCustomer(req.userId);
+      
+      // Enrich orders with product and merchant details
+      const ordersWithDetails = await Promise.all(
+        orders.map(async (order) => {
+          const product = await storage.getProduct(order.productId);
+          const merchant = await storage.getMerchant(order.merchantId);
+          return {
+            ...order,
+            product: product ? { id: product.id, name: product.name, price: product.price, images: product.images } : null,
+            merchant: merchant ? { id: merchant.id, storeName: merchant.storeName } : null,
+          };
+        })
+      );
+
+      res.json(ordersWithDetails);
+    } catch (error) {
+      console.error("Get orders error:", error);
+      res.status(500).json({ error: "فشل جلب الطلبات" });
     }
   });
 

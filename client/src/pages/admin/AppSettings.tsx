@@ -59,6 +59,7 @@ export default function AppSettings() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const categoryIconInputRef = useRef<HTMLInputElement>(null);
 
   const [isAddBannerOpen, setIsAddBannerOpen] = useState(false);
   const [isAddCategoryOpen, setIsAddCategoryOpen] = useState(false);
@@ -124,6 +125,30 @@ export default function AppSettings() {
     queryFn: getDiscountCodes
   });
 
+  // Helper function to convert base64 to File
+  const base64ToFile = (base64String: string, filename: string): File => {
+    const arr = base64String.split(',');
+    const mime = arr[0].match(/:(.*?);/)?.[1] || 'image/png';
+    const bstr = atob(arr[1]);
+    let n = bstr.length;
+    const u8arr = new Uint8Array(n);
+    while (n--) {
+      u8arr[n] = bstr.charCodeAt(n);
+    }
+    return new File([u8arr], filename, { type: mime });
+  };
+
+  // Helper function to upload base64 to Firebase Storage
+  const uploadBase64ToStorage = async (base64String: string, folder: string): Promise<string> => {
+    const timestamp = Date.now();
+    const randomString = Math.random().toString(36).substring(7);
+    const mime = base64String.match(/data:(.*?);/)?.[1] || 'image/png';
+    const extension = mime.split('/')[1] || 'png';
+    const filename = `${folder}/${timestamp}-${randomString}.${extension}`;
+    const file = base64ToFile(base64String, filename);
+    return await uploadToStorage(file, folder);
+  };
+
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'banner' | 'category') => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -142,7 +167,7 @@ export default function AppSettings() {
       if (type === 'banner') {
         setBannerForm(prev => ({ ...prev, image: uploadedUrl }));
       } else { // type === 'category'
-        setCategoryForm(prev => ({ ...prev, icon: uploadedUrl })); // Assuming 'icon' for category based on instruction's 'setCategoryIcon'
+        setCategoryForm(prev => ({ ...prev, icon: uploadedUrl }));
       }
       toast({ title: "تم رفع الصورة بنجاح" });
     } catch (error: any) {
@@ -156,6 +181,9 @@ export default function AppSettings() {
       setIsUploading(false);
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
+      }
+      if (categoryIconInputRef.current) {
+        categoryIconInputRef.current.value = "";
       }
     }
   };
@@ -449,16 +477,39 @@ export default function AppSettings() {
     }
   };
 
-  const handleCategorySubmit = (e: React.FormEvent) => {
+  const handleCategorySubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!categoryForm.name) {
       toast({ variant: "destructive", title: "اسم القسم مطلوب" });
       return;
     }
+
+    // Check if icon is base64 and upload it before saving
+    let finalCategoryForm = { ...categoryForm };
+    if (categoryForm.icon && categoryForm.icon.startsWith('data:image/')) {
+      setIsUploading(true);
+      try {
+        const uploadedUrl = await uploadBase64ToStorage(categoryForm.icon, 'categories');
+        finalCategoryForm.icon = uploadedUrl;
+        toast({ title: "تم رفع الصورة بنجاح" });
+      } catch (error: any) {
+        console.error("Base64 upload error:", error);
+        toast({
+          variant: "destructive",
+          title: "فشل رفع الصورة",
+          description: error.message || "حدث خطأ أثناء رفع الصورة"
+        });
+        setIsUploading(false);
+        return; // Don't save if upload fails
+      } finally {
+        setIsUploading(false);
+      }
+    }
+
     if (editingCategory) {
-      updateCategoryMutation.mutate({ id: editingCategory.id, data: categoryForm });
+      updateCategoryMutation.mutate({ id: editingCategory.id, data: finalCategoryForm });
     } else {
-      createCategoryMutation.mutate(categoryForm);
+      createCategoryMutation.mutate(finalCategoryForm);
     }
   };
 
@@ -685,18 +736,76 @@ export default function AppSettings() {
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label>رابط الأيقونة (اختياري)</Label>
-                        <Input
-                          placeholder="https://example.com/icon.png"
-                          value={categoryForm.icon}
-                          onChange={(e) => setCategoryForm(prev => ({ ...prev, icon: e.target.value }))}
-                          className="font-mono text-left"
-                          dir="ltr"
-                          data-testid="input-category-icon"
-                        />
+                        <Label>أيقونة القسم (اختياري)</Label>
+                        <div className="flex gap-2">
+                          <Input
+                            placeholder="https://example.com/icon.png"
+                            value={categoryForm.icon}
+                            onChange={async (e) => {
+                              const value = e.target.value;
+                              // If user pastes base64, automatically upload it to Firebase Storage
+                              if (value.startsWith('data:image/')) {
+                                setIsUploading(true);
+                                try {
+                                  const uploadedUrl = await uploadBase64ToStorage(value, 'categories');
+                                  setCategoryForm(prev => ({ ...prev, icon: uploadedUrl }));
+                                  toast({ title: "تم رفع الصورة بنجاح" });
+                                } catch (error: any) {
+                                  console.error("Base64 upload error:", error);
+                                  toast({
+                                    variant: "destructive",
+                                    title: "فشل رفع الصورة",
+                                    description: error.message || "حدث خطأ أثناء رفع الصورة"
+                                  });
+                                } finally {
+                                  setIsUploading(false);
+                                }
+                                return;
+                              }
+                              setCategoryForm(prev => ({ ...prev, icon: value }));
+                            }}
+                            className="font-mono text-left"
+                            dir="ltr"
+                            data-testid="input-category-icon"
+                          />
+                          <input
+                            type="file"
+                            ref={categoryIconInputRef}
+                            accept="image/*"
+                            onChange={(e) => handleImageUpload(e, 'category')}
+                            className="hidden"
+                            id="category-icon-upload"
+                          />
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => categoryIconInputRef.current?.click()}
+                            disabled={isUploading}
+                          >
+                            {isUploading ? (
+                              <>
+                                <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                                جاري الرفع...
+                              </>
+                            ) : (
+                              <>
+                                <Image className="w-4 h-4 mr-2" />
+                                رفع صورة
+                              </>
+                            )}
+                          </Button>
+                        </div>
                         {categoryForm.icon && (
                           <div className="flex items-center gap-2 p-2 border rounded bg-muted/20">
-                            <img src={categoryForm.icon} alt="أيقونة" className="w-8 h-8 object-contain" />
+                            <img 
+                              src={categoryForm.icon} 
+                              alt="أيقونة" 
+                              className="w-8 h-8 object-contain"
+                              onError={(e) => {
+                                console.error('Image load error:', categoryForm.icon);
+                                e.currentTarget.style.display = 'none';
+                              }}
+                            />
                             <span className="text-xs text-muted-foreground">معاينة الأيقونة</span>
                           </div>
                         )}
@@ -709,10 +818,10 @@ export default function AppSettings() {
                         <Label>نشط</Label>
                       </div>
                       <DialogFooter>
-                        <Button type="submit" disabled={createCategoryMutation.isPending || updateCategoryMutation.isPending}>
-                          {(createCategoryMutation.isPending || updateCategoryMutation.isPending) &&
+                        <Button type="submit" disabled={createCategoryMutation.isPending || updateCategoryMutation.isPending || isUploading}>
+                          {(createCategoryMutation.isPending || updateCategoryMutation.isPending || isUploading) &&
                             <Loader2 className="w-4 h-4 animate-spin ml-2" />}
-                          {editingCategory ? "حفظ التعديلات" : "إضافة القسم"}
+                          {isUploading ? "جاري رفع الصورة..." : editingCategory ? "حفظ التعديلات" : "إضافة القسم"}
                         </Button>
                       </DialogFooter>
                     </form>
@@ -736,7 +845,17 @@ export default function AppSettings() {
                       <div key={category.id} className="border rounded-lg p-4" data-testid={`card-category-${category.id}`}>
                         <div className="flex items-center justify-between mb-3">
                           <div className="flex items-center gap-2">
-                            {category.icon && <span className="text-2xl">{category.icon}</span>}
+                            {category.icon && (
+                              <img 
+                                src={category.icon} 
+                                alt={category.name}
+                                className="w-8 h-8 object-contain"
+                                onError={(e) => {
+                                  console.error('Category icon load error:', category.icon);
+                                  e.currentTarget.style.display = 'none';
+                                }}
+                              />
+                            )}
                             <div>
                               <div className="font-medium">{category.name}</div>
                               {category.nameEn && <div className="text-sm text-muted-foreground">{category.nameEn}</div>}

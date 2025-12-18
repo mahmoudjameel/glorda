@@ -8,7 +8,9 @@ import {
   query,
   updateDoc,
   where,
+  orderBy,
   serverTimestamp,
+  onSnapshot,
   type DocumentData,
 } from "firebase/firestore";
 import { db } from "./firebase";
@@ -66,6 +68,7 @@ export interface OrderMessage {
   senderId: string;
   senderType: string;
   message: string;
+  imageUrl?: string;
   createdAt?: any;
 }
 
@@ -167,13 +170,19 @@ export async function getOrderMessages(orderId: string) {
 }
 
 
-export async function addOrderMessage(orderId: string, senderId: string, senderType: string, message: string) {
-  await addDoc(collection(db, "orders", orderId, "messages"), {
+export async function addOrderMessage(orderId: string, senderId: string, senderType: string, message: string, imageUrl?: string) {
+  const messageData: any = {
     senderId,
     senderType,
     message,
     createdAt: serverTimestamp(),
-  });
+  };
+  
+  if (imageUrl) {
+    messageData.imageUrl = imageUrl;
+  }
+  
+  await addDoc(collection(db, "orders", orderId, "messages"), messageData);
 
   // If merchant sends message, notify customer
   if (senderType === "merchant") {
@@ -193,6 +202,406 @@ export async function addOrderMessage(orderId: string, senderId: string, senderT
       );
     }
   }
+}
+
+// ========== DIRECT CONVERSATIONS ==========
+export interface DirectConversation {
+  id: string;
+  customerId: string | number;
+  merchantId: string | number;
+  customerName?: string;
+  merchantName?: string;
+  merchantNameAr?: string;
+  merchantImage?: string;
+  lastMessage?: string;
+  lastMessageAt?: any;
+  unreadCountCustomer?: number;
+  unreadCountMerchant?: number;
+  createdAt?: any;
+  updatedAt?: any;
+}
+
+export interface DirectMessage {
+  id: string;
+  conversationId: string;
+  senderId: string | number;
+  senderType: 'customer' | 'merchant';
+  message: string;
+  imageUrl?: string;
+  createdAt?: any;
+}
+
+// Helper function to convert Firestore Timestamp to Date
+const getDateFromTimestamp = (timestamp: any): Date => {
+  if (!timestamp) return new Date(0);
+  
+  if (timestamp.seconds) {
+    return new Date(timestamp.seconds * 1000 + (timestamp.nanoseconds || 0) / 1000000);
+  }
+  
+  if (timestamp.toDate && typeof timestamp.toDate === 'function') {
+    return timestamp.toDate();
+  }
+  
+  if (timestamp instanceof Date) {
+    return timestamp;
+  }
+  
+  return new Date(timestamp);
+};
+
+// Get all direct conversations for a merchant
+export async function getMerchantDirectConversations(merchantId: string): Promise<DirectConversation[]> {
+  try {
+    // Try with orderBy first, if it fails (no index), fetch without orderBy
+    let snap;
+    try {
+      const q = query(
+        collection(db, "directConversations"),
+        where("merchantId", "==", merchantId.toString()),
+        orderBy("updatedAt", "desc")
+      );
+      snap = await getDocs(q);
+    } catch (orderByError: any) {
+      console.warn('⚠️ orderBy failed, fetching without orderBy:', orderByError.message);
+      // If orderBy fails (likely missing index), fetch all and sort in memory
+      const q = query(
+        collection(db, "directConversations"),
+        where("merchantId", "==", merchantId.toString())
+      );
+      snap = await getDocs(q);
+    }
+    
+    const conversations = mapDocs<DirectConversation>(snap);
+    
+    // Sort by updatedAt if not already sorted
+    conversations.sort((a, b) => {
+      const aDate = getDateFromTimestamp(a.updatedAt);
+      const bDate = getDateFromTimestamp(b.updatedAt);
+      return bDate.getTime() - aDate.getTime();
+    });
+    
+    // Get customer info and last message for each conversation
+    const conversationsWithDetails = await Promise.all(
+      conversations.map(async (conv) => {
+        try {
+          // Get customer info
+          const customerDoc = await getDoc(doc(db, "customers", conv.customerId.toString()));
+          const customer = customerDoc.exists() ? customerDoc.data() : null;
+          
+          // Get last message - try with orderBy, fallback without
+          let lastMessage = null;
+          try {
+            const messagesSnap = await getDocs(
+              query(
+                collection(db, "directConversations", conv.id, "messages"),
+                orderBy("createdAt", "desc"),
+                limit(1)
+              )
+            );
+            lastMessage = messagesSnap.empty ? null : messagesSnap.docs[0].data();
+          } catch (error: any) {
+            // If orderBy fails, get all messages and find last one
+            const messagesSnap = await getDocs(
+              collection(db, "directConversations", conv.id, "messages")
+            );
+            if (!messagesSnap.empty) {
+              const messages = mapDocs<DirectMessage>(messagesSnap);
+              messages.sort((a, b) => {
+                const aDate = getDateFromTimestamp(a.createdAt);
+                const bDate = getDateFromTimestamp(b.createdAt);
+                return bDate.getTime() - aDate.getTime();
+              });
+              lastMessage = messages[0];
+            }
+          }
+          
+          return {
+            ...conv,
+            customerName: customer?.name || '',
+            lastMessage: lastMessage?.message || '',
+            lastMessageAt: lastMessage?.createdAt || conv.updatedAt,
+          };
+        } catch (error) {
+          console.error('Error loading conversation details:', conv.id, error);
+          return {
+            ...conv,
+            customerName: '',
+            lastMessage: '',
+            lastMessageAt: conv.updatedAt,
+          };
+        }
+      })
+    );
+    
+    return conversationsWithDetails;
+  } catch (error) {
+    console.error("Error fetching merchant direct conversations:", error);
+    return [];
+  }
+}
+
+// Get messages for a direct conversation
+export async function getDirectMessages(conversationId: string): Promise<DirectMessage[]> {
+  try {
+    // Try with orderBy first, if it fails (no index), fetch without orderBy
+    let messagesSnap;
+    try {
+      messagesSnap = await getDocs(
+        query(
+          collection(db, "directConversations", conversationId, "messages"),
+          orderBy("createdAt", "asc")
+        )
+      );
+    } catch (orderByError: any) {
+      console.warn('⚠️ orderBy failed for messages, fetching without orderBy:', orderByError.message);
+      // If orderBy fails (likely missing index), fetch all and sort in memory
+      messagesSnap = await getDocs(
+        collection(db, "directConversations", conversationId, "messages")
+      );
+    }
+    
+    const messages = mapDocs<DirectMessage>(messagesSnap);
+    
+    // Sort by createdAt if not already sorted
+    messages.sort((a, b) => {
+      const aDate = getDateFromTimestamp(a.createdAt);
+      const bDate = getDateFromTimestamp(b.createdAt);
+      return aDate.getTime() - bDate.getTime();
+    });
+    
+    return messages;
+  } catch (error) {
+    console.error("Error fetching direct messages:", error);
+    return [];
+  }
+}
+
+// Add message to direct conversation
+export async function addDirectMessage(
+  conversationId: string,
+  senderId: string,
+  senderType: 'customer' | 'merchant',
+  message: string,
+  imageUrl?: string
+): Promise<void> {
+  try {
+    // Add message
+    const messageData: any = {
+      senderId: senderId.toString(),
+      senderType,
+      message,
+      createdAt: serverTimestamp(),
+    };
+    
+    if (imageUrl) {
+      messageData.imageUrl = imageUrl;
+    }
+    
+    await addDoc(
+      collection(db, "directConversations", conversationId, "messages"),
+      messageData
+    );
+    
+    // Update conversation
+    const conversationRef = doc(db, "directConversations", conversationId);
+    const conversationDoc = await getDoc(conversationRef);
+    
+    if (conversationDoc.exists()) {
+      const conversationData = conversationDoc.data();
+      const updateData: any = {
+        lastMessage: message,
+        lastMessageAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      };
+      
+      // Update unread count for the recipient
+      if (senderType === 'customer') {
+        updateData.unreadCountMerchant = (conversationData.unreadCountMerchant || 0) + 1;
+      } else {
+        updateData.unreadCountCustomer = (conversationData.unreadCountCustomer || 0) + 1;
+      }
+      
+      await updateDoc(conversationRef, updateData);
+      
+      // Send notification to recipient
+      if (senderType === 'merchant') {
+        // Notify customer
+        await addNotification(
+          conversationData.customerId?.toString() || conversationData.customerId,
+          "customer",
+          "رسالة جديدة من المتجر",
+          message.substring(0, 50) + (message.length > 50 ? '...' : ''),
+          "direct_message",
+          `/messages?conversationId=${conversationId}`
+        );
+      }
+    }
+  } catch (error) {
+    console.error("Error adding direct message:", error);
+    throw error;
+  }
+}
+
+// Mark conversation as read
+export async function markDirectConversationAsRead(
+  conversationId: string,
+  userType: 'customer' | 'merchant'
+): Promise<void> {
+  try {
+    const conversationRef = doc(db, "directConversations", conversationId);
+    const updateData: any = {};
+    
+    if (userType === 'customer') {
+      updateData.unreadCountCustomer = 0;
+    } else {
+      updateData.unreadCountMerchant = 0;
+    }
+    
+    await updateDoc(conversationRef, updateData);
+  } catch (error) {
+    console.error("Error marking conversation as read:", error);
+  }
+}
+
+// Real-time subscription for direct conversations
+export function subscribeToMerchantDirectConversations(
+  merchantId: string,
+  callback: (conversations: DirectConversation[]) => void
+) {
+  console.log('🔄 Setting up subscription for merchant direct conversations:', merchantId);
+  
+  // Use query without orderBy to avoid index requirement
+  // We'll sort in memory instead
+  const q = query(
+    collection(db, "directConversations"),
+    where("merchantId", "==", merchantId.toString())
+  );
+  
+  return onSnapshot(
+    q,
+    async (snap) => {
+      const conversations = mapDocs<DirectConversation>(snap);
+      
+      // Sort by updatedAt in memory
+      conversations.sort((a, b) => {
+        const aDate = getDateFromTimestamp(a.updatedAt);
+        const bDate = getDateFromTimestamp(b.updatedAt);
+        return bDate.getTime() - aDate.getTime();
+      });
+      
+      // Get customer info and last message for each conversation
+      const conversationsWithDetails = await Promise.all(
+        conversations.map(async (conv) => {
+          try {
+            const customerDoc = await getDoc(doc(db, "customers", conv.customerId.toString()));
+            const customer = customerDoc.exists() ? customerDoc.data() : null;
+            
+            // Get last message - fetch all and sort in memory
+            let lastMessage = null;
+            try {
+              const messagesSnap = await getDocs(
+                collection(db, "directConversations", conv.id, "messages")
+              );
+              if (!messagesSnap.empty) {
+                const messages = mapDocs<DirectMessage>(messagesSnap);
+                messages.sort((a, b) => {
+                  const aDate = getDateFromTimestamp(a.createdAt);
+                  const bDate = getDateFromTimestamp(b.createdAt);
+                  return bDate.getTime() - aDate.getTime();
+                });
+                lastMessage = messages[messages.length - 1]; // Last message (sorted ascending)
+              }
+            } catch (error: any) {
+              console.warn('Error loading last message:', conv.id, error);
+            }
+            
+            return {
+              ...conv,
+              customerName: customer?.name || '',
+              lastMessage: lastMessage?.message || '',
+              lastMessageAt: lastMessage?.createdAt || conv.updatedAt,
+            };
+          } catch (error) {
+            console.error('Error loading conversation details:', conv.id, error);
+            return {
+              ...conv,
+              customerName: '',
+              lastMessage: '',
+              lastMessageAt: conv.updatedAt,
+            };
+          }
+        })
+      );
+      
+      console.log('📨 Real-time merchant direct conversations update:', conversationsWithDetails.length);
+      callback(conversationsWithDetails);
+    },
+    (error) => {
+      console.error('❌ Error in merchant direct conversations subscription:', error);
+      // Return empty array on error instead of crashing
+      callback([]);
+    }
+  );
+}
+
+// Real-time subscription for direct messages
+export function subscribeToDirectMessages(
+  conversationId: string,
+  callback: (messages: DirectMessage[]) => void
+) {
+  console.log('🔄 Setting up subscription for direct messages:', conversationId);
+  
+  // Try with orderBy first, if it fails, use without orderBy
+  let q;
+  try {
+    q = query(
+      collection(db, "directConversations", conversationId, "messages"),
+      orderBy("createdAt", "asc")
+    );
+  } catch (error: any) {
+    console.warn('⚠️ orderBy query failed, using without orderBy:', error.message);
+    q = query(
+      collection(db, "directConversations", conversationId, "messages")
+    );
+  }
+  
+  return onSnapshot(
+    q,
+    (snap) => {
+      const messages = mapDocs<DirectMessage>(snap);
+      
+      // Sort by createdAt if not already sorted
+      messages.sort((a, b) => {
+        const aDate = getDateFromTimestamp(a.createdAt);
+        const bDate = getDateFromTimestamp(b.createdAt);
+        return aDate.getTime() - bDate.getTime();
+      });
+      
+      console.log('📨 Real-time direct messages update:', messages.length);
+      callback(messages);
+    },
+    (error) => {
+      console.error('❌ Error in direct messages subscription:', error);
+      // If orderBy fails, try without it
+      if (error.code === 'failed-precondition') {
+        console.log('🔄 Retrying subscription without orderBy');
+        const fallbackQ = query(
+          collection(db, "directConversations", conversationId, "messages")
+        );
+        return onSnapshot(fallbackQ, (snap) => {
+          const messages = mapDocs<DirectMessage>(snap);
+          messages.sort((a, b) => {
+            const aDate = getDateFromTimestamp(a.createdAt);
+            const bDate = getDateFromTimestamp(b.createdAt);
+            return aDate.getTime() - bDate.getTime();
+          });
+          console.log('📨 Real-time direct messages update (fallback):', messages.length);
+          callback(messages);
+        });
+      }
+    }
+  );
 }
 
 // Transactions & withdrawals
@@ -223,11 +632,56 @@ export async function requestWithdrawal(merchantId: string, amount: number) {
   );
 }
 
-// Reviews
+// Reviews - using existing Review interface from schema
+
 export async function getMerchantReviews(merchantId: string) {
-  const q = query(collection(db, "reviews"), where("merchantId", "==", merchantId));
-  const snap = await getDocs(q);
-  return mapDocs<Review>(snap);
+  try {
+    const q = query(collection(db, "reviews"), where("merchantId", "==", merchantId));
+    const snap = await getDocs(q);
+    const reviews = mapDocs<Review>(snap);
+    
+    // Sort by createdAt (newest first)
+    reviews.sort((a, b) => {
+      const aDate = getDateFromTimestamp(a.createdAt);
+      const bDate = getDateFromTimestamp(b.createdAt);
+      return bDate.getTime() - aDate.getTime();
+    });
+    
+    // Get product and customer details for each review
+    const reviewsWithDetails = await Promise.all(
+      reviews.map(async (review) => {
+        try {
+          // Get product details
+          const productDoc = await getDoc(doc(db, "products", review.productId));
+          const product = productDoc.exists() ? { id: productDoc.id, ...productDoc.data() } : null;
+          
+          // Get customer details
+          const customerDoc = await getDoc(doc(db, "customers", review.customerId));
+          const customer = customerDoc.exists() ? { id: customerDoc.id, ...customerDoc.data() } : null;
+          
+          return {
+            ...review,
+            product: product ? {
+              name: product.name || product.nameEn || product.nameAr || '',
+              images: product.images || [],
+            } : undefined,
+            customer: customer ? {
+              name: customer.name || '',
+              mobile: customer.mobile || '',
+            } : undefined,
+          };
+        } catch (error) {
+          console.error('Error loading review details:', error);
+          return review;
+        }
+      })
+    );
+    
+    return reviewsWithDetails;
+  } catch (error) {
+    console.error('Error fetching merchant reviews:', error);
+    return [];
+  }
 }
 
 // Single merchant profile helper
@@ -236,6 +690,8 @@ export async function getMerchantProfile(merchantId: string) {
   if (!snap.exists()) return null;
   return { id: snap.id, ...snap.data() } as any;
 }
+
+
 
 
 

@@ -19,6 +19,17 @@ import { notifyAdmins, addNotification } from "./notifications";
 const mapDocs = <T = DocumentData>(snap: any): T[] =>
   snap.docs.map((d: any) => ({ id: d.id, ...d.data() })) as T[];
 
+// Helper function to remove undefined values from object (Firestore doesn't allow undefined)
+const removeUndefined = (obj: Record<string, unknown>): Record<string, unknown> => {
+  const cleaned: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(obj)) {
+    if (value !== undefined) {
+      cleaned[key] = value;
+    }
+  }
+  return cleaned;
+};
+
 export interface ProductOptionChoice {
   label: string;
 }
@@ -133,24 +144,149 @@ export async function setProductVisibility(id: string, isActive: boolean) {
 }
 
 export async function saveProductOptions(productId: string, options: ProductOption[]) {
-  const optionsCol = collection(db, "products", productId, "options");
-  // Delete existing options then re-add (simple approach)
-  const existing = await getDocs(optionsCol);
-  await Promise.all(existing.docs.map((d) => deleteDoc(d.ref)));
+  try {
+    // Ensure productId is a string
+    const productIdStr = String(productId);
+    const optionsCol = collection(db, "products", productIdStr, "options");
+    
+    // Delete existing options and their choices first
+    try {
+      const existing = await getDocs(optionsCol);
+      await Promise.all(
+        existing.docs.map(async (optionDoc) => {
+          // Delete all choices for this option
+          try {
+            const choicesCol = collection(db, "products", productIdStr, "options", optionDoc.id, "choices");
+            const choicesSnap = await getDocs(choicesCol);
+            await Promise.all(choicesSnap.docs.map((d) => deleteDoc(d.ref)));
+          } catch (error) {
+            console.warn("Error deleting choices for option:", optionDoc.id, error);
+          }
+          // Delete the option
+          try {
+            await deleteDoc(optionDoc.ref);
+          } catch (error) {
+            console.warn("Error deleting option:", optionDoc.id, error);
+          }
+        })
+      );
+    } catch (error) {
+      console.warn("Error fetching existing options:", error);
+      // Continue anyway - might be first time adding options
+    }
 
-  await Promise.all(
-    options.map((opt) =>
-      addDoc(optionsCol, {
-        ...opt,
+    // If no options provided, we're done (all existing options are deleted)
+    if (!options || options.length === 0) {
+      return;
+    }
+
+    // Create new options with choices
+    for (let i = 0; i < options.length; i++) {
+      const opt = options[i];
+      
+      // Validate option
+      if (!opt.type || !opt.title) {
+        console.warn("Skipping invalid option at index", i, opt);
+        continue;
+      }
+      
+      // Remove choices from option data before saving (choices will be saved separately)
+      const { choices, ...optionData } = opt;
+      
+      // Build option document data
+      const optionDocData: any = {
+        type: optionData.type,
+        title: optionData.title || "",
+        required: optionData.required || false,
+        sortOrder: i,
         createdAt: serverTimestamp(),
-      })
-    )
-  );
+      };
+      
+      // Only add placeholder if it exists and is not empty
+      if (optionData.placeholder && optionData.placeholder.trim()) {
+        optionDocData.placeholder = optionData.placeholder.trim();
+      }
+      
+      // Remove undefined values before saving (Firestore doesn't allow undefined)
+      const cleanedOptionData = removeUndefined(optionDocData);
+      
+      // Create option document
+      const optionRef = await addDoc(optionsCol, cleanedOptionData);
+      
+      // Create choices subcollection if this is a multiple_choice option
+      if (opt.type === "multiple_choice" && choices && Array.isArray(choices) && choices.length > 0) {
+        const choicesCol = collection(db, "products", productIdStr, "options", optionRef.id, "choices");
+        await Promise.all(
+          choices
+            .filter(choice => choice && choice.label) // Filter out invalid choices
+            .map((choice, j) =>
+              addDoc(choicesCol, {
+                label: String(choice.label || ""),
+                sortOrder: j,
+                createdAt: serverTimestamp(),
+              })
+            )
+        );
+      }
+    }
+  } catch (error) {
+    console.error("Error saving product options:", error);
+    throw error; // Re-throw to let caller handle it
+  }
 }
 
 export async function getProductOptions(productId: string): Promise<ProductOption[]> {
-  const snap = await getDocs(collection(db, "products", productId, "options"));
-  return mapDocs<ProductOption>(snap);
+  const optionsSnap = await getDocs(collection(db, "products", productId, "options"));
+  
+  // Load options with their choices
+  const optionsWithChoices = await Promise.all(
+    optionsSnap.docs.map(async (optionDoc) => {
+      const optionData = { id: optionDoc.id, ...optionDoc.data() } as any;
+      const option: ProductOption = {
+        type: optionData.type,
+        title: optionData.title || "",
+        placeholder: optionData.placeholder || undefined,
+        required: optionData.required || false,
+      };
+      
+      // Load choices for multiple_choice type
+      if (optionData.type === "multiple_choice") {
+        try {
+          const choicesSnap = await getDocs(
+            collection(db, "products", productId, "options", optionDoc.id, "choices")
+          );
+          
+          const choices = choicesSnap.docs.map(d => {
+            const choiceData = d.data();
+            return {
+              label: choiceData.label || "",
+              _sortOrder: choiceData.sortOrder || 0, // Temporary for sorting
+            };
+          });
+          
+          // Sort choices by sortOrder
+          choices.sort((a, b) => a._sortOrder - b._sortOrder);
+          
+          // Remove temporary sortOrder
+          option.choices = choices.map(({ _sortOrder, ...rest }) => rest);
+        } catch (error) {
+          console.warn("Error fetching choices for option:", optionDoc.id, error);
+          option.choices = [];
+        }
+      }
+      
+      return {
+        option,
+        sortOrder: optionData.sortOrder || 0,
+      };
+    })
+  );
+  
+  // Sort options by sortOrder
+  optionsWithChoices.sort((a, b) => a.sortOrder - b.sortOrder);
+  
+  // Return just the options
+  return optionsWithChoices.map(({ option }) => option);
 }
 
 // Orders

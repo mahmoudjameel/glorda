@@ -4,6 +4,7 @@ import {
   getDocs,
   getDoc,
   updateDoc,
+  setDoc,
   deleteDoc,
   doc,
   query,
@@ -169,15 +170,58 @@ export async function getTransactions() {
 
 // Settings key/value
 export async function getSetting(key: string) {
-  const snap = await getDocs(query(collection(db, "settings"), where("key", "==", key)));
-  if (snap.docs.length === 0) return null;
-  const d = snap.docs[0];
-  return { id: d.id, ...d.data() } as any;
+  // First try to get by document ID (most common case)
+  try {
+    const settingDoc = await getDoc(doc(db, "settings", key));
+    if (settingDoc.exists()) {
+      return { id: settingDoc.id, ...settingDoc.data() } as any;
+    }
+  } catch (error) {
+    console.error("Error getting setting by ID:", error);
+  }
+  
+  // If not found by ID, try querying by key field (fallback)
+  try {
+    const snap = await getDocs(query(collection(db, "settings"), where("key", "==", key)));
+    if (snap.docs.length > 0) {
+      const d = snap.docs[0];
+      return { id: d.id, ...d.data() } as any;
+    }
+  } catch (error) {
+    console.error("Error getting setting by query:", error);
+  }
+  
+  return null;
 }
 
 export async function setSetting(key: string, value: any) {
   // Use doc id = key for simplicity
-  await updateDoc(doc(db, "settings", key), { value, updatedAt: serverTimestamp() }).catch(async () => {
-    await addDoc(collection(db, "settings"), { key, value, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
+  // Use setDoc with merge to ensure the document is created/updated correctly
+  const settingRef = doc(db, "settings", key);
+  const existingDoc = await getDoc(settingRef);
+  
+  // Ensure value is a string (convert null/undefined to empty string)
+  const stringValue = value !== null && value !== undefined ? String(value) : "";
+  
+  if (existingDoc.exists()) {
+    // Update existing document - ensure key field is also updated
+    await updateDoc(settingRef, { 
+      key, 
+      value: stringValue, 
+      updatedAt: serverTimestamp() 
+    });
+  } else {
+    // Create new document with doc ID = key
+    await setDoc(settingRef, { 
+      key, 
+      value: stringValue, 
+      createdAt: serverTimestamp(), 
+      updatedAt: serverTimestamp() 
+    });
+  }
+  
+  console.log(`✅ [setSetting] Saved setting: ${key}`, { 
+    valueLength: stringValue.length,
+    valuePreview: stringValue.substring(0, 50) + (stringValue.length > 50 ? '...' : '')
   });
 }

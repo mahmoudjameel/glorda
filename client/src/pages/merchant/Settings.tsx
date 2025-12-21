@@ -193,20 +193,22 @@ export default function MerchantSettings() {
     if (socialLinks.website?.trim()) cleanLinks.website = socialLinks.website.trim();
     if (socialLinks.tiktok?.trim()) cleanLinks.tiktok = socialLinks.tiktok.trim();
 
-    updateProfileMutation.mutate({
-      storeName,
-      username,
-      bio,
-      city,
-      storeImage: storeImage || undefined,
-      socialLinks: Object.keys(cleanLinks).length > 0 ? cleanLinks : undefined,
-      bankName: bankName.trim() || undefined,
-      iban: iban.trim() || undefined,
-      accountHolderName: accountHolderName.trim() || undefined,
-      ownerName: ownerName.trim() || undefined,
-      email: email.trim() || undefined,
-      mobile: mobile.trim() || undefined
-    });
+    // Build data object and remove undefined values (Firestore doesn't allow undefined)
+    const data: any = {};
+    if (storeName.trim()) data.storeName = storeName.trim();
+    if (username.trim()) data.username = username.trim();
+    if (bio.trim()) data.bio = bio.trim();
+    if (city.trim()) data.city = city.trim();
+    if (storeImage && storeImage.trim()) data.storeImage = storeImage.trim();
+    if (Object.keys(cleanLinks).length > 0) data.socialLinks = cleanLinks;
+    if (bankName.trim()) data.bankName = bankName.trim();
+    if (iban.trim()) data.iban = iban.trim();
+    if (accountHolderName.trim()) data.accountHolderName = accountHolderName.trim();
+    if (ownerName.trim()) data.ownerName = ownerName.trim();
+    if (email.trim()) data.email = email.trim();
+    if (mobile.trim()) data.mobile = mobile.trim();
+
+    updateProfileMutation.mutate(data);
   };
 
   const handleDocumentUpload = async () => {

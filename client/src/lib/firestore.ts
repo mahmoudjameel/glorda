@@ -21,24 +21,55 @@ export async function getDocData<T = DocumentData>(path: string): Promise<T | nu
   return { id: snapshot.id, ...snapshot.data() } as T;
 }
 
+// Helper function to remove undefined values from object (Firestore doesn't allow undefined)
+function removeUndefined(obj: Record<string, unknown>): Record<string, unknown> {
+  const cleaned: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(obj)) {
+    if (value !== undefined) {
+      cleaned[key] = value;
+    }
+  }
+  return cleaned;
+}
+
 export async function setDocData(path: string, data: Record<string, unknown>) {
-  await setDoc(doc(db, path), {
-    ...data,
+  // Remove undefined values before saving (Firestore doesn't allow undefined)
+  const cleanedData = removeUndefined(data);
+  
+  // Check if document exists to determine if we should set createdAt
+  const docRef = doc(db, path);
+  const docSnap = await getDoc(docRef);
+  const isNewDoc = !docSnap.exists();
+  
+  const docData: Record<string, unknown> = {
+    ...cleanedData,
     updatedAt: serverTimestamp(),
-    createdAt: serverTimestamp(),
-  }, { merge: true });
+  };
+  
+  // Only set createdAt for new documents
+  if (isNewDoc) {
+    docData.createdAt = serverTimestamp();
+  }
+  
+  await setDoc(docRef, docData, { merge: true });
 }
 
 export async function updateDocData(path: string, data: Record<string, unknown>) {
+  // Remove undefined values before updating (Firestore doesn't allow undefined)
+  const cleanedData = removeUndefined(data);
+  
   await updateDoc(doc(db, path), {
-    ...data,
+    ...cleanedData,
     updatedAt: serverTimestamp(),
   });
 }
 
 export async function addCollectionDoc<T = DocumentData>(collectionPath: string, data: Record<string, unknown>) {
+  // Remove undefined values before adding (Firestore doesn't allow undefined)
+  const cleanedData = removeUndefined(data);
+  
   const ref = await addDoc(collection(db, collectionPath), {
-    ...data,
+    ...cleanedData,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   });

@@ -505,39 +505,64 @@ export class FirebaseStorage implements IStorage {
     }
 
     async getNotificationsForMerchant(merchantId: number): Promise<Notification[]> {
-        const snapshot = await db.collection('notifications')
-            .where('recipientType', '==', 'merchant')
-            .where('recipientId', '==', merchantId)
-            .orderBy('createdAt', 'desc')
-            .limit(50)
-            .get();
-        return snapshot.docs.map(doc => ({ id: parseInt(doc.id), ...doc.data() } as Notification));
+        // Fetch all notifications and filter/sort in memory to avoid index requirement
+        const snapshot = await db.collection('notifications').get();
+        let notifications = snapshot.docs
+            .map(doc => ({ id: parseInt(doc.id), ...doc.data() } as Notification))
+            .filter((notif: any) => 
+                notif.recipientType === 'merchant' && 
+                notif.recipientId === merchantId
+            );
+        
+        // Sort by createdAt descending in memory
+        notifications.sort((a: any, b: any) => {
+            const aDate = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt || 0);
+            const bDate = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt || 0);
+            return bDate.getTime() - aDate.getTime();
+        });
+        
+        // Apply limit after sorting
+        return notifications.slice(0, 50);
     }
 
     async getNotificationsForAdmin(): Promise<Notification[]> {
-        const snapshot = await db.collection('notifications')
-            .where('recipientType', '==', 'admin')
-            .orderBy('createdAt', 'desc')
-            .limit(50)
-            .get();
-        return snapshot.docs.map(doc => ({ id: parseInt(doc.id), ...doc.data() } as Notification));
+        // Fetch all notifications and filter/sort in memory to avoid index requirement
+        const snapshot = await db.collection('notifications').get();
+        let notifications = snapshot.docs
+            .map(doc => ({ id: parseInt(doc.id), ...doc.data() } as Notification))
+            .filter((notif: any) => notif.recipientType === 'admin');
+        
+        // Sort by createdAt descending in memory
+        notifications.sort((a: any, b: any) => {
+            const aDate = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt || 0);
+            const bDate = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt || 0);
+            return bDate.getTime() - aDate.getTime();
+        });
+        
+        // Apply limit after sorting
+        return notifications.slice(0, 50);
     }
 
     async getUnreadCountForMerchant(merchantId: number): Promise<number> {
-        const snapshot = await db.collection('notifications')
-            .where('recipientType', '==', 'merchant')
-            .where('recipientId', '==', merchantId)
-            .where('isRead', '==', false)
-            .get();
-        return snapshot.size;
+        // Fetch all notifications and filter in memory to avoid index requirement
+        const snapshot = await db.collection('notifications').get();
+        const unreadCount = snapshot.docs.filter(doc => {
+            const data = doc.data();
+            return data.recipientType === 'merchant' && 
+                   data.recipientId === merchantId && 
+                   data.isRead === false;
+        }).length;
+        return unreadCount;
     }
 
     async getUnreadCountForAdmin(): Promise<number> {
-        const snapshot = await db.collection('notifications')
-            .where('recipientType', '==', 'admin')
-            .where('isRead', '==', false)
-            .get();
-        return snapshot.size;
+        // Fetch all notifications and filter in memory to avoid index requirement
+        const snapshot = await db.collection('notifications').get();
+        const unreadCount = snapshot.docs.filter(doc => {
+            const data = doc.data();
+            return data.recipientType === 'admin' && data.isRead === false;
+        }).length;
+        return unreadCount;
     }
 
     async markNotificationRead(id: number): Promise<void> {

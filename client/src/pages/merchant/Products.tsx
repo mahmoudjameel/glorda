@@ -157,16 +157,33 @@ export default function MerchantProducts() {
       return newId;
     },
     onSuccess: async (productId) => {
-      if (productOptions.length > 0) {
+      try {
+        // Save product options (even if empty array)
         await persistProductOptions(productId, productOptions);
+        queryClient.invalidateQueries({ queryKey: ["merchant-products", user?.id] });
+        setIsAddOpen(false);
+        resetForm();
+        toast({ title: "تم إضافة المنتج بنجاح" });
+      } catch (error) {
+        console.error("Error saving product options:", error);
+        // Still show success for product creation, but warn about options
+        queryClient.invalidateQueries({ queryKey: ["merchant-products", user?.id] });
+        setIsAddOpen(false);
+        resetForm();
+        toast({ 
+          variant: "destructive", 
+          title: "تم إضافة المنتج لكن فشل حفظ الخيارات",
+          description: "يرجى المحاولة مرة أخرى" 
+        });
       }
-      queryClient.invalidateQueries({ queryKey: ["merchant-products", user?.id] });
-      setIsAddOpen(false);
-      resetForm();
-      toast({ title: "تم إضافة المنتج بنجاح" });
     },
-    onError: () => {
-      toast({ variant: "destructive", title: "فشل إضافة المنتج" });
+    onError: (error: any) => {
+      console.error("Error creating product:", error);
+      toast({ 
+        variant: "destructive", 
+        title: "فشل إضافة المنتج",
+        description: error?.message || "حدث خطأ غير متوقع"
+      });
     }
   });
 
@@ -176,15 +193,35 @@ export default function MerchantProducts() {
       return { ...data, id };
     },
     onSuccess: async (result) => {
-      await persistProductOptions(result.id, productOptions);
-      queryClient.invalidateQueries({ queryKey: ["merchant-products", user?.id] });
-      setIsEditOpen(false);
-      setEditingProduct(null);
-      resetForm();
-      toast({ title: "تم تحديث المنتج بنجاح" });
+      try {
+        // Save product options (even if empty array to clear existing options)
+        await persistProductOptions(result.id, productOptions);
+        queryClient.invalidateQueries({ queryKey: ["merchant-products", user?.id] });
+        setIsEditOpen(false);
+        setEditingProduct(null);
+        resetForm();
+        toast({ title: "تم تحديث المنتج بنجاح" });
+      } catch (error) {
+        console.error("Error saving product options:", error);
+        // Still show success for product update, but warn about options
+        queryClient.invalidateQueries({ queryKey: ["merchant-products", user?.id] });
+        setIsEditOpen(false);
+        setEditingProduct(null);
+        resetForm();
+        toast({ 
+          variant: "destructive", 
+          title: "تم تحديث المنتج لكن فشل حفظ الخيارات",
+          description: "يرجى المحاولة مرة أخرى" 
+        });
+      }
     },
-    onError: () => {
-      toast({ variant: "destructive", title: "فشل تحديث المنتج" });
+    onError: (error: any) => {
+      console.error("Error updating product:", error);
+      toast({ 
+        variant: "destructive", 
+        title: "فشل تحديث المنتج",
+        description: error?.message || "حدث خطأ غير متوقع"
+      });
     }
   });
 

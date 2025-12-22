@@ -11,8 +11,8 @@ try {
     firebaseApp = admin.app();
 } catch (error) {
     // Initialize with project ID only (client-side uploads mode)
-    const projectId = process.env.FIREBASE_PROJECT_ID || 'njik-app';
-    const storageBucket = process.env.FIREBASE_STORAGE_BUCKET;
+    const projectId = process.env.FIREBASE_PROJECT_ID || 'glorda';
+    const storageBucket = process.env.FIREBASE_STORAGE_BUCKET || 'glorda.firebasestorage.app';
 
     firebaseApp = admin.initializeApp({
         projectId,

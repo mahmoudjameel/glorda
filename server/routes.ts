@@ -1467,15 +1467,25 @@ export async function registerRoutes(
 
   app.post("/api/admin/settings", requireAdmin, async (req, res) => {
     try {
+      console.log('POST /api/admin/settings - Request body:', req.body);
+      console.log('POST /api/admin/settings - User:', { userId: req.userId, userType: req.userType });
+      
       const parsed = settingSchema.safeParse(req.body);
       if (!parsed.success) {
+        console.error('Validation error:', parsed.error);
         return res.status(400).json({ error: fromZodError(parsed.error).message });
       }
       const { key, value, valueJson } = parsed.data;
+      console.log('Saving setting:', { key, value, valueJson });
+      
       const setting = await storage.setSetting(key, value ?? undefined, valueJson);
+      console.log('Setting saved successfully:', setting);
+      
       res.json(setting);
-    } catch (error) {
-      res.status(500).json({ error: "فشل حفظ الإعداد" });
+    } catch (error: any) {
+      console.error('Error saving setting:', error);
+      console.error('Error stack:', error.stack);
+      res.status(500).json({ error: error.message || "فشل حفظ الإعداد" });
     }
   });
 

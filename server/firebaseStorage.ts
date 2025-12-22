@@ -470,13 +470,13 @@ export class FirebaseStorage implements IStorage {
 
     // ========== App Settings ==========
     async getSetting(key: string): Promise<AppSetting | undefined> {
-        const doc = await db.collection('appSettings').doc(key).get();
+        const doc = await db.collection('settings').doc(key).get();
         if (!doc.exists) return undefined;
         return { id: 0, key, ...doc.data() } as AppSetting;
     }
 
     async getAllSettings(): Promise<AppSetting[]> {
-        const snapshot = await db.collection('appSettings').get();
+        const snapshot = await db.collection('settings').get();
         return snapshot.docs.map((doc, idx) => ({ id: idx, key: doc.id, ...doc.data() } as AppSetting));
     }
 
@@ -486,7 +486,7 @@ export class FirebaseStorage implements IStorage {
             valueJson,
             updatedAt: FieldValue.serverTimestamp(),
         };
-        await db.collection('appSettings').doc(key).set(data, { merge: true });
+        await db.collection('settings').doc(key).set(data, { merge: true });
         return { id: 0, key, ...data, updatedAt: new Date() } as AppSetting;
     }
 

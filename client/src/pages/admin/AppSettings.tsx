@@ -30,8 +30,9 @@ import { saudiCities } from "@/constants/saudiCities";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState, useRef } from "react";
+import React, { useState, useRef } from "react";
 import { uploadToStorage } from "@/lib/storage-upload";
+import { setDocData, getDocData } from "@/lib/firestore";
 import {
   addBanner,
   addCategory,
@@ -124,6 +125,62 @@ export default function AppSettings() {
     queryKey: ["discount-codes"],
     queryFn: getDiscountCodes
   });
+
+  const [deliveryFee, setDeliveryFee] = useState<string | null>(null);
+  const [deliveryFeeInput, setDeliveryFeeInput] = useState<string>("25");
+  const [isSavingDeliveryFee, setIsSavingDeliveryFee] = useState(false);
+
+  // Load delivery fee setting
+  React.useEffect(() => {
+    const loadDeliveryFee = async () => {
+      try {
+        const setting = await getDocData<{ value?: string }>('settings/delivery_fee');
+        if (setting && setting.value) {
+          setDeliveryFee(setting.value);
+          setDeliveryFeeInput(setting.value);
+        }
+      } catch (error) {
+        console.error('Failed to load delivery fee:', error);
+      }
+    };
+    loadDeliveryFee();
+  }, []);
+
+  const handleSaveDeliveryFee = async () => {
+    const value = deliveryFeeInput.trim();
+    if (!value || parseFloat(value) < 0) {
+      toast({
+        title: "خطأ",
+        description: "يرجى إدخال سعر صحيح",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsSavingDeliveryFee(true);
+    try {
+      // Save directly to Firestore
+      await setDocData('settings/delivery_fee', {
+        value: value,
+        updatedAt: new Date()
+      });
+      
+      setDeliveryFee(value);
+      toast({
+        title: "تم الحفظ",
+        description: "تم تحديث سعر التوصيل بنجاح",
+      });
+    } catch (error: any) {
+      console.error('Error saving delivery fee:', error);
+      toast({
+        title: "خطأ",
+        description: error.message || "فشل تحديث سعر التوصيل. يرجى المحاولة مرة أخرى.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSavingDeliveryFee(false);
+    }
+  };
 
   // Helper function to convert base64 to File
   const base64ToFile = (base64String: string, filename: string): File => {
@@ -522,7 +579,7 @@ export default function AppSettings() {
         </div>
 
         <Tabs defaultValue="banners" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4 max-w-2xl">
+          <TabsList className="grid w-full grid-cols-5 max-w-3xl">
             <TabsTrigger value="banners" className="gap-2">
               <Image className="w-4 h-4" />
               البانرات
@@ -538,6 +595,10 @@ export default function AppSettings() {
             <TabsTrigger value="discounts" className="gap-2">
               <Tag className="w-4 h-4" />
               أكواد الخصم
+            </TabsTrigger>
+            <TabsTrigger value="settings" className="gap-2">
+              <DollarSign className="w-4 h-4" />
+              الإعدادات
             </TabsTrigger>
           </TabsList>
 
@@ -1299,6 +1360,58 @@ export default function AppSettings() {
                     </Table>
                   </div>
                 )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="settings">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <DollarSign className="w-5 h-5" />
+                  إعدادات التوصيل
+                </CardTitle>
+                <CardDescription>
+                  إدارة أسعار التوصيل في التطبيق
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="delivery_fee">سعر التوصيل (ريال سعودي)</Label>
+                    <div className="flex items-center gap-4">
+                      <Input
+                        id="delivery_fee"
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        placeholder="25"
+                        value={deliveryFeeInput}
+                        onChange={(e) => setDeliveryFeeInput(e.target.value)}
+                        className="max-w-xs"
+                      />
+                      <Button
+                        onClick={handleSaveDeliveryFee}
+                        disabled={isSavingDeliveryFee}
+                      >
+                        {isSavingDeliveryFee ? (
+                          <>
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            جاري الحفظ...
+                          </>
+                        ) : (
+                          "حفظ"
+                        )}
+                      </Button>
+                      <p className="text-sm text-muted-foreground">
+                        السعر الحالي: {deliveryFee || 25} ريال
+                      </p>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      بعد الحفظ، سيتم تحديث السعر في التطبيق تلقائياً
+                    </p>
+                  </div>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>

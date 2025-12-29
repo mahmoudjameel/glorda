@@ -41,6 +41,7 @@ export interface IStorage {
   // Merchants
   getMerchant(id: number): Promise<Merchant | undefined>;
   getMerchantByEmail(email: string): Promise<Merchant | undefined>;
+  getMerchantByPhone(phone: string): Promise<Merchant | undefined>;
   createMerchant(merchant: InsertMerchant): Promise<Merchant>;
   updateMerchant(id: number, data: Partial<Merchant>): Promise<void>;
   updateMerchantStatus(id: number, status: string): Promise<void>;
@@ -56,6 +57,7 @@ export interface IStorage {
 
   // Customers
   getCustomer(id: number): Promise<Customer | undefined>;
+  getCustomerByPhone(phone: string): Promise<Customer | undefined>;
   getAllCustomers(): Promise<Customer[]>;
   createCustomer(customer: InsertCustomer): Promise<Customer>;
 

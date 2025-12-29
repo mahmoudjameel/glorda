@@ -53,6 +53,13 @@ export class FirebaseStorage implements IStorage {
         return { id: parseInt(doc.id), ...doc.data() } as Merchant;
     }
 
+    async getMerchantByPhone(phone: string): Promise<Merchant | undefined> {
+        const snapshot = await db.collection('merchants').where('mobile', '==', phone).limit(1).get();
+        if (snapshot.empty) return undefined;
+        const doc = snapshot.docs[0];
+        return { id: parseInt(doc.id), ...doc.data() } as Merchant;
+    }
+
     async createMerchant(merchant: InsertMerchant): Promise<Merchant> {
         const docRef = db.collection('merchants').doc();
         const id = parseInt(docRef.id.slice(0, 10), 36); // Generate numeric ID from Firestore ID
@@ -123,6 +130,13 @@ export class FirebaseStorage implements IStorage {
     async getCustomer(id: number): Promise<Customer | undefined> {
         const doc = await db.collection('customers').doc(id.toString()).get();
         if (!doc.exists) return undefined;
+        return { id: parseInt(doc.id), ...doc.data() } as Customer;
+    }
+
+    async getCustomerByPhone(phone: string): Promise<Customer | undefined> {
+        const snapshot = await db.collection('customers').where('mobile', '==', phone).limit(1).get();
+        if (snapshot.empty) return undefined;
+        const doc = snapshot.docs[0];
         return { id: parseInt(doc.id), ...doc.data() } as Customer;
     }
 
@@ -509,18 +523,18 @@ export class FirebaseStorage implements IStorage {
         const snapshot = await db.collection('notifications').get();
         let notifications = snapshot.docs
             .map(doc => ({ id: parseInt(doc.id), ...doc.data() } as Notification))
-            .filter((notif: any) => 
-                notif.recipientType === 'merchant' && 
+            .filter((notif: any) =>
+                notif.recipientType === 'merchant' &&
                 notif.recipientId === merchantId
             );
-        
+
         // Sort by createdAt descending in memory
         notifications.sort((a: any, b: any) => {
             const aDate = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt || 0);
             const bDate = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt || 0);
             return bDate.getTime() - aDate.getTime();
         });
-        
+
         // Apply limit after sorting
         return notifications.slice(0, 50);
     }
@@ -531,14 +545,14 @@ export class FirebaseStorage implements IStorage {
         let notifications = snapshot.docs
             .map(doc => ({ id: parseInt(doc.id), ...doc.data() } as Notification))
             .filter((notif: any) => notif.recipientType === 'admin');
-        
+
         // Sort by createdAt descending in memory
         notifications.sort((a: any, b: any) => {
             const aDate = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt || 0);
             const bDate = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt || 0);
             return bDate.getTime() - aDate.getTime();
         });
-        
+
         // Apply limit after sorting
         return notifications.slice(0, 50);
     }
@@ -548,9 +562,9 @@ export class FirebaseStorage implements IStorage {
         const snapshot = await db.collection('notifications').get();
         const unreadCount = snapshot.docs.filter(doc => {
             const data = doc.data();
-            return data.recipientType === 'merchant' && 
-                   data.recipientId === merchantId && 
-                   data.isRead === false;
+            return data.recipientType === 'merchant' &&
+                data.recipientId === merchantId &&
+                data.isRead === false;
         }).length;
         return unreadCount;
     }

@@ -331,7 +331,7 @@ export default function MerchantProducts() {
     const data = {
       name: formData.name,
       description: formData.description,
-      price: parseInt(formData.price) * 100,
+      price: Math.round(parseFloat(formData.price) || 0), // Save as integer without decimals
       stock: parseInt(formData.stock),
       productType: formData.productType,
       category: formData.category || formData.productType,
@@ -352,7 +352,7 @@ export default function MerchantProducts() {
     setFormData({
       name: product.name,
       description: product.description || "",
-      price: String(product.price / 100),
+      price: String(Math.round(product.price)), // Display as integer without decimals
       stock: String(product.stock),
       productType: product.productType || "gifts",
       category: product.category || "",
@@ -420,9 +420,17 @@ export default function MerchantProducts() {
                         <Input
                           id="price"
                           type="number"
-                          placeholder="0.00"
+                          placeholder="0"
+                          min="0"
+                          step="1"
                           value={formData.price}
-                          onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            // Only allow integers (no decimals)
+                            if (value === '' || /^\d+$/.test(value)) {
+                              setFormData({ ...formData, price: value });
+                            }
+                          }}
                           required
                           data-testid="input-product-price"
                         />
@@ -452,7 +460,7 @@ export default function MerchantProducts() {
                         <SelectContent>
                           {categories.map((cat) => (
                             <SelectItem key={cat.id} value={cat.id?.toString() || cat.id}>
-                              {cat.name || cat.nameAr || cat.nameEn}
+                              {cat.name || cat.nameEn || ''}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -808,8 +816,17 @@ export default function MerchantProducts() {
                       <Input
                         id="edit-price"
                         type="number"
+                        placeholder="0"
+                        min="0"
+                        step="1"
                         value={formData.price}
-                        onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          // Only allow integers (no decimals)
+                          if (value === '' || /^\d+$/.test(value)) {
+                            setFormData({ ...formData, price: value });
+                          }
+                        }}
                         required
                       />
                     </div>
@@ -836,7 +853,7 @@ export default function MerchantProducts() {
                       <SelectContent>
                         {categories.map((cat) => (
                           <SelectItem key={cat.id} value={cat.id?.toString() || cat.id}>
-                            {cat.name || cat.nameAr || cat.nameEn}
+                            {cat.name || cat.nameEn || ''}
                           </SelectItem>
                         ))}
                       </SelectContent>

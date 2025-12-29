@@ -9,6 +9,7 @@ import {
   updateDoc,
   where,
   orderBy,
+  limit,
   serverTimestamp,
   onSnapshot,
   type DocumentData,
@@ -67,10 +68,22 @@ export interface Order {
   quantity: number;
   totalAmount: number;
   status: string;
+  isPaid?: boolean;
+  deliveryAddress?: string;
   deliveryMethod?: string;
   customerNote?: string | null;
   createdAt?: any;
   updatedAt?: any;
+  product?: {
+    name: string;
+    price: number;
+    images?: string[];
+  };
+  customer?: {
+    name: string;
+    mobile: string;
+    city: string;
+  };
 }
 
 export interface OrderMessage {
@@ -148,7 +161,7 @@ export async function saveProductOptions(productId: string, options: ProductOpti
     // Ensure productId is a string
     const productIdStr = String(productId);
     const optionsCol = collection(db, "products", productIdStr, "options");
-    
+
     // Delete existing options and their choices first
     try {
       const existing = await getDocs(optionsCol);
@@ -183,16 +196,16 @@ export async function saveProductOptions(productId: string, options: ProductOpti
     // Create new options with choices
     for (let i = 0; i < options.length; i++) {
       const opt = options[i];
-      
+
       // Validate option
       if (!opt.type || !opt.title) {
         console.warn("Skipping invalid option at index", i, opt);
         continue;
       }
-      
+
       // Remove choices from option data before saving (choices will be saved separately)
       const { choices, ...optionData } = opt;
-      
+
       // Build option document data
       const optionDocData: any = {
         type: optionData.type,
@@ -201,18 +214,18 @@ export async function saveProductOptions(productId: string, options: ProductOpti
         sortOrder: i,
         createdAt: serverTimestamp(),
       };
-      
+
       // Only add placeholder if it exists and is not empty
       if (optionData.placeholder && optionData.placeholder.trim()) {
         optionDocData.placeholder = optionData.placeholder.trim();
       }
-      
+
       // Remove undefined values before saving (Firestore doesn't allow undefined)
       const cleanedOptionData = removeUndefined(optionDocData);
-      
+
       // Create option document
       const optionRef = await addDoc(optionsCol, cleanedOptionData);
-      
+
       // Create choices subcollection if this is a multiple_choice option
       if (opt.type === "multiple_choice" && choices && Array.isArray(choices) && choices.length > 0) {
         const choicesCol = collection(db, "products", productIdStr, "options", optionRef.id, "choices");
@@ -237,7 +250,7 @@ export async function saveProductOptions(productId: string, options: ProductOpti
 
 export async function getProductOptions(productId: string): Promise<ProductOption[]> {
   const optionsSnap = await getDocs(collection(db, "products", productId, "options"));
-  
+
   // Load options with their choices
   const optionsWithChoices = await Promise.all(
     optionsSnap.docs.map(async (optionDoc) => {
@@ -248,14 +261,14 @@ export async function getProductOptions(productId: string): Promise<ProductOptio
         placeholder: optionData.placeholder || undefined,
         required: optionData.required || false,
       };
-      
+
       // Load choices for multiple_choice type
       if (optionData.type === "multiple_choice") {
         try {
           const choicesSnap = await getDocs(
             collection(db, "products", productId, "options", optionDoc.id, "choices")
           );
-          
+
           const choices = choicesSnap.docs.map(d => {
             const choiceData = d.data();
             return {
@@ -263,10 +276,10 @@ export async function getProductOptions(productId: string): Promise<ProductOptio
               _sortOrder: choiceData.sortOrder || 0, // Temporary for sorting
             };
           });
-          
+
           // Sort choices by sortOrder
           choices.sort((a, b) => a._sortOrder - b._sortOrder);
-          
+
           // Remove temporary sortOrder
           option.choices = choices.map(({ _sortOrder, ...rest }) => rest);
         } catch (error) {
@@ -274,26 +287,90 @@ export async function getProductOptions(productId: string): Promise<ProductOptio
           option.choices = [];
         }
       }
-      
+
       return {
         option,
         sortOrder: optionData.sortOrder || 0,
       };
     })
   );
-  
+
   // Sort options by sortOrder
   optionsWithChoices.sort((a, b) => a.sortOrder - b.sortOrder);
-  
+
   // Return just the options
   return optionsWithChoices.map(({ option }) => option);
 }
 
-// Orders
 export async function getMerchantOrders(merchantId: string) {
-  const q = query(collection(db, "orders"), where("merchantId", "==", merchantId));
-  const snap = await getDocs(q);
-  return mapDocs<Order>(snap);
+  const fetchEnrichedOrders = async (orders: Order[]) => {
+    return await Promise.all(
+      orders.map(async (order) => {
+        try {
+          // Fetch order items from subcollection if productId is missing at top level
+          let productId = order.productId;
+          let quantity = order.quantity;
+
+          if (!productId) {
+            const itemsSnap = await getDocs(collection(db, "orders", order.id, "items"));
+            if (!itemsSnap.empty) {
+              const firstItem = itemsSnap.docs[0].data();
+              productId = firstItem.productId;
+              if (!quantity) {
+                quantity = itemsSnap.docs.reduce((sum, d) => sum + (d.data().quantity || 0), 0);
+              }
+            }
+          }
+
+          // Get product info
+          let productData = null;
+          if (productId) {
+            const productDoc = await getDoc(doc(db, "products", productId));
+            productData = productDoc.exists() ? productDoc.data() : null;
+          }
+
+          // Get customer info
+          const customerDoc = await getDoc(doc(db, "customers", order.customerId));
+          const customer = customerDoc.exists() ? customerDoc.data() : null;
+
+          return {
+            ...order,
+            productId,
+            quantity: quantity || order.quantity || 1,
+            product: productData ? {
+              name: productData.nameAr || productData.nameEn || productData.name || "-",
+              price: productData.price || 0,
+              images: productData.images || [],
+            } : undefined,
+            customer: customer ? {
+              name: customer.name || "-",
+              mobile: customer.mobile || "-",
+              city: customer.city || "-",
+            } : undefined,
+          };
+        } catch (error) {
+          console.error(`Error enriching order ${order.id}:`, error);
+          return order;
+        }
+      })
+    );
+  };
+
+  try {
+    const q = query(
+      collection(db, "orders"),
+      where("merchantId", "==", merchantId),
+      orderBy("createdAt", "desc")
+    );
+    const snap = await getDocs(q);
+    return await fetchEnrichedOrders(mapDocs<Order>(snap));
+  } catch (error) {
+    console.error("Error fetching merchant orders with sort:", error);
+    // Fallback if orderBy fails
+    const q = query(collection(db, "orders"), where("merchantId", "==", merchantId));
+    const snap = await getDocs(q);
+    return await fetchEnrichedOrders(mapDocs<Order>(snap));
+  }
 }
 
 export async function updateOrderStatus(orderId: string, status: string) {
@@ -313,11 +390,11 @@ export async function addOrderMessage(orderId: string, senderId: string, senderT
     message,
     createdAt: serverTimestamp(),
   };
-  
+
   if (imageUrl) {
     messageData.imageUrl = imageUrl;
   }
-  
+
   await addDoc(collection(db, "orders", orderId, "messages"), messageData);
 
   // If merchant sends message, notify customer
@@ -370,19 +447,19 @@ export interface DirectMessage {
 // Helper function to convert Firestore Timestamp to Date
 const getDateFromTimestamp = (timestamp: any): Date => {
   if (!timestamp) return new Date(0);
-  
+
   if (timestamp.seconds) {
     return new Date(timestamp.seconds * 1000 + (timestamp.nanoseconds || 0) / 1000000);
   }
-  
+
   if (timestamp.toDate && typeof timestamp.toDate === 'function') {
     return timestamp.toDate();
   }
-  
+
   if (timestamp instanceof Date) {
     return timestamp;
   }
-  
+
   return new Date(timestamp);
 };
 
@@ -407,16 +484,16 @@ export async function getMerchantDirectConversations(merchantId: string): Promis
       );
       snap = await getDocs(q);
     }
-    
+
     const conversations = mapDocs<DirectConversation>(snap);
-    
+
     // Sort by updatedAt if not already sorted
     conversations.sort((a, b) => {
       const aDate = getDateFromTimestamp(a.updatedAt);
       const bDate = getDateFromTimestamp(b.updatedAt);
       return bDate.getTime() - aDate.getTime();
     });
-    
+
     // Get customer info and last message for each conversation
     const conversationsWithDetails = await Promise.all(
       conversations.map(async (conv) => {
@@ -424,7 +501,7 @@ export async function getMerchantDirectConversations(merchantId: string): Promis
           // Get customer info
           const customerDoc = await getDoc(doc(db, "customers", conv.customerId.toString()));
           const customer = customerDoc.exists() ? customerDoc.data() : null;
-          
+
           // Get last message - try with orderBy, fallback without
           let lastMessage = null;
           try {
@@ -451,7 +528,7 @@ export async function getMerchantDirectConversations(merchantId: string): Promis
               lastMessage = messages[0];
             }
           }
-          
+
           return {
             ...conv,
             customerName: customer?.name || '',
@@ -469,7 +546,7 @@ export async function getMerchantDirectConversations(merchantId: string): Promis
         }
       })
     );
-    
+
     return conversationsWithDetails;
   } catch (error) {
     console.error("Error fetching merchant direct conversations:", error);
@@ -496,16 +573,16 @@ export async function getDirectMessages(conversationId: string): Promise<DirectM
         collection(db, "directConversations", conversationId, "messages")
       );
     }
-    
+
     const messages = mapDocs<DirectMessage>(messagesSnap);
-    
+
     // Sort by createdAt if not already sorted
     messages.sort((a, b) => {
       const aDate = getDateFromTimestamp(a.createdAt);
       const bDate = getDateFromTimestamp(b.createdAt);
       return aDate.getTime() - bDate.getTime();
     });
-    
+
     return messages;
   } catch (error) {
     console.error("Error fetching direct messages:", error);
@@ -529,20 +606,20 @@ export async function addDirectMessage(
       message,
       createdAt: serverTimestamp(),
     };
-    
+
     if (imageUrl) {
       messageData.imageUrl = imageUrl;
     }
-    
+
     await addDoc(
       collection(db, "directConversations", conversationId, "messages"),
       messageData
     );
-    
+
     // Update conversation
     const conversationRef = doc(db, "directConversations", conversationId);
     const conversationDoc = await getDoc(conversationRef);
-    
+
     if (conversationDoc.exists()) {
       const conversationData = conversationDoc.data();
       const updateData: any = {
@@ -550,16 +627,16 @@ export async function addDirectMessage(
         lastMessageAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       };
-      
+
       // Update unread count for the recipient
       if (senderType === 'customer') {
         updateData.unreadCountMerchant = (conversationData.unreadCountMerchant || 0) + 1;
       } else {
         updateData.unreadCountCustomer = (conversationData.unreadCountCustomer || 0) + 1;
       }
-      
+
       await updateDoc(conversationRef, updateData);
-      
+
       // Send notification to recipient
       if (senderType === 'merchant') {
         // Notify customer
@@ -587,13 +664,13 @@ export async function markDirectConversationAsRead(
   try {
     const conversationRef = doc(db, "directConversations", conversationId);
     const updateData: any = {};
-    
+
     if (userType === 'customer') {
       updateData.unreadCountCustomer = 0;
     } else {
       updateData.unreadCountMerchant = 0;
     }
-    
+
     await updateDoc(conversationRef, updateData);
   } catch (error) {
     console.error("Error marking conversation as read:", error);
@@ -606,33 +683,33 @@ export function subscribeToMerchantDirectConversations(
   callback: (conversations: DirectConversation[]) => void
 ) {
   console.log('🔄 Setting up subscription for merchant direct conversations:', merchantId);
-  
+
   // Use query without orderBy to avoid index requirement
   // We'll sort in memory instead
   const q = query(
     collection(db, "directConversations"),
     where("merchantId", "==", merchantId.toString())
   );
-  
+
   return onSnapshot(
     q,
     async (snap) => {
       const conversations = mapDocs<DirectConversation>(snap);
-      
+
       // Sort by updatedAt in memory
       conversations.sort((a, b) => {
         const aDate = getDateFromTimestamp(a.updatedAt);
         const bDate = getDateFromTimestamp(b.updatedAt);
         return bDate.getTime() - aDate.getTime();
       });
-      
+
       // Get customer info and last message for each conversation
       const conversationsWithDetails = await Promise.all(
         conversations.map(async (conv) => {
           try {
             const customerDoc = await getDoc(doc(db, "customers", conv.customerId.toString()));
             const customer = customerDoc.exists() ? customerDoc.data() : null;
-            
+
             // Get last message - fetch all and sort in memory
             let lastMessage = null;
             try {
@@ -651,7 +728,7 @@ export function subscribeToMerchantDirectConversations(
             } catch (error: any) {
               console.warn('Error loading last message:', conv.id, error);
             }
-            
+
             return {
               ...conv,
               customerName: customer?.name || '',
@@ -669,7 +746,7 @@ export function subscribeToMerchantDirectConversations(
           }
         })
       );
-      
+
       console.log('📨 Real-time merchant direct conversations update:', conversationsWithDetails.length);
       callback(conversationsWithDetails);
     },
@@ -687,7 +764,7 @@ export function subscribeToDirectMessages(
   callback: (messages: DirectMessage[]) => void
 ) {
   console.log('🔄 Setting up subscription for direct messages:', conversationId);
-  
+
   // Try with orderBy first, if it fails, use without orderBy
   let q;
   try {
@@ -701,19 +778,19 @@ export function subscribeToDirectMessages(
       collection(db, "directConversations", conversationId, "messages")
     );
   }
-  
+
   return onSnapshot(
     q,
     (snap) => {
       const messages = mapDocs<DirectMessage>(snap);
-      
+
       // Sort by createdAt if not already sorted
       messages.sort((a, b) => {
         const aDate = getDateFromTimestamp(a.createdAt);
         const bDate = getDateFromTimestamp(b.createdAt);
         return aDate.getTime() - bDate.getTime();
       });
-      
+
       console.log('📨 Real-time direct messages update:', messages.length);
       callback(messages);
     },
@@ -775,14 +852,14 @@ export async function getMerchantReviews(merchantId: string) {
     const q = query(collection(db, "reviews"), where("merchantId", "==", merchantId));
     const snap = await getDocs(q);
     const reviews = mapDocs<Review>(snap);
-    
+
     // Sort by createdAt (newest first)
     reviews.sort((a, b) => {
       const aDate = getDateFromTimestamp(a.createdAt);
       const bDate = getDateFromTimestamp(b.createdAt);
       return bDate.getTime() - aDate.getTime();
     });
-    
+
     // Get product and customer details for each review
     const reviewsWithDetails = await Promise.all(
       reviews.map(async (review) => {
@@ -790,20 +867,20 @@ export async function getMerchantReviews(merchantId: string) {
           // Get product details
           const productDoc = await getDoc(doc(db, "products", review.productId));
           const product = productDoc.exists() ? { id: productDoc.id, ...productDoc.data() } : null;
-          
+
           // Get customer details
           const customerDoc = await getDoc(doc(db, "customers", review.customerId));
           const customer = customerDoc.exists() ? { id: customerDoc.id, ...customerDoc.data() } : null;
-          
+
           return {
             ...review,
             product: product ? {
-              name: product.name || product.nameEn || product.nameAr || '',
-              images: product.images || [],
+              name: (product as any).name || (product as any).nameEn || (product as any).nameAr || '',
+              images: (product as any).images || [],
             } : undefined,
             customer: customer ? {
-              name: customer.name || '',
-              mobile: customer.mobile || '',
+              name: (customer as any).name || '',
+              mobile: (customer as any).mobile || '',
             } : undefined,
           };
         } catch (error) {
@@ -812,7 +889,7 @@ export async function getMerchantReviews(merchantId: string) {
         }
       })
     );
-    
+
     return reviewsWithDetails;
   } catch (error) {
     console.error('Error fetching merchant reviews:', error);

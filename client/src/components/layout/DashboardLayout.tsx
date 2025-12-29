@@ -16,7 +16,8 @@ import {
   FileText,
   ShoppingBag,
   MessageCircle,
-  Star
+  Star,
+  Truck
 } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -40,6 +41,7 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
     { href: "/dashboard/reviews", label: "التقييمات", icon: Star },
     { href: "/dashboard/messages", label: "الرسائل", icon: MessageCircle },
     { href: "/dashboard/wallet", label: "المحفظة", icon: Wallet },
+    { href: "/dashboard/delivery", label: "التوصيل والفروع", icon: Truck },
     { href: "/dashboard/settings", label: "إعدادات المتجر", icon: Settings },
   ];
 
@@ -61,14 +63,14 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
     <div className="min-h-screen bg-muted/10 flex" dir="rtl">
       {/* Mobile Sidebar Overlay */}
       {sidebarOpen && (
-        <div 
+        <div
           className="fixed inset-0 bg-black/50 z-40 md:hidden backdrop-blur-sm"
           onClick={() => setSidebarOpen(false)}
         />
       )}
 
       {/* Sidebar */}
-      <aside 
+      <aside
         className={cn(
           "fixed inset-y-0 right-0 z-50 w-64 bg-sidebar border-l border-sidebar-border transition-transform duration-200 ease-in-out md:translate-x-0 md:static md:flex md:flex-col shadow-xl md:shadow-none",
           sidebarOpen ? "translate-x-0" : "translate-x-full"
@@ -81,9 +83,9 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
             </div>
             <span className="font-display text-foreground">غلوردا</span>
           </div>
-          <Button 
-            variant="ghost" 
-            size="icon" 
+          <Button
+            variant="ghost"
+            size="icon"
             className="mr-auto md:hidden"
             onClick={() => setSidebarOpen(false)}
           >
@@ -98,11 +100,11 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
               const isActive = location === link.href;
               return (
                 <Link key={link.href} href={link.href}>
-                  <div 
+                  <div
                     className={cn(
                       "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all cursor-pointer",
-                      isActive 
-                        ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-md shadow-sidebar-primary/20" 
+                      isActive
+                        ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-md shadow-sidebar-primary/20"
                         : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
                     )}
                   >
@@ -137,9 +139,9 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
       {/* Main Content */}
       <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
         <header className="h-16 border-b bg-background/80 backdrop-blur-md flex items-center justify-between px-6 md:px-8 sticky top-0 z-30">
-          <Button 
-            variant="ghost" 
-            size="icon" 
+          <Button
+            variant="ghost"
+            size="icon"
             className="md:hidden -mr-2"
             onClick={() => setSidebarOpen(true)}
           >

@@ -14,8 +14,10 @@ import {
   insertBannerSchema,
   insertCategorySchema,
   insertCitySchema,
-  insertOrderMessageSchema
+  insertOrderMessageSchema,
+  insertCustomerSchema
 } from "@shared/schema";
+import { authenticaService } from "./services/authentica.service";
 import { z } from "zod";
 import { fromZodError } from "zod-validation-error";
 
@@ -533,6 +535,78 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Verify OTP error:", error);
       res.status(500).json({ error: "حدث خطأ" });
+    }
+  });
+
+  app.post("/api/auth/request-otp", async (req, res) => {
+    try {
+      const { phone } = req.body;
+      if (!phone) {
+        return res.status(400).json({ error: "رقم الهاتف مطلوب" });
+      }
+
+      const result = await authenticaService.sendOTP(phone);
+      if (result.success) {
+        res.json({ success: true, message: result.message || "تم إرسال رمز التحقق" });
+      } else {
+        res.status(400).json({ error: result.message || "فشل إرسال رمز التحقق" });
+      }
+    } catch (error) {
+      console.error("Request OTP error:", error);
+      res.status(500).json({ error: "حدث خطأ أثناء طلب رمز التحقق" });
+    }
+  });
+
+  app.post("/api/auth/verify-otp", async (req, res) => {
+    try {
+      const { phone, otp, name } = req.body;
+      if (!phone || !otp) {
+        return res.status(400).json({ error: "رقم الهاتف ورمز التحقق مطلوبان" });
+      }
+
+      const result = await authenticaService.verifyOTP(phone, otp);
+      if (!result.success) {
+        return res.status(400).json({ error: result.message || "رمز التحقق غير صحيح" });
+      }
+
+      // Verification successful, find user type
+      // Check if merchant first (merchants are rarer than customers)
+      let user: any = await storage.getMerchantByPhone?.(phone);
+      let userType: "merchant" | "customer" = "merchant";
+
+      if (!user) {
+        // Find customer
+        user = await storage.getCustomerByPhone?.(phone);
+        userType = "customer";
+      }
+
+      if (!user) {
+        // Auto-register as customer if not found
+        user = await storage.createCustomer({
+          name: name || phone, // Use provided name if available
+          mobile: phone,
+          email: null,
+          city: null
+        });
+        userType = "customer";
+      }
+
+      // Create Firebase custom token
+      const customToken = await auth.createCustomToken(`${userType}_${user.id}`, {
+        userId: user.id,
+        userType: userType,
+        phone: phone
+      });
+
+      res.json({
+        success: true,
+        user,
+        type: userType,
+        token: customToken
+      });
+    } catch (error) {
+      console.error("Verify OTP error:", error);
+      res.status(500).json({ error: "حدث خطأ أثناء التحقق" });
     }
   });
 
@@ -1469,7 +1543,7 @@ export async function registerRoutes(
     try {
       console.log('POST /api/admin/settings - Request body:', req.body);
       console.log('POST /api/admin/settings - User:', { userId: req.userId, userType: req.userType });
-      
+
       const parsed = settingSchema.safeParse(req.body);
       if (!parsed.success) {
         console.error('Validation error:', parsed.error);
@@ -1477,10 +1551,10 @@ export async function registerRoutes(
       }
       const { key, value, valueJson } = parsed.data;
       console.log('Saving setting:', { key, value, valueJson });
-      
+
       const setting = await storage.setSetting(key, value ?? undefined, valueJson);
       console.log('Setting saved successfully:', setting);
-      
+
       res.json(setting);
     } catch (error: any) {
       console.error('Error saving setting:', error);
@@ -1647,12 +1721,12 @@ export async function registerRoutes(
   app.get("/api/public/products", async (req, res) => {
     try {
       const { category, merchantId, search, status = "active" } = req.query;
-      
+
       // Get all products from Firestore
       const allProducts = await db.collection('products').get();
-      let products = allProducts.docs.map(doc => ({ 
-        id: parseInt(doc.id), 
-        ...doc.data() 
+      let products = allProducts.docs.map(doc => ({
+        id: parseInt(doc.id),
+        ...doc.data()
       }));
 
       // Filter by status
@@ -1671,7 +1745,7 @@ export async function registerRoutes(
       // Search filter
       if (search) {
         const searchLower = (search as string).toLowerCase();
-        products = products.filter((p: any) => 
+        products = products.filter((p: any) =>
           p.name?.toLowerCase().includes(searchLower) ||
           p.description?.toLowerCase().includes(searchLower)
         );
@@ -1695,7 +1769,7 @@ export async function registerRoutes(
     try {
       const productId = parseInt(req.params.id);
       const product = await storage.getProduct(productId);
-      
+
       if (!product) {
         return res.status(404).json({ error: "المنتج غير موجود" });
       }
@@ -2054,7 +2128,7 @@ export async function registerRoutes(
       }
 
       const orders = await storage.getOrdersByCustomer(req.userId);
-      
+
       // Enrich orders with product and merchant details
       const ordersWithDetails = await Promise.all(
         orders.map(async (order) => {

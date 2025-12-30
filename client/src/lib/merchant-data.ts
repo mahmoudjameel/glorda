@@ -12,6 +12,7 @@ import {
   limit,
   serverTimestamp,
   onSnapshot,
+  increment,
   type DocumentData,
 } from "firebase/firestore";
 import { db } from "./firebase";
@@ -322,19 +323,41 @@ export async function getMerchantOrders(merchantId: string) {
             }
           }
 
+
           // Get product info
           let productData = null;
           if (productId) {
-            const productDoc = await getDoc(doc(db, "products", productId));
+            const productDoc = await getDoc(doc(db, "products", productId.toString()));
             productData = productDoc.exists() ? productDoc.data() : null;
           }
 
-          // Get customer info
-          const customerDoc = await getDoc(doc(db, "customers", order.customerId));
-          const customer = customerDoc.exists() ? customerDoc.data() : null;
+          // Get customer info (query by numeric id)
+          let customer = null;
+          if (order.customerId) {
+            try {
+              const customersRef = collection(db, "customers");
+              // Check if customerId is stored as string or number and handle both
+              const cId = Number(order.customerId);
+              const q = query(customersRef, where("id", "==", cId));
+              const customerSnap = await getDocs(q);
+
+              if (!customerSnap.empty) {
+                customer = customerSnap.docs[0].data();
+              } else {
+                // Fallback: try fetching by doc ID if query fails (legacy support)
+                const docSnap = await getDoc(doc(db, "customers", order.customerId.toString()));
+                if (docSnap.exists()) {
+                  customer = docSnap.data();
+                }
+              }
+            } catch (err) {
+              console.error("Error fetching customer for order:", order.id, err);
+            }
+          }
 
           return {
             ...order,
+            orderNumber: order.orderNumber || `ORD-${order.id}`, // Fallback for order number
             productId,
             quantity: quantity || order.quantity || 1,
             product: productData ? {
@@ -374,7 +397,46 @@ export async function getMerchantOrders(merchantId: string) {
 }
 
 export async function updateOrderStatus(orderId: string, status: string) {
-  await updateDoc(doc(db, "orders", orderId), { status, updatedAt: serverTimestamp() });
+  const orderRef = doc(db, "orders", orderId);
+  const orderSnap = await getDoc(orderRef);
+
+  if (orderSnap.exists()) {
+    const orderData = orderSnap.data();
+
+    // If order is completed, credit the merchant's wallet
+    if (status === 'completed' && orderData.status !== 'completed') {
+      try {
+        const merchantId = orderData.merchantId;
+        const amount = Number(orderData.totalAmount) || 0;
+
+        if (merchantId && amount > 0) {
+          // 1. Add credit transaction
+          await addDoc(collection(db, "transactions"), {
+            merchantId: merchantId.toString(),
+            amount: amount,
+            type: 'credit',
+            description: `إيداع ربح الطلب #${orderData.orderNumber || orderId}`,
+            status: 'completed',
+            createdAt: serverTimestamp(),
+            orderId: orderId
+          });
+
+          // 2. Update merchant balance
+          const merchantRef = doc(db, "merchants", merchantId.toString());
+          await updateDoc(merchantRef, {
+            balance: increment(amount),
+            updatedAt: serverTimestamp()
+          });
+
+          console.log(`Credited ${amount} to merchant ${merchantId} for order ${orderId}`);
+        }
+      } catch (err) {
+        console.error("Error crediting wallet:", err);
+      }
+    }
+  }
+
+  await updateDoc(orderRef, { status, updatedAt: serverTimestamp() });
 }
 
 export async function getOrderMessages(orderId: string) {
@@ -825,17 +887,47 @@ export async function getMerchantTransactions(merchantId: string) {
 }
 
 export async function requestWithdrawal(merchantId: string, amount: number) {
-  await addDoc(collection(db, "withdrawals"), {
+  // Check balance first
+  const merchantRef = doc(db, "merchants", merchantId);
+  const merchantSnap = await getDoc(merchantRef);
+
+  if (!merchantSnap.exists()) {
+    throw new Error("Merchant not found");
+  }
+
+  const currentBalance = merchantSnap.data().balance || 0;
+
+  if (currentBalance < amount) {
+    throw new Error("رصيد المحفظة غير كافي");
+  }
+
+  // Create withdrawal request
+  const withdrawalRef = await addDoc(collection(db, "withdrawals"), {
     merchantId,
     amount,
     status: "pending",
     createdAt: serverTimestamp(),
   });
 
+  // Create debit transaction
+  await addDoc(collection(db, "transactions"), {
+    merchantId: merchantId.toString(),
+    amount: -amount,
+    type: 'debit',
+    description: `طلب سحب رصيد #${withdrawalRef.id.slice(0, 8)}`,
+    status: 'pending',
+    createdAt: serverTimestamp(),
+    withdrawalId: withdrawalRef.id
+  });
+
+  // Deduct from balance
+  await updateDoc(merchantRef, {
+    balance: increment(-amount),
+    updatedAt: serverTimestamp()
+  });
+
   // Notify admins
-  // Fetch store name first for better notification
-  const merchantSnap = await getDoc(doc(db, "merchants", merchantId));
-  const storeName = merchantSnap.exists() ? merchantSnap.data().storeName : "تاجر";
+  const storeName = merchantSnap.data().storeName || "تاجر";
 
   await notifyAdmins(
     "طلب سحب جديد",

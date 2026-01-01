@@ -10,6 +10,7 @@ import {
   query,
   where,
   serverTimestamp,
+  increment,
   type DocumentData,
 } from "firebase/firestore";
 import { db } from "./firebase";
@@ -78,42 +79,61 @@ export async function updateMerchantStatus(id: string, status: string) {
 export async function updateWithdrawalStatus(id: string, status: "completed" | "rejected") {
   // Withdrawals are stored in transactions collection with type="withdrawal"
   const withdrawalRef = doc(db, "transactions", id);
+  const wDoc = await getDoc(withdrawalRef);
+
+  if (!wDoc.exists()) {
+    throw new Error("Transaction not found");
+  }
+
+  const data = wDoc.data();
+
+  // If completing a withdrawal, deduct from merchant balance
+  if (status === "completed" && data.status === "pending") {
+    const merchantId = data.merchantId;
+    const amount = Math.abs(data.amount); // amount is stored as negative in transaction
+
+    if (merchantId && amount > 0) {
+      const merchantRef = doc(db, "merchants", merchantId.toString());
+      await updateDoc(merchantRef, {
+        balance: increment(-amount),
+        updatedAt: serverTimestamp()
+      });
+      console.log(`Deducted ${amount} from merchant ${merchantId} balance due to withdrawal completion`);
+    }
+  }
+
   await updateDoc(withdrawalRef, { status, updatedAt: serverTimestamp() });
 
   // Get withdrawal details to notify merchant
-  const wDoc = await getDoc(withdrawalRef);
-  if (wDoc.exists()) {
-    const data = wDoc.data();
-    const title = status === "completed" ? "تم الموافقة على السحب" : "تم رفض طلب السحب";
-    const body = status === "completed"
-      ? `تم تحويل مبلغ ${Math.abs(data.amount)} ر.س إلى حسابك البنكي بنجاح.`
-      : `تم رفض طلب سحب مبلغ ${Math.abs(data.amount)} ر.س. يرجى مراجعة سبب الرفض او التواصل مع الإدارة.`;
+  const title = status === "completed" ? "تم الموافقة على السحب" : "تم رفض طلب السحب";
+  const body = status === "completed"
+    ? `تم تحويل مبلغ ${Math.abs(data.amount)} ر.س إلى حسابك البنكي بنجاح.`
+    : `تم رفض طلب سحب مبلغ ${Math.abs(data.amount)} ر.س. يرجى مراجعة سبب الرفض او التواصل مع الإدارة.`;
 
-    await addNotification(
-      data.merchantId,
-      "merchant",
-      title,
-      body,
-      "withdrawal",
-      "/dashboard/wallet"
-    );
-  }
+  await addNotification(
+    data.merchantId,
+    "merchant",
+    title,
+    body,
+    "withdrawal",
+    "/dashboard/wallet"
+  );
 }
 
 // Helper function to convert Firestore Timestamp to Date
 const getDateFromTimestamp = (timestamp: any): Date => {
   if (!timestamp) return new Date(0);
-  
+
   // Firestore Timestamp object
   if (timestamp.seconds) {
     return new Date(timestamp.seconds * 1000 + (timestamp.nanoseconds || 0) / 1000000);
   }
-  
+
   // Firestore Timestamp with toDate method
   if (typeof timestamp.toDate === 'function') {
     return timestamp.toDate();
   }
-  
+
   // Regular Date or string
   return new Date(timestamp);
 };
@@ -127,7 +147,7 @@ export async function getWithdrawals() {
   );
   const snap = await getDocs(q);
   const withdrawals = mapDocs<any>(snap);
-  
+
   // Sort by createdAt descending (no index required - sorted in memory)
   return withdrawals.sort((a, b) => {
     const aDate = getDateFromTimestamp(a.createdAt);
@@ -140,7 +160,7 @@ export async function getWithdrawals() {
 export async function getCustomers() {
   const snap = await getDocs(collection(db, "customers"));
   const customers = mapDocs<any>(snap);
-  
+
   // Sort by createdAt descending (no index required - sorted in memory)
   return customers.sort((a, b) => {
     const aDate = getDateFromTimestamp(a.createdAt);
@@ -153,7 +173,7 @@ export async function getCustomers() {
 export async function getAllOrders() {
   const snap = await getDocs(collection(db, "orders"));
   const orders = mapDocs<any>(snap);
-  
+
   // Sort by createdAt descending (no index required - sorted in memory)
   return orders.sort((a, b) => {
     const aDate = getDateFromTimestamp(a.createdAt);
@@ -179,7 +199,7 @@ export async function getSetting(key: string) {
   } catch (error) {
     console.error("Error getting setting by ID:", error);
   }
-  
+
   // If not found by ID, try querying by key field (fallback)
   try {
     const snap = await getDocs(query(collection(db, "settings"), where("key", "==", key)));
@@ -190,7 +210,7 @@ export async function getSetting(key: string) {
   } catch (error) {
     console.error("Error getting setting by query:", error);
   }
-  
+
   return null;
 }
 
@@ -199,28 +219,28 @@ export async function setSetting(key: string, value: any) {
   // Use setDoc with merge to ensure the document is created/updated correctly
   const settingRef = doc(db, "settings", key);
   const existingDoc = await getDoc(settingRef);
-  
+
   // Ensure value is a string (convert null/undefined to empty string)
   const stringValue = value !== null && value !== undefined ? String(value) : "";
-  
+
   if (existingDoc.exists()) {
     // Update existing document - ensure key field is also updated
-    await updateDoc(settingRef, { 
-      key, 
-      value: stringValue, 
-      updatedAt: serverTimestamp() 
+    await updateDoc(settingRef, {
+      key,
+      value: stringValue,
+      updatedAt: serverTimestamp()
     });
   } else {
     // Create new document with doc ID = key
-    await setDoc(settingRef, { 
-      key, 
-      value: stringValue, 
-      createdAt: serverTimestamp(), 
-      updatedAt: serverTimestamp() 
+    await setDoc(settingRef, {
+      key,
+      value: stringValue,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp()
     });
   }
-  
-  console.log(`✅ [setSetting] Saved setting: ${key}`, { 
+
+  console.log(`✅ [setSetting] Saved setting: ${key}`, {
     valueLength: stringValue.length,
     valuePreview: stringValue.substring(0, 50) + (stringValue.length > 50 ? '...' : '')
   });

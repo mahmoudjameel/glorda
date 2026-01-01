@@ -909,21 +909,15 @@ export async function requestWithdrawal(merchantId: string, amount: number) {
     createdAt: serverTimestamp(),
   });
 
-  // Create debit transaction
+  // Create withdrawal transaction (debit from the request, but not yet from balance)
   await addDoc(collection(db, "transactions"), {
     merchantId: merchantId.toString(),
     amount: -amount,
-    type: 'debit',
+    type: 'withdrawal',
     description: `طلب سحب رصيد #${withdrawalRef.id.slice(0, 8)}`,
     status: 'pending',
     createdAt: serverTimestamp(),
     withdrawalId: withdrawalRef.id
-  });
-
-  // Deduct from balance
-  await updateDoc(merchantRef, {
-    balance: increment(-amount),
-    updatedAt: serverTimestamp()
   });
 
   // Notify admins

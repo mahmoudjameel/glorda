@@ -61,6 +61,8 @@ const formatFirebaseDate = (date: any): string => {
   }
 };
 
+type Merchant = any;
+
 export default function AdminMerchants() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -168,7 +170,7 @@ export default function AdminMerchants() {
                     </TableCell>
                     <TableCell>{storeTypeLabels[merchant.storeType] || merchant.storeType}</TableCell>
                     <TableCell>{merchant.city}</TableCell>
-                    <TableCell className="font-mono">{(merchant.balance / 100).toFixed(2)} ر.س</TableCell>
+                    <TableCell className="font-mono">{merchant.balance?.toFixed(2) || "0.00"} ر.س</TableCell>
                     <TableCell className="font-mono text-sm">
                       {formatFirebaseDate(merchant.createdAt)}
                     </TableCell>
@@ -282,7 +284,7 @@ export default function AdminMerchants() {
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">الرصيد الحالي</p>
-                    <p className="font-medium font-mono">{(selectedMerchant.balance / 100).toFixed(2)} ر.س</p>
+                    <p className="font-medium font-mono">{selectedMerchant.balance?.toFixed(2) || "0.00"} ر.س</p>
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">تاريخ التسجيل</p>

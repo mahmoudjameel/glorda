@@ -54,6 +54,12 @@ interface Branch {
     isActive: boolean;
 }
 
+interface City {
+    id: string;
+    name: string;
+    nameEn: string | null;
+}
+
 interface DeliveryTimeSlot {
     id: string;
     nameAr: string;
@@ -67,6 +73,8 @@ interface DeliveryOption {
     type: 'own_delivery' | 'third_party';
     titleAr: string;
     titleEn: string;
+    deliveryPrice: number;
+    cityId: string;
     deliveryDays: string[];
     deliveryTimeSlots: DeliveryTimeSlot[];
     isActive: boolean;
@@ -112,6 +120,8 @@ export default function DeliverySettings() {
         type: 'own_delivery' as 'own_delivery' | 'third_party',
         titleAr: '',
         titleEn: '',
+        deliveryPrice: 0,
+        cityId: '',
         deliveryDays: [] as string[],
         deliveryTimeSlots: [] as DeliveryTimeSlot[],
         isActive: true,
@@ -137,6 +147,12 @@ export default function DeliverySettings() {
             setEnabledMethods(merchant.enabledDeliveryMethods);
         }
     }, [merchant]);
+
+    // Fetch cities
+    const { data: cities = [] } = useQuery<City[]>({
+        queryKey: ["cities"],
+        queryFn: () => getCollectionAll<City>("cities"),
+    });
 
     // Fetch branches
     const { data: branches = [], isLoading: loadingBranches } = useQuery<Branch[]>({
@@ -279,6 +295,8 @@ export default function DeliverySettings() {
                 type: option.type,
                 titleAr: option.titleAr,
                 titleEn: option.titleEn,
+                deliveryPrice: option.deliveryPrice || 0,
+                cityId: option.cityId || '',
                 deliveryDays: option.deliveryDays,
                 deliveryTimeSlots: option.deliveryTimeSlots,
                 isActive: option.isActive,
@@ -289,6 +307,8 @@ export default function DeliverySettings() {
                 type: 'own_delivery',
                 titleAr: '',
                 titleEn: '',
+                deliveryPrice: 0,
+                cityId: '',
                 deliveryDays: [],
                 deliveryTimeSlots: [],
                 isActive: true,
@@ -516,7 +536,18 @@ export default function DeliverySettings() {
                                                         <Calendar className="w-4 h-4" />
                                                         أيام التوصيل: {option.deliveryDays.join(', ')}
                                                     </div>
-                                                    <div className="flex items-center gap-1">
+                                                    <div className="flex flex-wrap gap-4 mt-2">
+                                                        {option.cityId && (
+                                                            <div className="flex items-center gap-1 text-primary">
+                                                                <MapPin className="w-3.5 h-3.5" />
+                                                                {cities.find(c => c.id === option.cityId)?.name || 'مدينة غير معروفة'}
+                                                            </div>
+                                                        )}
+                                                        <div className="flex items-center gap-1 font-bold text-green-600">
+                                                            سعر التوصيل: {option.deliveryPrice} ر.س
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex items-center gap-1 mt-1">
                                                         <Clock className="w-4 h-4" />
                                                         {option.deliveryTimeSlots.length} فترة زمنية
                                                     </div>
@@ -686,7 +717,7 @@ export default function DeliverySettings() {
                                         id="titleAr"
                                         value={deliveryForm.titleAr}
                                         onChange={(e) => setDeliveryForm({ ...deliveryForm, titleAr: e.target.value })}
-                                        placeholder="توصيل بمندوب الم تجر"
+                                        placeholder="توصيل بمندوب المتجر"
                                     />
                                 </div>
                                 <div className="space-y-2">
@@ -698,6 +729,37 @@ export default function DeliverySettings() {
                                         placeholder="Store Representative Delivery"
                                         dir="ltr"
                                     />
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <Label htmlFor="deliveryPrice">سعر التوصيل (ر.س)</Label>
+                                    <Input
+                                        id="deliveryPrice"
+                                        type="number"
+                                        value={deliveryForm.deliveryPrice}
+                                        onChange={(e) => setDeliveryForm({ ...deliveryForm, deliveryPrice: Number(e.target.value) })}
+                                        placeholder="0"
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="cityId">المدينة</Label>
+                                    <Select
+                                        value={deliveryForm.cityId}
+                                        onValueChange={(value) => setDeliveryForm({ ...deliveryForm, cityId: value })}
+                                    >
+                                        <SelectTrigger id="cityId">
+                                            <SelectValue placeholder="اختر المدينة" />
+                                        </SelectTrigger>
+                                        <SelectContent dir="rtl">
+                                            {cities.map((city) => (
+                                                <SelectItem key={city.id} value={city.id}>
+                                                    {city.name}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
                                 </div>
                             </div>
 

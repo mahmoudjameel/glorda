@@ -54,6 +54,43 @@ export const requestOtp = functions.https.onCall(async (data: any, context: any)
     }
 
     const phone = normalizePhone(rawPhone);
+    const dbPhone = denormalizePhone(phone);
+    const { email, isRegistration } = data;
+
+    if (isRegistration) {
+        // Check if phone exists (either 05... or 9665...)
+        const merchantsPhoneSnap = await db.collection("merchants")
+            .where("mobile", "in", [dbPhone, phone])
+            .limit(1).get();
+        if (!merchantsPhoneSnap.empty) {
+            throw new functions.https.HttpsError("already-exists", "رقم الجوال مسجل بالفعل");
+        }
+
+        const customersPhoneSnap = await db.collection("customers")
+            .where("mobile", "in", [dbPhone, phone])
+            .limit(1).get();
+        if (!customersPhoneSnap.empty) {
+            throw new functions.https.HttpsError("already-exists", "رقم الجوال مسجل بالفعل");
+        }
+
+        // Check if email exists
+        if (email) {
+            const merchantsEmailSnap = await db.collection("merchants")
+                .where("email", "==", email)
+                .limit(1).get();
+            if (!merchantsEmailSnap.empty) {
+                throw new functions.https.HttpsError("already-exists", "البريد الإلكتروني مسجل بالفعل");
+            }
+
+            const customersEmailSnap = await db.collection("customers")
+                .where("email", "==", email)
+                .limit(1).get();
+            if (!customersEmailSnap.empty) {
+                throw new functions.https.HttpsError("already-exists", "البريد الإلكتروني مسجل بالفعل");
+            }
+        }
+    }
+
     const result = await authenticaService.sendOTP(phone);
     if (!result.success) {
         console.error("[requestOtp] Authentica Error:", result.message, result.data);
@@ -83,6 +120,7 @@ export const checkOtp = functions.https.onCall(async (data: any, context: any) =
 
     // OTP verified successfully, now get or create user
     try {
+        const { email, password } = data;
         const normalizedPhone = phone; // 966...
         const dbPhone = denormalizePhone(phone); // 05...
 
@@ -97,16 +135,23 @@ export const checkOtp = functions.https.onCall(async (data: any, context: any) =
         let userType: "merchant" | "customer" = "customer";
 
         if (!merchantsSnap.empty) {
-            const data = merchantsSnap.docs[0].data();
-            const docId = merchantsSnap.docs[0].id;
+            const doc = merchantsSnap.docs[0];
+            const data = doc.data();
+            const docId = doc.id;
+
             // Ensure we have a numeric ID if possible
             let numericId = data.id;
             if (!numericId || typeof numericId !== "number") {
                 numericId = generateNumericId(docId);
-                await merchantsSnap.docs[0].ref.update({ id: numericId });
             }
 
-            user = { ...data, id: numericId };
+            const updateData: any = { id: numericId };
+            if (name && name !== data.name) updateData.name = name;
+            if (email && email !== data.email) updateData.email = email;
+
+            await doc.ref.update(updateData);
+
+            user = { ...data, ...updateData };
             userType = "merchant";
         } else {
             // Search Customers
@@ -115,24 +160,31 @@ export const checkOtp = functions.https.onCall(async (data: any, context: any) =
                 .limit(1).get();
 
             if (!customersSnap.empty) {
-                const data = customersSnap.docs[0].data();
-                const docId = customersSnap.docs[0].id;
+                const doc = customersSnap.docs[0];
+                const data = doc.data();
+                const docId = doc.id;
+
                 // Ensure we have a numeric ID
                 let numericId = data.id;
                 if (!numericId || typeof numericId !== "number") {
                     numericId = generateNumericId(docId);
-                    await customersSnap.docs[0].ref.update({ id: numericId });
                 }
 
-                user = { ...data, id: numericId };
+                const updateData: any = { id: numericId };
+                if (name && name !== data.name) updateData.name = name;
+                if (email && email !== data.email) updateData.email = email;
+
+                await doc.ref.update(updateData);
+
+                user = { ...data, ...updateData };
                 userType = "customer";
             } else {
-                // Auto-register as customer
+                // Auto-register or Register with provided credentials
                 console.log(`[checkOtp] Registering NEW customer for phone: ${dbPhone}`);
-                const newCustomerData = {
+                const newCustomerData: any = {
                     name: name || dbPhone,
                     mobile: dbPhone,
-                    email: null,
+                    email: email || null,
                     city: null,
                 };
 
@@ -148,6 +200,23 @@ export const checkOtp = functions.https.onCall(async (data: any, context: any) =
 
                 user = { id: numericId, ...newCustomerData };
                 userType = "customer";
+
+                // If password provided, create standard Firebase Auth user as well
+                if (password) {
+                    try {
+                        const firebaseEmail = email || `${dbPhone}@glorda.com`;
+                        await auth.createUser({
+                            uid: `${userType}_${numericId}`,
+                            email: firebaseEmail,
+                            password: password,
+                            displayName: name || dbPhone,
+                        });
+                        console.log(`[checkOtp] Created Firebase Auth user with email: ${firebaseEmail}`);
+                    } catch (authError: any) {
+                        console.error("[checkOtp] Error creating Auth user:", authError.message);
+                        // Continue anyway, as the custom token will still work
+                    }
+                }
             }
         }
 

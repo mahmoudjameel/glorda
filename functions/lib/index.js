@@ -58,6 +58,36 @@ exports.requestOtp = functions.https.onCall(async (data, context) => {
         throw new functions.https.HttpsError("invalid-argument", "Phone number is required");
     }
     const phone = normalizePhone(rawPhone);
+    const dbPhone = denormalizePhone(phone);
+    const { email, isRegistration } = data;
+    if (isRegistration) {
+        const merchantsPhoneSnap = await db.collection("merchants")
+            .where("mobile", "in", [dbPhone, phone])
+            .limit(1).get();
+        if (!merchantsPhoneSnap.empty) {
+            throw new functions.https.HttpsError("already-exists", "رقم الجوال مسجل بالفعل");
+        }
+        const customersPhoneSnap = await db.collection("customers")
+            .where("mobile", "in", [dbPhone, phone])
+            .limit(1).get();
+        if (!customersPhoneSnap.empty) {
+            throw new functions.https.HttpsError("already-exists", "رقم الجوال مسجل بالفعل");
+        }
+        if (email) {
+            const merchantsEmailSnap = await db.collection("merchants")
+                .where("email", "==", email)
+                .limit(1).get();
+            if (!merchantsEmailSnap.empty) {
+                throw new functions.https.HttpsError("already-exists", "البريد الإلكتروني مسجل بالفعل");
+            }
+            const customersEmailSnap = await db.collection("customers")
+                .where("email", "==", email)
+                .limit(1).get();
+            if (!customersEmailSnap.empty) {
+                throw new functions.https.HttpsError("already-exists", "البريد الإلكتروني مسجل بالفعل");
+            }
+        }
+    }
     const result = await authenticaService.sendOTP(phone);
     if (!result.success) {
         console.error("[requestOtp] Authentica Error:", result.message, result.data);
@@ -78,6 +108,7 @@ exports.checkOtp = functions.https.onCall(async (data, context) => {
         throw new functions.https.HttpsError("permission-denied", result.message || "Invalid OTP");
     }
     try {
+        const { email, password } = data;
         const normalizedPhone = phone;
         const dbPhone = denormalizePhone(phone);
         console.log(`[checkOtp] Searching for user: ${dbPhone} or ${normalizedPhone}`);
@@ -87,14 +118,20 @@ exports.checkOtp = functions.https.onCall(async (data, context) => {
         let user = null;
         let userType = "customer";
         if (!merchantsSnap.empty) {
-            const data = merchantsSnap.docs[0].data();
-            const docId = merchantsSnap.docs[0].id;
+            const doc = merchantsSnap.docs[0];
+            const data = doc.data();
+            const docId = doc.id;
             let numericId = data.id;
             if (!numericId || typeof numericId !== "number") {
                 numericId = generateNumericId(docId);
-                await merchantsSnap.docs[0].ref.update({ id: numericId });
             }
-            user = { ...data, id: numericId };
+            const updateData = { id: numericId };
+            if (name && name !== data.name)
+                updateData.name = name;
+            if (email && email !== data.email)
+                updateData.email = email;
+            await doc.ref.update(updateData);
+            user = { ...data, ...updateData };
             userType = "merchant";
         }
         else {
@@ -102,14 +139,20 @@ exports.checkOtp = functions.https.onCall(async (data, context) => {
                 .where("mobile", "in", [dbPhone, normalizedPhone])
                 .limit(1).get();
             if (!customersSnap.empty) {
-                const data = customersSnap.docs[0].data();
-                const docId = customersSnap.docs[0].id;
+                const doc = customersSnap.docs[0];
+                const data = doc.data();
+                const docId = doc.id;
                 let numericId = data.id;
                 if (!numericId || typeof numericId !== "number") {
                     numericId = generateNumericId(docId);
-                    await customersSnap.docs[0].ref.update({ id: numericId });
                 }
-                user = { ...data, id: numericId };
+                const updateData = { id: numericId };
+                if (name && name !== data.name)
+                    updateData.name = name;
+                if (email && email !== data.email)
+                    updateData.email = email;
+                await doc.ref.update(updateData);
+                user = { ...data, ...updateData };
                 userType = "customer";
             }
             else {
@@ -117,7 +160,7 @@ exports.checkOtp = functions.https.onCall(async (data, context) => {
                 const newCustomerData = {
                     name: name || dbPhone,
                     mobile: dbPhone,
-                    email: null,
+                    email: email || null,
                     city: null,
                 };
                 const docRef = await db.collection("customers").add({
@@ -129,6 +172,21 @@ exports.checkOtp = functions.https.onCall(async (data, context) => {
                 await docRef.update({ id: numericId });
                 user = { id: numericId, ...newCustomerData };
                 userType = "customer";
+                if (password) {
+                    try {
+                        const firebaseEmail = email || `${dbPhone}@glorda.com`;
+                        await auth.createUser({
+                            uid: `${userType}_${numericId}`,
+                            email: firebaseEmail,
+                            password: password,
+                            displayName: name || dbPhone,
+                        });
+                        console.log(`[checkOtp] Created Firebase Auth user with email: ${firebaseEmail}`);
+                    }
+                    catch (authError) {
+                        console.error("[checkOtp] Error creating Auth user:", authError.message);
+                    }
+                }
             }
         }
         const uid = `${userType}_${user.id}`;

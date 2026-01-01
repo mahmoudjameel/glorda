@@ -17,6 +17,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Select,
   SelectContent,
@@ -61,25 +62,22 @@ const formatFirebaseDate = (date: any, formatStr: string = "dd/MM/yyyy"): string
 
 type OrderWithDetails = Order;
 
-const statusMap: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
+const statusMap: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline"; className?: string }> = {
   pending: { label: "قيد الانتظار", variant: "secondary" },
-  processing: { label: "قيد التجهيز", variant: "default" },
-  shipped: { label: "تم الشحن", variant: "default" },
-  delivered: { label: "تم التسليم", variant: "default" },
+  processing: { label: "قيد التجهيز", variant: "secondary", className: "bg-yellow-500 hover:bg-yellow-600 text-white border-transparent" },
+  delivered: { label: "تم التسليم", variant: "default", className: "bg-green-500 hover:bg-green-600 text-white border-transparent" },
   completed: { label: "مكتمل", variant: "default" },
   cancelled: { label: "ملغي", variant: "destructive" },
-  rescheduled: { label: "إعادة جدولة", variant: "outline" },
   not_received: { label: "عدم استلام الطلب", variant: "destructive" },
 };
+// removed obsolete statusOptions definition if it matches strict content
 
 const statusOptions = [
   { value: "pending", label: "قيد الانتظار" },
   { value: "processing", label: "قيد التجهيز" },
-  { value: "shipped", label: "تم الشحن" },
   { value: "delivered", label: "تم التسليم" },
   { value: "completed", label: "مكتمل" },
   { value: "cancelled", label: "ملغي" },
-  { value: "rescheduled", label: "إعادة جدولة" },
   { value: "not_received", label: "عدم استلام الطلب" },
 ];
 
@@ -188,110 +186,47 @@ export default function MerchantOrders() {
               <div className="flex justify-center py-12" data-testid="loading-orders">
                 <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
               </div>
-            ) : filteredOrders.length === 0 ? (
-              <div className="text-center py-12 border rounded-lg bg-muted/20" data-testid="empty-orders">
-                <ShoppingBag className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                <h3 className="font-semibold text-lg">لا يوجد طلبات</h3>
-                <p className="text-muted-foreground">
-                  {searchQuery ? "لا توجد نتائج للبحث" : "لم تستلم أي طلبات بعد"}
-                </p>
-              </div>
             ) : (
-              <div className="rounded-md border" data-testid="table-orders">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="text-right">رقم الطلب</TableHead>
-                      <TableHead className="text-right">العميل</TableHead>
-                      <TableHead className="text-right">المنتج</TableHead>
-                      <TableHead className="text-right">الكمية</TableHead>
-                      <TableHead className="text-right">المبلغ</TableHead>
-                      <TableHead className="text-right">الحالة</TableHead>
-                      <TableHead className="text-right">الدفع</TableHead>
-                      <TableHead className="text-right">التاريخ</TableHead>
-                      <TableHead className="text-right">إجراءات</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredOrders.map((order) => (
-                      <TableRow key={order.id} data-testid={`row-order-${order.id}`}>
-                        <TableCell className="font-mono font-medium" data-testid={`text-order-number-${order.id}`}>
-                          #{order.orderNumber}
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <User className="w-4 h-4 text-muted-foreground" />
-                            <span data-testid={`text-customer-${order.id}`}>{order.customer?.name || "-"}</span>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <Package className="w-4 h-4 text-muted-foreground" />
-                            <span className="max-w-[150px] truncate" data-testid={`text-product-${order.id}`}>{order.product?.name || "-"}</span>
-                          </div>
-                        </TableCell>
-                        <TableCell data-testid={`text-quantity-${order.id}`}>{order.quantity}</TableCell>
-                        <TableCell className="font-medium" data-testid={`text-amount-${order.id}`}>
-                          {order.totalAmount} ر.س
-                        </TableCell>
-                        <TableCell>
-                          <Select
-                            value={order.status}
-                            onValueChange={(value) => updateStatusMutation.mutate({ orderId: order.id, status: value })}
-                          >
-                            <SelectTrigger className="w-[130px]" data-testid={`select-status-${order.id}`}>
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {statusOptions.map(option => (
-                                <SelectItem key={option.value} value={option.value} data-testid={`option-status-${option.value}`}>
-                                  {option.label}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={order.isPaid ? "default" : "outline"} data-testid={`status-paid-${order.id}`}>
-                            {order.isPaid ? "مدفوع" : "غير مدفوع"}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-muted-foreground text-sm" data-testid={`text-date-${order.id}`}>
-                          {formatFirebaseDate(order.createdAt)}
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-1">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => setSelectedOrder(order)}
-                              data-testid={`button-view-order-${order.id}`}
-                              title="عرض التفاصيل"
-                            >
-                              <Eye className="w-4 h-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleMessageCustomer(order.id, order.orderNumber)}
-                              data-testid={`button-message-customer-${order.id}`}
-                              title="رسالة للعميل"
-                            >
-                              <MessageCircle className="w-4 h-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
+              <Tabs defaultValue="active" className="w-full" dir="rtl">
+                <TabsList className="grid w-full grid-cols-3 mb-4">
+                  <TabsTrigger value="active">الطلبات الحالية</TabsTrigger>
+                  <TabsTrigger value="completed">الطلبات المكتملة</TabsTrigger>
+                  <TabsTrigger value="cancelled">الطلبات الملغية</TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="active">
+                  <OrdersTable
+                    orders={filteredOrders.filter(o => ['pending', 'processing', 'delivered', 'not_received'].includes(o.status))}
+                    updateStatus={(id, status) => updateStatusMutation.mutate({ orderId: id, status })}
+                    onView={(order) => setSelectedOrder(order)}
+                    onMessage={(id, num) => handleMessageCustomer(id, num)}
+                  />
+                </TabsContent>
+
+                <TabsContent value="completed">
+                  <OrdersTable
+                    orders={filteredOrders.filter(o => o.status === 'completed')}
+                    updateStatus={(id, status) => updateStatusMutation.mutate({ orderId: id, status })}
+                    onView={(order) => setSelectedOrder(order)}
+                    onMessage={(id, num) => handleMessageCustomer(id, num)}
+                  />
+                </TabsContent>
+
+                <TabsContent value="cancelled">
+                  <OrdersTable
+                    orders={filteredOrders.filter(o => o.status === 'cancelled')}
+                    updateStatus={(id, status) => updateStatusMutation.mutate({ orderId: id, status })}
+                    onView={(order) => setSelectedOrder(order)}
+                    onMessage={(id, num) => handleMessageCustomer(id, num)}
+                  />
+                </TabsContent>
+              </Tabs>
             )}
           </CardContent>
         </Card>
 
         <Dialog open={!!selectedOrder} onOpenChange={() => setSelectedOrder(null)}>
-          <DialogContent className="max-w-2xl" dir="rtl">
+          <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto" dir="rtl">
             <DialogHeader>
               <DialogTitle>تفاصيل الطلب #{selectedOrder?.orderNumber}</DialogTitle>
             </DialogHeader>
@@ -323,12 +258,16 @@ export default function MerchantOrders() {
                     بيانات المنتج
                   </h4>
                   <div className="p-4 rounded-lg bg-muted/50 flex items-start gap-4">
-                    {selectedOrder.product?.images && selectedOrder.product.images[0] && (
+                    {selectedOrder.product?.images && selectedOrder.product.images.length > 0 ? (
                       <img
                         src={selectedOrder.product.images[0]}
                         alt={selectedOrder.product.name}
                         className="w-20 h-20 object-cover rounded-lg"
                       />
+                    ) : (
+                      <div className="w-20 h-20 bg-muted rounded-lg flex items-center justify-center">
+                        <Package className="w-8 h-8 text-muted-foreground/50" />
+                      </div>
                     )}
                     <div className="space-y-2">
                       <p><strong>المنتج:</strong> {selectedOrder.product?.name || "-"}</p>
@@ -342,7 +281,10 @@ export default function MerchantOrders() {
                 <div className="grid md:grid-cols-3 gap-4">
                   <div className="p-4 rounded-lg border space-y-2">
                     <h4 className="font-semibold text-sm">الحالة</h4>
-                    <Badge variant={statusMap[selectedOrder.status]?.variant || "secondary"}>
+                    <Badge
+                      variant={statusMap[selectedOrder.status]?.variant || "secondary"}
+                      className={statusMap[selectedOrder.status]?.className}
+                    >
                       {statusMap[selectedOrder.status]?.label || selectedOrder.status}
                     </Badge>
                   </div>
@@ -388,5 +330,108 @@ export default function MerchantOrders() {
         </Dialog>
       </div>
     </DashboardLayout>
+  );
+}
+
+function OrdersTable({ orders, updateStatus, onView, onMessage }: {
+  orders: OrderWithDetails[],
+  updateStatus: (id: string, status: string) => void,
+  onView: (order: OrderWithDetails) => void,
+  onMessage: (id: number, num: string) => void
+}) {
+  if (orders.length === 0) {
+    return (
+      <div className="text-center py-12 border rounded-lg bg-muted/20">
+        <ShoppingBag className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+        <h3 className="font-semibold text-lg">لا يوجد طلبات</h3>
+        <p className="text-muted-foreground">لا توجد طلبات في هذه القائمة</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-md border">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead className="text-right">رقم الطلب</TableHead>
+            <TableHead className="text-right">العميل</TableHead>
+            <TableHead className="text-right">المنتج</TableHead>
+            <TableHead className="text-right">الكمية</TableHead>
+            <TableHead className="text-right">المبلغ</TableHead>
+            <TableHead className="text-right">الحالة</TableHead>
+            <TableHead className="text-right">الدفع</TableHead>
+            <TableHead className="text-right">التاريخ</TableHead>
+            <TableHead className="text-right">إجراءات</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {orders.map((order) => (
+            <TableRow key={order.id}>
+              <TableCell className="font-mono font-medium">#{order.orderNumber}</TableCell>
+              <TableCell>
+                <div className="flex items-center gap-2">
+                  <User className="w-4 h-4 text-muted-foreground" />
+                  <span>{order.customer?.name || "زائر"}</span>
+                </div>
+              </TableCell>
+              <TableCell>
+                <div className="flex items-center gap-2">
+                  <Package className="w-4 h-4 text-muted-foreground" />
+                  <span className="max-w-[150px] truncate">{order.product?.name || "منتج غير متوفر"}</span>
+                </div>
+              </TableCell>
+              <TableCell>{order.quantity}</TableCell>
+              <TableCell className="font-medium">{order.totalAmount} ر.س</TableCell>
+              <TableCell>
+                <Select
+                  value={order.status}
+                  onValueChange={(value) => updateStatus(order.id, value)}
+                >
+                  <SelectTrigger className="w-[130px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {statusOptions.map(option => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </TableCell>
+              <TableCell>
+                <Badge variant={order.isPaid ? "default" : "outline"}>
+                  {order.isPaid ? "مدفوع" : "غير مدفوع"}
+                </Badge>
+              </TableCell>
+              <TableCell className="text-muted-foreground text-sm">
+                {formatFirebaseDate(order.createdAt)}
+              </TableCell>
+              <TableCell>
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => onView(order)}
+                    title="عرض التفاصيل"
+                  >
+                    <Eye className="w-4 h-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => onMessage(Number(order.id), order.orderNumber)}
+                    title="رسالة للعميل"
+                  >
+                    <MessageCircle className="w-4 h-4" />
+                  </Button>
+                </div>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </div>
   );
 }

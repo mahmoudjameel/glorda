@@ -23,16 +23,20 @@ var __importStar = (this && this.__importStar) || function (mod) {
     return result;
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.checkOtp = exports.requestOtp = void 0;
+exports.checkOccasionReminders = exports.onOrderMessageCreate = exports.onMessageCreate = exports.onOrderUpdate = exports.verifyTapPayment = exports.createTapCharge = exports.checkOtp = exports.requestOtp = void 0;
 const functions = __importStar(require("firebase-functions/v1"));
 const admin = __importStar(require("firebase-admin"));
 const authentica_1 = require("./authentica");
+const tap_1 = require("./tap");
+const notifications_1 = require("./notifications");
 admin.initializeApp();
 const db = admin.firestore();
 const auth = admin.auth();
 const AUTHENTICA_API_KEY = process.env.AUTHENTICA_API_KEY || functions.config().authentica?.key || "";
 console.log("[Setup] Authentica API Key present:", !!AUTHENTICA_API_KEY);
 const authenticaService = new authentica_1.AuthenticaService(AUTHENTICA_API_KEY);
+const TAP_SECRET_KEY = process.env.TAP_SECRET_KEY || functions.config().tap?.secret || "";
+const tapService = new tap_1.TapService(TAP_SECRET_KEY);
 const normalizePhone = (phone) => {
     let cleaned = phone.trim().replace(/\s+/g, "");
     if (cleaned.startsWith("05") && cleaned.length === 10) {
@@ -220,5 +224,132 @@ exports.checkOtp = functions.https.onCall(async (data, context) => {
         console.error("[checkOtp] Critical Error in business logic:", error.message, error.stack);
         throw new functions.https.HttpsError("internal", error.message || "Failed to process user data");
     }
+});
+exports.createTapCharge = functions.https.onCall(async (data, context) => {
+    const { amount, currency, customer, orderId, redirectUrl } = data;
+    if (!amount || !currency || !customer || !orderId || !redirectUrl) {
+        throw new functions.https.HttpsError("invalid-argument", "Missing required transaction fields");
+    }
+    try {
+        const result = await tapService.createCharge({
+            amount,
+            currency,
+            customer,
+            order_id: orderId,
+            redirect_url: redirectUrl,
+            post_url: `https://${process.env.GCLOUD_PROJECT}.cloudfunctions.net/tapWebhook`
+        });
+        return result;
+    }
+    catch (error) {
+        console.error("[createTapCharge] Error:", error.message);
+        throw new functions.https.HttpsError("internal", error.message || "Failed to create payment");
+    }
+});
+exports.verifyTapPayment = functions.https.onCall(async (data, context) => {
+    const { chargeId } = data;
+    if (!chargeId) {
+        throw new functions.https.HttpsError("invalid-argument", "chargeId is required");
+    }
+    try {
+        const result = await tapService.verifyCharge(chargeId);
+        return result;
+    }
+    catch (error) {
+        console.error("[verifyTapPayment] Error:", error.message);
+        throw new functions.https.HttpsError("internal", error.message || "Failed to verify payment");
+    }
+});
+exports.onOrderUpdate = functions.firestore
+    .document('orders/{orderId}')
+    .onUpdate(async (change, context) => {
+    const before = change.before.data();
+    const after = change.after.data();
+    if (before.status === after.status) {
+        return null;
+    }
+    const customerId = after.customerId;
+    const statusMap = {
+        'pending': 'قيد الانتظار',
+        'processing': 'قيد التجهيز',
+        'shipped': 'تم الشحن',
+        'delivered': 'تم التوصيل',
+        'cancelled': 'ملغي'
+    };
+    const statusText = statusMap[after.status] || after.status;
+    const title = "تحديث حالة الطلب";
+    const body = `تغيرت حالة طلبك #${after.orderNumber || context.params.orderId} إلى ${statusText}`;
+    await (0, notifications_1.sendPushToUser)(customerId, title, body, { orderId: context.params.orderId, type: 'order' });
+    return null;
+});
+exports.onMessageCreate = functions.firestore
+    .document('directConversations/{conversationId}/messages/{messageId}')
+    .onCreate(async (snap, context) => {
+    const message = snap.data();
+    const conversationId = context.params.conversationId;
+    const conversationDoc = await db.collection('directConversations').doc(conversationId).get();
+    if (!conversationDoc.exists) {
+        console.log('Conversation not found');
+        return null;
+    }
+    const conversation = conversationDoc.data();
+    if (!conversation)
+        return null;
+    let recipientId;
+    if (message.senderId === conversation.customerId) {
+        recipientId = conversation.merchantId;
+    }
+    else {
+        recipientId = conversation.customerId;
+    }
+    const title = "رسالة جديدة";
+    const body = message.message || "لقد تلقيت رسالة جديدة";
+    await (0, notifications_1.sendPushToUser)(recipientId, title, body, { conversationId, type: 'chat' });
+    return null;
+});
+exports.onOrderMessageCreate = functions.firestore
+    .document('orders/{orderId}/messages/{messageId}')
+    .onCreate(async (snap, context) => {
+    const message = snap.data();
+    const orderId = context.params.orderId;
+    const orderDoc = await db.collection('orders').doc(orderId).get();
+    if (!orderDoc.exists)
+        return null;
+    const order = orderDoc.data();
+    if (!order)
+        return null;
+    let recipientId;
+    if (String(message.senderId) === String(order.customerId)) {
+        recipientId = order.merchantId;
+    }
+    else {
+        recipientId = order.customerId;
+    }
+    const title = `رسالة جديدة بخصوص الطلب #${order.orderNumber}`;
+    const body = message.message || "رسالة جديدة";
+    await (0, notifications_1.sendPushToUser)(recipientId, title, body, { orderId, type: 'order_chat' });
+    return null;
+});
+exports.checkOccasionReminders = functions.pubsub.schedule('every 1 hours').onRun(async (context) => {
+    const now = new Date();
+    const oneHourLater = new Date(now.getTime() + 60 * 60 * 1000);
+    const query = db.collection('occasions')
+        .where('reminderDate', '>=', now)
+        .where('reminderDate', '<=', oneHourLater);
+    const snapshot = await query.get();
+    if (snapshot.empty) {
+        console.log('No occasions to remind.');
+        return null;
+    }
+    const promises = snapshot.docs.map(async (doc) => {
+        const occasion = doc.data();
+        const title = "تذكير مناسبة";
+        const body = `اقترب موعد مناسبة: ${occasion.title}`;
+        if (occasion.userId || occasion.customerId) {
+            await (0, notifications_1.sendPushToUser)(occasion.userId || occasion.customerId, title, body, { occasionId: doc.id, type: 'occasion' });
+        }
+    });
+    await Promise.all(promises);
+    return null;
 });
 //# sourceMappingURL=index.js.map

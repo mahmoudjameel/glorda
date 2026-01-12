@@ -232,25 +232,121 @@ export default function MerchantOrders() {
             </DialogHeader>
             {selectedOrder && (
               <div className="space-y-6">
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div className="space-y-4">
+                    <h4 className="font-semibold flex items-center gap-2">
+                      <User className="w-4 h-4" />
+                      بيانات العميل
+                    </h4>
+                    <div className="p-4 rounded-lg bg-muted/50 space-y-2">
+                      <p><strong>الاسم:</strong> {selectedOrder.customer?.name || "-"}</p>
+                      <p className="flex items-center gap-2">
+                        <Phone className="w-3 h-3" />
+                        <a href={`tel:${selectedOrder.customer?.mobile}`} className="text-primary hover:underline">
+                          {selectedOrder.customer?.mobile || "-"}
+                        </a>
+                      </p>
+                      <p className="flex items-center gap-2">
+                        <MapPin className="w-3 h-3" />
+                        {selectedOrder.customer?.city || "-"}
+                      </p>
+                    </div>
+                  </div>
+
+                  {(selectedOrder.recipientName || selectedOrder.recipientPhone) && (
+                    <div className="space-y-4">
+                      <h4 className="font-semibold flex items-center gap-2">
+                        <User className="w-4 h-4 text-primary" />
+                        بيانات المستلم
+                      </h4>
+                      <div className="p-4 rounded-lg bg-primary/5 border border-primary/10 space-y-2">
+                        <p><strong>الاسم:</strong> {selectedOrder.recipientName || "-"}</p>
+                        <p className="flex items-center gap-2">
+                          <Phone className="w-3 h-3" />
+                          <a href={`tel:${selectedOrder.recipientPhone}`} className="text-primary hover:underline">
+                            {selectedOrder.recipientPhone || "-"}
+                          </a>
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
                 <div className="space-y-4">
                   <h4 className="font-semibold flex items-center gap-2">
-                    <User className="w-4 h-4" />
-                    بيانات العميل
+                    <MapPin className="w-4 h-4" />
+                    تفاصيل التسليم
                   </h4>
-                  <div className="p-4 rounded-lg bg-muted/50 space-y-2">
-                    <p><strong>الاسم:</strong> {selectedOrder.customer?.name || "-"}</p>
-                    <p className="flex items-center gap-2">
-                      <Phone className="w-3 h-3" />
-                      <a href={`tel:${selectedOrder.customer?.mobile}`} className="text-primary hover:underline">
-                        {selectedOrder.customer?.mobile || "-"}
-                      </a>
-                    </p>
-                    <p className="flex items-center gap-2">
-                      <MapPin className="w-3 h-3" />
-                      {selectedOrder.customer?.city || "-"}
-                    </p>
+                  <div className="p-4 rounded-lg border grid md:grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <p className="text-sm text-muted-foreground">طريقة الاستلام</p>
+                      <p className="font-medium">
+                        {selectedOrder.deliveryMethod === 'pickup' ? 'استلام من الفرع' : 'توصيل'}
+                      </p>
+                    </div>
+                    {selectedOrder.deliveryOptionName && (
+                      <div className="space-y-1">
+                        <p className="text-sm text-muted-foreground">خيار التوصيل</p>
+                        <p className="font-medium">{selectedOrder.deliveryOptionName}</p>
+                      </div>
+                    )}
+                    {selectedOrder.deliveryDate && (
+                      <div className="space-y-1">
+                        <p className="text-sm text-muted-foreground">تاريخ التسليم</p>
+                        <p className="font-medium">{selectedOrder.deliveryDate}</p>
+                      </div>
+                    )}
+                    {selectedOrder.deliveryTime && (
+                      <div className="space-y-1">
+                        <p className="text-sm text-muted-foreground">وقت التسليم</p>
+                        <p className="font-medium">{selectedOrder.deliveryTime}</p>
+                      </div>
+                    )}
                   </div>
                 </div>
+
+                {selectedOrder.deliveryAddress && (
+                  <div className="p-4 rounded-lg border">
+                    <h4 className="font-semibold mb-2 flex items-center gap-2">
+                      <MapPin className="w-4 h-4" />
+                      عنوان التوصيل
+                    </h4>
+                    <p className="text-muted-foreground">{selectedOrder.deliveryAddress}</p>
+                  </div>
+                )}
+
+                {selectedOrder.tapChargeId && (
+                  <div className="space-y-4">
+                    <h4 className="font-semibold flex items-center gap-2">
+                      <CreditCard className="w-4 h-4 text-primary" />
+                      تفاصيل الدفع الإلكتروني
+                    </h4>
+                    <div className="p-4 rounded-lg bg-primary/5 border border-primary/10 grid md:grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <p className="text-sm text-muted-foreground">رقم العملية (Tap)</p>
+                        <p className="font-mono text-xs">{selectedOrder.tapChargeId}</p>
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-sm text-muted-foreground">حالة الدفع</p>
+                        <Badge variant={selectedOrder.paymentStatus === 'CAPTURED' ? 'default' : 'secondary'}>
+                          {selectedOrder.paymentStatus === 'CAPTURED' ? 'مقبول' : selectedOrder.paymentStatus}
+                        </Badge>
+                      </div>
+                      {selectedOrder.tapReceiptUrl && (
+                        <div className="md:col-span-2">
+                          <a
+                            href={selectedOrder.tapReceiptUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-primary text-sm hover:underline flex items-center gap-1"
+                          >
+                            عرض إيصال الدفع
+                          </a>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
 
                 <div className="space-y-4">
                   <h4 className="font-semibold flex items-center gap-2">
@@ -312,16 +408,6 @@ export default function MerchantOrders() {
                   <div className="p-4 rounded-lg border">
                     <h4 className="font-semibold mb-2">ملاحظات العميل</h4>
                     <p className="text-muted-foreground">{selectedOrder.customerNote}</p>
-                  </div>
-                )}
-
-                {selectedOrder.deliveryAddress && (
-                  <div className="p-4 rounded-lg border">
-                    <h4 className="font-semibold mb-2 flex items-center gap-2">
-                      <MapPin className="w-4 h-4" />
-                      عنوان التوصيل
-                    </h4>
-                    <p className="text-muted-foreground">{selectedOrder.deliveryAddress}</p>
                   </div>
                 )}
               </div>

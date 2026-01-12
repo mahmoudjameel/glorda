@@ -72,7 +72,16 @@ export interface Order {
   isPaid?: boolean;
   deliveryAddress?: string;
   deliveryMethod?: string;
+  deliveryOptionId?: string;
+  deliveryOptionName?: string;
+  deliveryDate?: string;
+  deliveryTime?: string;
+  recipientName?: string;
+  recipientPhone?: string;
   customerNote?: string | null;
+  tapChargeId?: string;
+  paymentStatus?: string;
+  tapReceiptUrl?: string;
   createdAt?: any;
   updatedAt?: any;
   product?: {

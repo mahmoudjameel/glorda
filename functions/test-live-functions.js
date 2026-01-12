@@ -63,9 +63,46 @@ async function runTest() {
         console.log("🎫 Received Token:", verResult.result.token.substring(0, 20) + "...");
     } else {
         console.log("❌ verifyOtp FAILED");
-        if (verResult.error) {
-            console.log("Error Detail:", verResult.error.message);
+    }
+
+    // 3. Test verifyTapPayment
+    console.log("\n3️⃣  Calling verifyTapPayment(chg_test_123)...");
+    const tapResult = await callFunction('verifyTapPayment', {
+        chargeId: 'chg_test_123'
+    });
+    console.log("Response:", JSON.stringify(tapResult, null, 2));
+
+    if (tapResult.error) {
+        if (tapResult.error.message.includes("TAP_SECRET_KEY not configured")) {
+            console.log("🟡 verifyTapPayment: Secret key not set (Expected)");
+        } else {
+            console.log("❌ verifyTapPayment FAILED:", tapResult.error.message);
         }
+    } else {
+        console.log("✅ verifyTapPayment SUCCESS (API reachable)");
+    }
+
+    // 4. Test createTapCharge
+    console.log("\n4️⃣  Calling createTapCharge...");
+    const createResult = await callFunction('createTapCharge', {
+        amount: 1.0,
+        currency: "SAR",
+        customer: {
+            first_name: "Test",
+            last_name: "User",
+            email: "test@example.com",
+            phone: { country_code: "966", number: "500000000" }
+        },
+        orderId: "TEST_ORDER_123",
+        redirectUrl: "glorda://payment-callback"
+    });
+    console.log("Response:", JSON.stringify(createResult, null, 2));
+
+    if (createResult.result && createResult.result.transaction && createResult.result.transaction.url) {
+        console.log("✅ createTapCharge SUCCESS (URL received)");
+        console.log("🔗 Payment URL:", createResult.result.transaction.url);
+    } else {
+        console.log("❌ createTapCharge FAILED");
     }
 }
 

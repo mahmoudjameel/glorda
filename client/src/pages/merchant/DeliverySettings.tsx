@@ -41,6 +41,7 @@ import { getDocData, setDocData, getCollectionAll, addCollectionDoc, updateDocDa
 
 interface Branch {
     id: string;
+    cityId?: string;
     nameAr: string;
     nameEn: string;
     addressAr: string;
@@ -56,8 +57,8 @@ interface Branch {
 
 interface City {
     id: string;
-    name: string;
-    nameEn: string | null;
+    nameAr: string;
+    nameEn: string;
 }
 
 interface DeliveryTimeSlot {
@@ -104,6 +105,7 @@ export default function DeliverySettings() {
     const [branchForm, setBranchForm] = useState({
         nameAr: '',
         nameEn: '',
+        cityId: '',
         addressAr: '',
         addressEn: '',
         googleMapsUrl: '',
@@ -258,6 +260,7 @@ export default function DeliverySettings() {
             setBranchForm({
                 nameAr: branch.nameAr,
                 nameEn: branch.nameEn,
+                cityId: branch.cityId || '',
                 addressAr: branch.addressAr,
                 addressEn: branch.addressEn,
                 googleMapsUrl: branch.googleMapsUrl,
@@ -271,6 +274,7 @@ export default function DeliverySettings() {
             setBranchForm({
                 nameAr: '',
                 nameEn: '',
+                cityId: '',
                 addressAr: '',
                 addressEn: '',
                 googleMapsUrl: '',
@@ -540,7 +544,7 @@ export default function DeliverySettings() {
                                                         {option.cityId && (
                                                             <div className="flex items-center gap-1 text-primary">
                                                                 <MapPin className="w-3.5 h-3.5" />
-                                                                {cities.find(c => c.id === option.cityId)?.name || 'مدينة غير معروفة'}
+                                                                {cities.find(c => c.id === option.cityId)?.nameAr || 'مدينة غير معروفة'}
                                                             </div>
                                                         )}
                                                         <div className="flex items-center gap-1 font-bold text-green-600">
@@ -603,6 +607,25 @@ export default function DeliverySettings() {
                                         dir="ltr"
                                     />
                                 </div>
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label htmlFor="cityId">المدينة</Label>
+                                <Select
+                                    value={branchForm.cityId}
+                                    onValueChange={(value) => setBranchForm({ ...branchForm, cityId: value })}
+                                >
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="اختر المدينة" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {cities.map((city) => (
+                                            <SelectItem key={city.id} value={city.id}>
+                                                {city.nameAr}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
                             </div>
 
                             <div className="grid grid-cols-2 gap-4">
@@ -755,7 +778,7 @@ export default function DeliverySettings() {
                                         <SelectContent dir="rtl">
                                             {cities.map((city) => (
                                                 <SelectItem key={city.id} value={city.id}>
-                                                    {city.name}
+                                                    {city.nameAr}
                                                 </SelectItem>
                                             ))}
                                         </SelectContent>

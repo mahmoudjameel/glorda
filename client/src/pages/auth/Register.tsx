@@ -20,7 +20,6 @@ import { useToast } from "@/hooks/use-toast";
 import { useQuery } from "@tanstack/react-query";
 import logoUrl from "@assets/شعار_غلوردا_1764881546720.jpg";
 import { cn } from "@/lib/utils";
-import { saudiBanks } from "@/constants/saudiBanks";
 import { uploadToStorage } from "@/lib/storage-upload";
 import { auth } from "@/lib/firebase";
 import { createUserWithEmailAndPassword } from "firebase/auth";
@@ -52,9 +51,9 @@ const formSchema = z.object({
     name: z.string().min(1, "اسم الفرع مطلوب"),
     mapLink: z.string().url("رابط قوقل ماب غير صالح"),
   })).optional(),
-  bankName: z.string().min(2, "اسم البنك مطلوب"),
-  iban: z.string().min(15, "رقم الآيبان غير صالح").max(34, "رقم الآيبان غير صالح"),
-  accountHolderName: z.string().min(2, "اسم صاحب الحساب مطلوب"),
+  bankName: z.string().optional(),
+  iban: z.string().optional(),
+  accountHolderName: z.string().optional(),
   password: z.string().min(6, "كلمة المرور يجب أن تكون 6 أحرف على الأقل"),
   confirmPassword: z.string(),
   acceptTerms: z.boolean().refine(val => val === true, {
@@ -80,8 +79,6 @@ export default function Register() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [showTermsDialog, setShowTermsDialog] = useState(false);
-  const [customBankName, setCustomBankName] = useState("");
-  const [isOtherBank, setIsOtherBank] = useState(false);
   const [commercialRegDoc, setCommercialRegDoc] = useState<File | null>(null);
   const [nationalIdImage, setNationalIdImage] = useState<File | null>(null);
   const [freelanceCertImage, setFreelanceCertImage] = useState<File | null>(null);
@@ -743,7 +740,8 @@ export default function Register() {
                   )}
                 </div>
 
-                <div className="rounded-lg border border-border bg-card p-6 shadow-sm">
+                {/* Bank details hidden as requested */}
+                {/* <div className="rounded-lg border border-border bg-card p-6 shadow-sm">
                   <div className="mb-6">
                     <h4 className="text-lg font-semibold text-foreground flex items-center gap-2">
                       <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-primary"><rect width="20" height="14" x="2" y="5" rx="2" /><line x1="2" x2="22" y1="10" y2="10" /></svg>
@@ -827,7 +825,7 @@ export default function Register() {
                       )}
                     />
                   </div>
-                </div>
+                </div> */}
 
                 <div className="grid md:grid-cols-2 gap-6">
                   <FormField

@@ -69,7 +69,12 @@ export interface OrderItemDetail {
   productId: string;
   quantity: number;
   price: number;
-  selectedOptions?: Array<{ optionId: string; optionTitle?: string; selectedChoices?: Array<{ id: string; label?: string; priceAdjustment?: number }> }>;
+  selectedOptions?: Array<{
+    optionId: string;
+    optionTitle?: string;
+    textValue?: string;
+    selectedChoices?: Array<{ id: string; label?: string; priceAdjustment?: number }>;
+  }>;
 }
 
 export interface Order {
@@ -88,6 +93,8 @@ export interface Order {
   deliveryOptionName?: string;
   deliveryDate?: string;
   deliveryTime?: string;
+  /** اسم المدينة للمستلم (عند التوصيل) */
+  recipientCity?: string;
   deliveryFee?: number;
   recipientName?: string;
   recipientPhone?: string;

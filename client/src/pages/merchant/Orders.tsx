@@ -25,7 +25,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ShoppingBag, Search, Loader2, Eye, User, Package, MapPin, Phone, Calendar, CreditCard, MessageCircle } from "lucide-react";
+import { ShoppingBag, Search, Loader2, Eye, User, Package, MapPin, Phone, Calendar, CreditCard, MessageCircle, Gift } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { format } from "date-fns";
@@ -272,76 +272,99 @@ export default function MerchantOrders() {
                   )}
                 </div>
 
+                {selectedOrder.giftCard && (
+                  <div className="space-y-4">
+                    <h4 className="font-semibold flex items-center gap-2 text-primary">
+                      <MessageCircle className="w-4 h-4" />
+                      رسالة بطاقة الهدية (مرفقة مع الطلب)
+                    </h4>
+                    <div className="p-4 rounded-lg bg-primary/10 border-2 border-primary/30 space-y-3">
+                      <div className="grid md:grid-cols-2 gap-4">
+                        <p><strong>من (المرسل):</strong> {selectedOrder.giftCard.fromName}</p>
+                        <p><strong>إلى (المستلم):</strong> {selectedOrder.giftCard.toName}</p>
+                      </div>
+                      {selectedOrder.giftCard.hideSenderIdentity && (
+                        <p className="text-muted-foreground text-sm">لا تظهر هوية المرسل للمستلم</p>
+                      )}
+                      <div className="mt-3 pt-3 border-t border-primary/20">
+                        <p className="text-sm text-muted-foreground mb-1">نص الرسالة:</p>
+                        <p className="p-3 rounded-md bg-background border text-base font-medium min-h-[60px]">
+                          {selectedOrder.giftCard.message ? selectedOrder.giftCard.message : "—"}
+                        </p>
+                      </div>
+                      {(selectedOrder.giftCardFee ?? 0) > 0 && (
+                        <p className="text-sm"><strong>رسوم البطاقة:</strong> {selectedOrder.giftCardFee} ر.س</p>
+                      )}
+                    </div>
+                  </div>
+                )}
+
                 <div className="space-y-4">
                   <h4 className="font-semibold flex items-center gap-2">
                     <MapPin className="w-4 h-4" />
-                    تفاصيل التسليم
+                    تفاصيل التسليم / الاستلام
                   </h4>
-                  <div className="p-4 rounded-lg border grid md:grid-cols-2 gap-4">
-                    <div className="space-y-1">
-                      <p className="text-sm text-muted-foreground">طريقة الاستلام</p>
-                      <p className="font-medium">
-                        {selectedOrder.deliveryMethod === 'pickup' ? 'استلام من الفرع' : 'توصيل'}
-                      </p>
-                    </div>
-                    {selectedOrder.deliveryOptionName && (
+                  <div className="p-4 rounded-lg border space-y-4">
+                    <div className="grid md:grid-cols-2 gap-4">
                       <div className="space-y-1">
+                        <p className="text-sm text-muted-foreground">نوع الطلب</p>
+                        <p className="font-medium">
+                          {selectedOrder.deliveryMethod === "pickup" ? "استلام من الفرع" : "توصيل"}
+                        </p>
+                      </div>
+                      {(selectedOrder.deliveryFee ?? 0) > 0 && (
+                        <div className="space-y-1">
+                          <p className="text-sm text-muted-foreground">رسوم التوصيل</p>
+                          <p className="font-medium">{selectedOrder.deliveryFee} ر.س</p>
+                        </div>
+                      )}
+                    </div>
+                    {selectedOrder.deliveryMethod === "pickup" && selectedOrder.deliveryAddress && (
+                      <div className="space-y-1 pt-2 border-t">
+                        <p className="text-sm text-muted-foreground">الفرع المختار</p>
+                        <p className="font-medium">{selectedOrder.deliveryAddress}</p>
+                      </div>
+                    )}
+                    {selectedOrder.deliveryMethod === "delivery" && (
+                      <>
+                        {selectedOrder.recipientCity && (
+                          <div className="space-y-1 pt-2 border-t">
+                            <p className="text-sm text-muted-foreground">المدينة</p>
+                            <p className="font-medium">{selectedOrder.recipientCity}</p>
+                          </div>
+                        )}
+                        {selectedOrder.deliveryAddress && (
+                          <div className="space-y-1 pt-2 border-t">
+                            <p className="text-sm text-muted-foreground">عنوان التوصيل</p>
+                            <p className="font-medium">{selectedOrder.deliveryAddress}</p>
+                          </div>
+                        )}
+                        {(selectedOrder.deliveryDate || selectedOrder.deliveryTime) && (
+                          <div className="grid md:grid-cols-2 gap-4 pt-2 border-t">
+                            {selectedOrder.deliveryDate && (
+                              <div className="space-y-1">
+                                <p className="text-sm text-muted-foreground">تاريخ التوصيل</p>
+                                <p className="font-medium">{selectedOrder.deliveryDate}</p>
+                              </div>
+                            )}
+                            {selectedOrder.deliveryTime && (
+                              <div className="space-y-1">
+                                <p className="text-sm text-muted-foreground">وقت التوصيل</p>
+                                <p className="font-medium">{selectedOrder.deliveryTime}</p>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </>
+                    )}
+                    {selectedOrder.deliveryOptionName && (
+                      <div className="space-y-1 pt-2 border-t">
                         <p className="text-sm text-muted-foreground">خيار التوصيل</p>
                         <p className="font-medium">{selectedOrder.deliveryOptionName}</p>
                       </div>
                     )}
-                    {(selectedOrder.deliveryFee ?? 0) > 0 && (
-                      <div className="space-y-1">
-                        <p className="text-sm text-muted-foreground">رسوم التوصيل</p>
-                        <p className="font-medium">{selectedOrder.deliveryFee} ر.س</p>
-                      </div>
-                    )}
-                    {selectedOrder.deliveryDate && (
-                      <div className="space-y-1">
-                        <p className="text-sm text-muted-foreground">تاريخ التسليم</p>
-                        <p className="font-medium">{selectedOrder.deliveryDate}</p>
-                      </div>
-                    )}
-                    {selectedOrder.deliveryTime && (
-                      <div className="space-y-1">
-                        <p className="text-sm text-muted-foreground">وقت التسليم</p>
-                        <p className="font-medium">{selectedOrder.deliveryTime}</p>
-                      </div>
-                    )}
                   </div>
                 </div>
-
-                {selectedOrder.deliveryAddress && (
-                  <div className="p-4 rounded-lg border">
-                    <h4 className="font-semibold mb-2 flex items-center gap-2">
-                      <MapPin className="w-4 h-4" />
-                      عنوان التوصيل
-                    </h4>
-                    <p className="text-muted-foreground">{selectedOrder.deliveryAddress}</p>
-                  </div>
-                )}
-
-                {selectedOrder.giftCard && (
-                  <div className="space-y-4">
-                    <h4 className="font-semibold flex items-center gap-2">
-                      <MessageCircle className="w-4 h-4 text-primary" />
-                      تفاصيل رسالة بطاقة الهدية
-                    </h4>
-                    <div className="p-4 rounded-lg bg-primary/5 border border-primary/10 space-y-2">
-                      <p><strong>من (المرسل):</strong> {selectedOrder.giftCard.fromName}</p>
-                      <p><strong>إلى (المستلم):</strong> {selectedOrder.giftCard.toName}</p>
-                      {selectedOrder.giftCard.hideSenderIdentity && (
-                        <p className="text-muted-foreground text-sm">لا تظهر هوية المرسل للمستلم</p>
-                      )}
-                      <p className="mt-2 pt-2 border-t">
-                        <strong>الرسالة:</strong> {selectedOrder.giftCard.message ? selectedOrder.giftCard.message : "—"}
-                      </p>
-                      {(selectedOrder.giftCardFee ?? 0) > 0 && (
-                        <p><strong>رسوم البطاقة:</strong> {selectedOrder.giftCardFee} ر.س</p>
-                      )}
-                    </div>
-                  </div>
-                )}
 
                 {selectedOrder.tapChargeId && (
                   <div className="space-y-4">
@@ -396,7 +419,10 @@ export default function MerchantOrders() {
                                 <ul className="list-disc list-inside text-sm space-y-0.5">
                                   {item.selectedOptions.map((opt: any, oi: number) => (
                                     <li key={oi}>
-                                      {opt.optionTitle || opt.optionId}: {opt.selectedChoices?.map((c: any) => c.label || c.id).join(", ") || "—"}
+                                      {opt.optionTitle || opt.optionId}:{" "}
+                                      {opt.textValue != null && opt.textValue !== ""
+                                        ? opt.textValue
+                                        : opt.selectedChoices?.map((c: any) => c.label || c.id).join(", ") || "—"}
                                     </li>
                                   ))}
                                 </ul>
@@ -510,7 +536,17 @@ function OrdersTable({ orders, updateStatus, onView, onMessage }: {
         <TableBody>
           {orders.map((order) => (
             <TableRow key={order.id}>
-              <TableCell className="font-mono font-medium">#{order.orderNumber}</TableCell>
+              <TableCell className="font-mono font-medium">
+                <div className="flex items-center gap-2">
+                  #{order.orderNumber}
+                  {order.giftCard && (
+                    <Badge variant="secondary" className="gap-1 text-xs">
+                      <Gift className="w-3 h-3" />
+                      بطاقة هدية
+                    </Badge>
+                  )}
+                </div>
+              </TableCell>
               <TableCell>
                 <div className="flex items-center gap-2">
                   <User className="w-4 h-4 text-muted-foreground" />

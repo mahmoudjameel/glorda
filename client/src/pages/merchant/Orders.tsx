@@ -290,6 +290,12 @@ export default function MerchantOrders() {
                         <p className="font-medium">{selectedOrder.deliveryOptionName}</p>
                       </div>
                     )}
+                    {(selectedOrder.deliveryFee ?? 0) > 0 && (
+                      <div className="space-y-1">
+                        <p className="text-sm text-muted-foreground">رسوم التوصيل</p>
+                        <p className="font-medium">{selectedOrder.deliveryFee} ر.س</p>
+                      </div>
+                    )}
                     {selectedOrder.deliveryDate && (
                       <div className="space-y-1">
                         <p className="text-sm text-muted-foreground">تاريخ التسليم</p>
@@ -312,6 +318,28 @@ export default function MerchantOrders() {
                       عنوان التوصيل
                     </h4>
                     <p className="text-muted-foreground">{selectedOrder.deliveryAddress}</p>
+                  </div>
+                )}
+
+                {selectedOrder.giftCard && (
+                  <div className="space-y-4">
+                    <h4 className="font-semibold flex items-center gap-2">
+                      <MessageCircle className="w-4 h-4 text-primary" />
+                      تفاصيل رسالة بطاقة الهدية
+                    </h4>
+                    <div className="p-4 rounded-lg bg-primary/5 border border-primary/10 space-y-2">
+                      <p><strong>من (المرسل):</strong> {selectedOrder.giftCard.fromName}</p>
+                      <p><strong>إلى (المستلم):</strong> {selectedOrder.giftCard.toName}</p>
+                      {selectedOrder.giftCard.hideSenderIdentity && (
+                        <p className="text-muted-foreground text-sm">لا تظهر هوية المرسل للمستلم</p>
+                      )}
+                      <p className="mt-2 pt-2 border-t">
+                        <strong>الرسالة:</strong> {selectedOrder.giftCard.message ? selectedOrder.giftCard.message : "—"}
+                      </p>
+                      {(selectedOrder.giftCardFee ?? 0) > 0 && (
+                        <p><strong>رسوم البطاقة:</strong> {selectedOrder.giftCardFee} ر.س</p>
+                      )}
+                    </div>
                   </div>
                 )}
 
@@ -351,27 +379,55 @@ export default function MerchantOrders() {
                 <div className="space-y-4">
                   <h4 className="font-semibold flex items-center gap-2">
                     <Package className="w-4 h-4" />
-                    بيانات المنتج
+                    بيانات المنتج (الطلبات)
                   </h4>
-                  <div className="p-4 rounded-lg bg-muted/50 flex items-start gap-4">
-                    {selectedOrder.product?.images && selectedOrder.product.images.length > 0 ? (
-                      <img
-                        src={selectedOrder.product.images[0]}
-                        alt={selectedOrder.product.name}
-                        className="w-20 h-20 object-cover rounded-lg"
-                      />
-                    ) : (
-                      <div className="w-20 h-20 bg-muted rounded-lg flex items-center justify-center">
-                        <Package className="w-8 h-8 text-muted-foreground/50" />
-                      </div>
-                    )}
-                    <div className="space-y-2">
-                      <p><strong>المنتج:</strong> {selectedOrder.product?.name || "-"}</p>
-                      <p><strong>السعر:</strong> {selectedOrder.product?.price} ر.س</p>
-                      <p><strong>الكمية:</strong> {selectedOrder.quantity}</p>
-                      <p><strong>الإجمالي:</strong> {selectedOrder.totalAmount} ر.س</p>
+                  {selectedOrder.orderItems && selectedOrder.orderItems.length > 0 ? (
+                    <div className="space-y-4">
+                      {selectedOrder.orderItems.map((item, idx) => (
+                        <div key={idx} className="p-4 rounded-lg bg-muted/50 flex items-start gap-4 border">
+                          <div className="space-y-2 flex-1">
+                            <p><strong>المنتج:</strong> {selectedOrder.product?.name || item.productId}</p>
+                            <p><strong>السعر للوحدة:</strong> {item.price} ر.س</p>
+                            <p><strong>الكمية:</strong> {item.quantity}</p>
+                            <p><strong>الإجمالي للعنصر:</strong> {(item.price * item.quantity).toFixed(0)} ر.س</p>
+                            {item.selectedOptions && item.selectedOptions.length > 0 && (
+                              <div className="mt-2 pt-2 border-t">
+                                <p className="text-sm font-medium text-muted-foreground mb-1">خيارات المنتج (من التطبيق):</p>
+                                <ul className="list-disc list-inside text-sm space-y-0.5">
+                                  {item.selectedOptions.map((opt: any, oi: number) => (
+                                    <li key={oi}>
+                                      {opt.optionTitle || opt.optionId}: {opt.selectedChoices?.map((c: any) => c.label || c.id).join(", ") || "—"}
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                      <p className="font-semibold">الإجمالي الكلي: {selectedOrder.totalAmount} ر.س</p>
                     </div>
-                  </div>
+                  ) : (
+                    <div className="p-4 rounded-lg bg-muted/50 flex items-start gap-4">
+                      {selectedOrder.product?.images && selectedOrder.product.images.length > 0 ? (
+                        <img
+                          src={selectedOrder.product.images[0]}
+                          alt={selectedOrder.product.name}
+                          className="w-20 h-20 object-cover rounded-lg"
+                        />
+                      ) : (
+                        <div className="w-20 h-20 bg-muted rounded-lg flex items-center justify-center">
+                          <Package className="w-8 h-8 text-muted-foreground/50" />
+                        </div>
+                      )}
+                      <div className="space-y-2">
+                        <p><strong>المنتج:</strong> {selectedOrder.product?.name || "-"}</p>
+                        <p><strong>السعر:</strong> {selectedOrder.product?.price} ر.س</p>
+                        <p><strong>الكمية:</strong> {selectedOrder.quantity}</p>
+                        <p><strong>الإجمالي:</strong> {selectedOrder.totalAmount} ر.س</p>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div className="grid md:grid-cols-3 gap-4">

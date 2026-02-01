@@ -610,18 +610,18 @@ export default function DeliverySettings() {
                             </div>
 
                             <div className="space-y-2">
-                                <Label htmlFor="cityId">المدينة</Label>
+                                <Label htmlFor="branch-cityId">المدينة</Label>
                                 <Select
-                                    value={branchForm.cityId}
+                                    value={branchForm.cityId || undefined}
                                     onValueChange={(value) => setBranchForm({ ...branchForm, cityId: value })}
                                 >
-                                    <SelectTrigger>
+                                    <SelectTrigger id="branch-cityId">
                                         <SelectValue placeholder="اختر المدينة" />
                                     </SelectTrigger>
-                                    <SelectContent>
+                                    <SelectContent className="z-[200]" position="popper">
                                         {cities.map((city) => (
                                             <SelectItem key={city.id} value={city.id}>
-                                                {city.nameAr}
+                                                {city.nameAr || (city as any).name || city.nameEn || city.id}
                                             </SelectItem>
                                         ))}
                                     </SelectContent>
@@ -767,18 +767,18 @@ export default function DeliverySettings() {
                                     />
                                 </div>
                                 <div className="space-y-2">
-                                    <Label htmlFor="cityId">المدينة</Label>
+                                    <Label htmlFor="delivery-cityId">المدينة</Label>
                                     <Select
-                                        value={deliveryForm.cityId}
+                                        value={deliveryForm.cityId || undefined}
                                         onValueChange={(value) => setDeliveryForm({ ...deliveryForm, cityId: value })}
                                     >
-                                        <SelectTrigger id="cityId">
+                                        <SelectTrigger id="delivery-cityId">
                                             <SelectValue placeholder="اختر المدينة" />
                                         </SelectTrigger>
-                                        <SelectContent dir="rtl">
+                                        <SelectContent dir="rtl" className="z-[200]" position="popper">
                                             {cities.map((city) => (
                                                 <SelectItem key={city.id} value={city.id}>
-                                                    {city.nameAr}
+                                                    {city.nameAr || (city as any).name || city.nameEn || city.id}
                                                 </SelectItem>
                                             ))}
                                         </SelectContent>

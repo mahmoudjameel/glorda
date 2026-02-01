@@ -56,8 +56,20 @@ export interface Product {
   promoBadge?: string | null;
   images?: string[] | null;
   status: string;
+  /** إذا كان المنتج متاحاً لإرفاق بطاقة هدية */
+  allowsGiftCard?: boolean;
+  /** رسوم بطاقة الهدية (ر.س) - اختياري */
+  giftCardFee?: number;
   createdAt?: any;
   updatedAt?: any;
+}
+
+/** عنصر طلب (من subcollection items) */
+export interface OrderItemDetail {
+  productId: string;
+  quantity: number;
+  price: number;
+  selectedOptions?: Array<{ optionId: string; optionTitle?: string; selectedChoices?: Array<{ id: string; label?: string; priceAdjustment?: number }> }>;
 }
 
 export interface Order {
@@ -76,12 +88,21 @@ export interface Order {
   deliveryOptionName?: string;
   deliveryDate?: string;
   deliveryTime?: string;
+  deliveryFee?: number;
   recipientName?: string;
   recipientPhone?: string;
   customerNote?: string | null;
   tapChargeId?: string;
   paymentStatus?: string;
   tapReceiptUrl?: string;
+  /** بيانات بطاقة الهدية إن وُجدت */
+  giftCard?: {
+    fromName: string;
+    toName: string;
+    message: string;
+    hideSenderIdentity: boolean;
+  };
+  giftCardFee?: number;
   createdAt?: any;
   updatedAt?: any;
   product?: {
@@ -94,6 +115,8 @@ export interface Order {
     mobile: string;
     city: string;
   };
+  /** عناصر الطلب مع الخيارات (من التطبيق) */
+  orderItems?: OrderItemDetail[];
 }
 
 export interface OrderMessage {
@@ -317,47 +340,45 @@ export async function getMerchantOrders(merchantId: string) {
     return await Promise.all(
       orders.map(async (order) => {
         try {
-          // Fetch order items from subcollection if productId is missing at top level
+          const itemsSnap = await getDocs(collection(db, "orders", order.id, "items"));
+          const itemsData = itemsSnap.docs.map((d) => {
+            const data = d.data();
+            return { productId: data.productId ?? "", quantity: data.quantity ?? 1, price: data.price ?? 0, selectedOptions: data.selectedOptions };
+          });
+
           let productId = order.productId;
           let quantity = order.quantity;
-
-          if (!productId) {
-            const itemsSnap = await getDocs(collection(db, "orders", order.id, "items"));
-            if (!itemsSnap.empty) {
-              const firstItem = itemsSnap.docs[0].data();
-              productId = firstItem.productId;
-              if (!quantity) {
-                quantity = itemsSnap.docs.reduce((sum, d) => sum + (d.data().quantity || 0), 0);
-              }
-            }
+          if (!productId && itemsData.length > 0) {
+            productId = itemsData[0].productId;
+            quantity = itemsData.reduce((sum, i) => sum + (i.quantity || 0), 0);
           }
 
+          const orderItems: OrderItemDetail[] = await Promise.all(
+            itemsData.map(async (item) => ({
+              productId: item.productId,
+              quantity: item.quantity || 1,
+              price: item.price || 0,
+              selectedOptions: item.selectedOptions || undefined,
+            }))
+          );
 
-          // Get product info
           let productData = null;
           if (productId) {
             const productDoc = await getDoc(doc(db, "products", productId.toString()));
             productData = productDoc.exists() ? productDoc.data() : null;
           }
 
-          // Get customer info (query by numeric id)
           let customer = null;
           if (order.customerId) {
             try {
-              const customersRef = collection(db, "customers");
-              // Check if customerId is stored as string or number and handle both
               const cId = Number(order.customerId);
-              const q = query(customersRef, where("id", "==", cId));
+              const q = query(collection(db, "customers"), where("id", "==", cId));
               const customerSnap = await getDocs(q);
-
               if (!customerSnap.empty) {
                 customer = customerSnap.docs[0].data();
               } else {
-                // Fallback: try fetching by doc ID if query fails (legacy support)
                 const docSnap = await getDoc(doc(db, "customers", order.customerId.toString()));
-                if (docSnap.exists()) {
-                  customer = docSnap.data();
-                }
+                if (docSnap.exists()) customer = docSnap.data();
               }
             } catch (err) {
               console.error("Error fetching customer for order:", order.id, err);
@@ -366,9 +387,11 @@ export async function getMerchantOrders(merchantId: string) {
 
           return {
             ...order,
-            orderNumber: order.orderNumber || `ORD-${order.id}`, // Fallback for order number
+            orderNumber: order.orderNumber || `ORD-${order.id}`,
             productId,
             quantity: quantity || order.quantity || 1,
+            deliveryFee: order.deliveryFee ?? 0,
+            orderItems: orderItems.length > 0 ? orderItems : undefined,
             product: productData ? {
               name: productData.nameAr || productData.nameEn || productData.name || "-",
               price: productData.price || 0,
@@ -379,6 +402,8 @@ export async function getMerchantOrders(merchantId: string) {
               mobile: customer.mobile || "-",
               city: customer.city || "-",
             } : undefined,
+            giftCard: order.giftCard ?? undefined,
+            giftCardFee: order.giftCardFee ?? 0,
           };
         } catch (error) {
           console.error(`Error enriching order ${order.id}:`, error);

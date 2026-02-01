@@ -74,7 +74,9 @@ export default function MerchantProducts() {
     stock: "",
     productType: "gifts",
     category: "",
-    promoBadge: ""
+    promoBadge: "",
+    allowsGiftCard: false,
+    giftCardFee: ""
   });
 
   const productTypeLabels: Record<string, string> = {
@@ -248,7 +250,7 @@ export default function MerchantProducts() {
   });
 
   const resetForm = () => {
-    setFormData({ name: "", description: "", price: "", stock: "", productType: "gifts", category: "", promoBadge: "" });
+    setFormData({ name: "", description: "", price: "", stock: "", productType: "gifts", category: "", promoBadge: "", allowsGiftCard: false, giftCardFee: "" });
     setImages([]);
     setProductOptions([]);
   };
@@ -337,7 +339,9 @@ export default function MerchantProducts() {
       category: formData.category || formData.productType,
       promoBadge: formData.promoBadge || null,
       images: images,
-      status: parseInt(formData.stock) > 0 ? "active" : "out_of_stock"
+      status: parseInt(formData.stock) > 0 ? "active" : "out_of_stock",
+      allowsGiftCard: formData.allowsGiftCard,
+      giftCardFee: formData.allowsGiftCard ? Math.round(parseFloat(formData.giftCardFee) || 0) : 0
     };
 
     if (editingProduct) {
@@ -356,7 +360,9 @@ export default function MerchantProducts() {
       stock: String(product.stock),
       productType: product.productType || "gifts",
       category: product.category || "",
-      promoBadge: product.promoBadge || ""
+      promoBadge: product.promoBadge || "",
+      allowsGiftCard: product.allowsGiftCard ?? false,
+      giftCardFee: product.giftCardFee != null ? String(product.giftCardFee) : ""
     });
     setImages(product.images || []);
     setProductOptions([]);
@@ -483,6 +489,35 @@ export default function MerchantProducts() {
                           ))}
                         </SelectContent>
                       </Select>
+                    </div>
+                    <Separator />
+                    <div className="grid gap-4">
+                      <div className="flex items-center justify-between">
+                        <Label htmlFor="allowsGiftCard">متاح مع بطاقة هدية</Label>
+                        <Switch
+                          id="allowsGiftCard"
+                          checked={formData.allowsGiftCard}
+                          onCheckedChange={(checked) => setFormData({ ...formData, allowsGiftCard: checked })}
+                        />
+                      </div>
+                      {formData.allowsGiftCard && (
+                        <div className="grid gap-2">
+                          <Label htmlFor="giftCardFee">رسوم بطاقة الإهداء (ر.س)</Label>
+                          <Input
+                            id="giftCardFee"
+                            type="number"
+                            placeholder="0"
+                            min="0"
+                            step="1"
+                            value={formData.giftCardFee}
+                            onChange={(e) => {
+                              const v = e.target.value;
+                              if (v === "" || /^\d+$/.test(v)) setFormData({ ...formData, giftCardFee: v });
+                            }}
+                          />
+                          <p className="text-xs text-muted-foreground">اتركه 0 أو فارغاً إذا بدون رسوم إضافية</p>
+                        </div>
+                      )}
                     </div>
                     <div className="grid gap-2">
                       <Label>صور المنتج ({images.length}/{MAX_IMAGES})</Label>
@@ -876,6 +911,34 @@ export default function MerchantProducts() {
                         ))}
                       </SelectContent>
                     </Select>
+                  </div>
+                  <Separator />
+                  <div className="grid gap-4">
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="edit-allowsGiftCard">متاح مع بطاقة هدية</Label>
+                      <Switch
+                        id="edit-allowsGiftCard"
+                        checked={formData.allowsGiftCard}
+                        onCheckedChange={(checked) => setFormData({ ...formData, allowsGiftCard: checked })}
+                      />
+                    </div>
+                    {formData.allowsGiftCard && (
+                      <div className="grid gap-2">
+                        <Label htmlFor="edit-giftCardFee">رسوم بطاقة الإهداء (ر.س)</Label>
+                        <Input
+                          id="edit-giftCardFee"
+                          type="number"
+                          placeholder="0"
+                          min="0"
+                          step="1"
+                          value={formData.giftCardFee}
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            if (v === "" || /^\d+$/.test(v)) setFormData({ ...formData, giftCardFee: v });
+                          }}
+                        />
+                      </div>
+                    )}
                   </div>
                   <div className="grid gap-2">
                     <Label>صور المنتج ({images.length}/{MAX_IMAGES})</Label>

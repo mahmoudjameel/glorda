@@ -2,6 +2,7 @@ import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
+import { getFunctions, httpsCallable } from 'firebase/functions';
 
 // Firebase configuration from environment variables
 const firebaseConfig = {
@@ -26,3 +27,11 @@ export const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const db = getFirestore(app);
 export const storage = getStorage(app);
+export const functions = getFunctions(app);
+
+/** استدعاء دالة سحابية (مثلاً إرسال إشعار ترويجي لجميع المستخدمين) */
+export async function callSendPromotionalPush(adId: string): Promise<{ success: boolean; message?: string }> {
+  const sendPromotionalPush = httpsCallable<{ adId: string }, { success: boolean; message?: string }>(functions, 'sendPromotionalPush');
+  const result = await sendPromotionalPush({ adId });
+  return result.data;
+}

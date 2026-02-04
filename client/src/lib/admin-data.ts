@@ -158,6 +158,49 @@ export interface DiscountCodes {
   createdAt?: any;
 }
 
+// Promotional ads (إعلانات ترويجية) — عنوان ونص وترتيب، تُرسل كبوش نوتيفيكيشن
+export interface PromotionalAd {
+  id: string;
+  title: string;
+  body: string;
+  order: number;
+  isActive: boolean;
+  sentAt?: any;
+  createdAt?: any;
+  updatedAt?: any;
+}
+
+export async function getPromotionalAds(): Promise<PromotionalAd[]> {
+  const snap = await getDocs(collection(db, "promotionalAds"));
+  const ads = mapDocs<PromotionalAd>(snap);
+  return ads.sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+}
+
+export async function addPromotionalAd(data: Partial<PromotionalAd>) {
+  const ref = await addDoc(collection(db, "promotionalAds"), {
+    title: data.title ?? "",
+    body: data.body ?? "",
+    order: data.order ?? 0,
+    isActive: data.isActive ?? true,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
+  return ref.id;
+}
+
+export async function updatePromotionalAd(id: string, data: Partial<PromotionalAd>) {
+  const { sentAt, ...rest } = data as PromotionalAd & { sentAt?: any };
+  await updateDoc(doc(db, "promotionalAds", id), {
+    ...rest,
+    ...(sentAt !== undefined && { sentAt }),
+    updatedAt: serverTimestamp(),
+  });
+}
+
+export async function deletePromotionalAd(id: string) {
+  await deleteDoc(doc(db, "promotionalAds", id));
+}
+
 
 
 

@@ -17,7 +17,8 @@ import {
   ShoppingBag,
   MessageCircle,
   Star,
-  Truck
+  Truck,
+  Megaphone
 } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -53,6 +54,7 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
     { href: "/admin/orders", label: "الطلبات", icon: ShoppingBag },
     { href: "/admin/withdrawals", label: "المحافظ والسحب", icon: Wallet },
     { href: "/admin/app-settings", label: "إعدادات التطبيق", icon: Smartphone },
+    { href: "/admin/promotions", label: "الإعلانات الترويجية", icon: Megaphone },
     { href: "/admin/policies", label: "السياسات والشروط", icon: FileText },
     { href: "/admin/settings", label: "الإعدادات", icon: Settings },
   ];

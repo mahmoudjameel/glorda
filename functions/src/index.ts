@@ -2,7 +2,7 @@ import * as functions from "firebase-functions/v1";
 import * as admin from "firebase-admin";
 import { AuthenticaService } from "./authentica";
 import { TapService } from "./tap";
-import { sendPushToUser } from "./notifications";
+import { sendPushToUser, sendPushToAllCustomers } from "./notifications";
 
 admin.initializeApp();
 
@@ -339,6 +339,20 @@ export const onOrderUpdate = functions.firestore
         const body = `تغيرت حالة طلبك #${after.orderNumber || context.params.orderId} إلى ${statusText}`;
 
         await sendPushToUser(customerId, title, body, { orderId: context.params.orderId, type: 'order' });
+
+        // حفظ إشعار الطلب في مجموعة notifications ليظهر في شاشة الإشعارات بالتطبيق
+        const customerIdStr = typeof customerId === 'string' ? customerId : String(customerId);
+        await db.collection('notifications').add({
+            recipientType: 'customer',
+            recipientId: customerIdStr,
+            title,
+            body,
+            actionType: 'order_status',
+            actionRef: { orderId: context.params.orderId, orderNumber: after.orderNumber },
+            isRead: false,
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+
         return null;
     });
 
@@ -415,6 +429,43 @@ export const onOrderMessageCreate = functions.firestore
         await sendPushToUser(recipientId, title, body, { orderId, type: 'order_chat' });
         return null;
     });
+
+/**
+ * Callable: Send promotional ad as push notification to all customers
+ * Called from admin panel when admin clicks "إرسال إشعار" on an ad.
+ */
+export const sendPromotionalPush = functions.https.onCall(async (data: { adId: string }, context) => {
+    if (!context.auth) {
+        throw new functions.https.HttpsError('unauthenticated', 'يجب تسجيل الدخول');
+    }
+    const callerDoc = await db.collection('users').doc(context.auth.uid).get();
+    const callerRole = callerDoc.data()?.role;
+    if (callerRole !== 'admin') {
+        throw new functions.https.HttpsError('permission-denied', 'غير مصرح');
+    }
+    const { adId } = data;
+    if (!adId) {
+        throw new functions.https.HttpsError('invalid-argument', 'معرف الإعلان مطلوب');
+    }
+
+    const adDoc = await db.collection('promotionalAds').doc(adId).get();
+    if (!adDoc.exists || !adDoc.data()) {
+        throw new functions.https.HttpsError('not-found', 'الإعلان غير موجود');
+    }
+
+    const ad = adDoc.data()!;
+    const title = ad.title || 'غلوردا';
+    const body = ad.body || '';
+
+    const sent = await sendPushToAllCustomers(title, body, { adId });
+
+    await db.collection('promotionalAds').doc(adId).update({
+        sentAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    return { success: true, message: `تم الإرسال إلى ${sent} جهاز`, sent };
+});
 
 /**
  * Scheduled: Check Occasion Reminders

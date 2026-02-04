@@ -85,3 +85,45 @@ export async function sendPushToUser(
         console.error('[Notification] Error sending push:', error);
     }
 }
+
+/**
+ * Send a promotional push notification to all customers (for admin ads).
+ * Gets all users with role 'customer' and a valid pushToken.
+ */
+export async function sendPushToAllCustomers(title: string, body: string, data: any = {}): Promise<number> {
+    const db = admin.firestore();
+    const usersSnap = await db.collection('users').where('role', '==', 'customer').get();
+    const pushTokens: string[] = [];
+    usersSnap.docs.forEach((doc) => {
+        const token = doc.data()?.pushToken;
+        if (token && Expo.isExpoPushToken(token)) {
+            pushTokens.push(token);
+        }
+    });
+
+    if (pushTokens.length === 0) {
+        console.log('[Notification] No customer push tokens found');
+        return 0;
+    }
+
+    const messages: ExpoPushMessage[] = pushTokens.map((token) => ({
+        to: token,
+        sound: 'default',
+        title,
+        body,
+        data: { type: 'promotional', ...data },
+    }));
+
+    const chunks = expo.chunkPushNotifications(messages);
+    let sent = 0;
+    for (const chunk of chunks) {
+        try {
+            const ticketChunk = await expo.sendPushNotificationsAsync(chunk);
+            sent += ticketChunk.length;
+        } catch (error) {
+            console.error('[Notification] Error sending promotional chunk:', error);
+        }
+    }
+    console.log(`[Notification] Promotional push sent to ${sent} devices`);
+    return sent;
+}

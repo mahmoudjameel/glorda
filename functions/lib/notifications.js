@@ -23,7 +23,7 @@ var __importStar = (this && this.__importStar) || function (mod) {
     return result;
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.sendPushToUser = void 0;
+exports.sendPushToAllCustomers = exports.sendPushToUser = void 0;
 const expo_server_sdk_1 = require("expo-server-sdk");
 const admin = __importStar(require("firebase-admin"));
 const expo = new expo_server_sdk_1.Expo();
@@ -86,4 +86,40 @@ async function sendPushToUser(userId, title, body, data = {}) {
     }
 }
 exports.sendPushToUser = sendPushToUser;
+async function sendPushToAllCustomers(title, body, data = {}) {
+    const db = admin.firestore();
+    const usersSnap = await db.collection('users').where('role', '==', 'customer').get();
+    const pushTokens = [];
+    usersSnap.docs.forEach((doc) => {
+        const token = doc.data()?.pushToken;
+        if (token && expo_server_sdk_1.Expo.isExpoPushToken(token)) {
+            pushTokens.push(token);
+        }
+    });
+    if (pushTokens.length === 0) {
+        console.log('[Notification] No customer push tokens found');
+        return 0;
+    }
+    const messages = pushTokens.map((token) => ({
+        to: token,
+        sound: 'default',
+        title,
+        body,
+        data: { type: 'promotional', ...data },
+    }));
+    const chunks = expo.chunkPushNotifications(messages);
+    let sent = 0;
+    for (const chunk of chunks) {
+        try {
+            const ticketChunk = await expo.sendPushNotificationsAsync(chunk);
+            sent += ticketChunk.length;
+        }
+        catch (error) {
+            console.error('[Notification] Error sending promotional chunk:', error);
+        }
+    }
+    console.log(`[Notification] Promotional push sent to ${sent} devices`);
+    return sent;
+}
+exports.sendPushToAllCustomers = sendPushToAllCustomers;
 //# sourceMappingURL=notifications.js.map

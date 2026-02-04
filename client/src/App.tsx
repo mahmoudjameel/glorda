@@ -34,6 +34,7 @@ import AdminPolicies from "@/pages/admin/Policies";
 import AdminWithdrawals from "@/pages/admin/Withdrawals";
 import AdminCustomers from "@/pages/admin/Customers";
 import AdminOrders from "@/pages/admin/Orders";
+import AdminPromotionalAds from "@/pages/admin/PromotionalAds";
 
 function Router() {
   return (
@@ -116,6 +117,11 @@ function Router() {
       <Route path="/admin/app-settings">
         <ProtectedRoute requiredRole="admin">
           <AdminAppSettings />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/promotions">
+        <ProtectedRoute requiredRole="admin">
+          <AdminPromotionalAds />
         </ProtectedRoute>
       </Route>
       <Route path="/admin/policies">

@@ -23,7 +23,7 @@ var __importStar = (this && this.__importStar) || function (mod) {
     return result;
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.checkOccasionReminders = exports.onOrderMessageCreate = exports.onMessageCreate = exports.onOrderUpdate = exports.verifyTapPayment = exports.createTapCharge = exports.checkOtp = exports.requestOtp = void 0;
+exports.checkOccasionReminders = exports.sendPromotionalPush = exports.onOrderMessageCreate = exports.onMessageCreate = exports.onOrderUpdate = exports.verifyTapPayment = exports.createTapCharge = exports.checkOtp = exports.requestOtp = void 0;
 const functions = __importStar(require("firebase-functions/v1"));
 const admin = __importStar(require("firebase-admin"));
 const authentica_1 = require("./authentica");
@@ -280,6 +280,17 @@ exports.onOrderUpdate = functions.firestore
     const title = "تحديث حالة الطلب";
     const body = `تغيرت حالة طلبك #${after.orderNumber || context.params.orderId} إلى ${statusText}`;
     await (0, notifications_1.sendPushToUser)(customerId, title, body, { orderId: context.params.orderId, type: 'order' });
+    const customerIdStr = typeof customerId === 'string' ? customerId : String(customerId);
+    await db.collection('notifications').add({
+        recipientType: 'customer',
+        recipientId: customerIdStr,
+        title,
+        body,
+        actionType: 'order_status',
+        actionRef: { orderId: context.params.orderId, orderNumber: after.orderNumber },
+        isRead: false,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
     return null;
 });
 exports.onMessageCreate = functions.firestore
@@ -329,6 +340,33 @@ exports.onOrderMessageCreate = functions.firestore
     const body = message.message || "رسالة جديدة";
     await (0, notifications_1.sendPushToUser)(recipientId, title, body, { orderId, type: 'order_chat' });
     return null;
+});
+exports.sendPromotionalPush = functions.https.onCall(async (data, context) => {
+    if (!context.auth) {
+        throw new functions.https.HttpsError('unauthenticated', 'يجب تسجيل الدخول');
+    }
+    const callerDoc = await db.collection('users').doc(context.auth.uid).get();
+    const callerRole = callerDoc.data()?.role;
+    if (callerRole !== 'admin') {
+        throw new functions.https.HttpsError('permission-denied', 'غير مصرح');
+    }
+    const { adId } = data;
+    if (!adId) {
+        throw new functions.https.HttpsError('invalid-argument', 'معرف الإعلان مطلوب');
+    }
+    const adDoc = await db.collection('promotionalAds').doc(adId).get();
+    if (!adDoc.exists || !adDoc.data()) {
+        throw new functions.https.HttpsError('not-found', 'الإعلان غير موجود');
+    }
+    const ad = adDoc.data();
+    const title = ad.title || 'غلوردا';
+    const body = ad.body || '';
+    const sent = await (0, notifications_1.sendPushToAllCustomers)(title, body, { adId });
+    await db.collection('promotionalAds').doc(adId).update({
+        sentAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    return { success: true, message: `تم الإرسال إلى ${sent} جهاز`, sent };
 });
 exports.checkOccasionReminders = functions.pubsub.schedule('every 1 hours').onRun(async (context) => {
     const now = new Date();

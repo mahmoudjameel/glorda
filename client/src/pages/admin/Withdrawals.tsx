@@ -202,7 +202,7 @@ export default function AdminWithdrawals() {
                       <TableHeader>
                         <TableRow>
                           <TableHead className="text-right">المتجر</TableHead>
-                          <TableHead className="text-right">المبلغ (بعد الرسوم)</TableHead>
+                          <TableHead className="text-right">المبلغ</TableHead>
                           <TableHead className="text-right">التاريخ</TableHead>
                           <TableHead className="text-right">الحالة</TableHead>
                           <TableHead className="text-right">إجراءات</TableHead>
@@ -225,7 +225,6 @@ export default function AdminWithdrawals() {
                             <TableCell>
                               <div>
                                 <span className="font-bold text-lg">{formatCurrency(withdrawal.amount)}</span>
-                                <p className="text-xs text-muted-foreground">بعد خصم الرسوم (5%)</p>
                               </div>
                             </TableCell>
                             <TableCell className="text-muted-foreground">
@@ -304,7 +303,7 @@ export default function AdminWithdrawals() {
                         <TableRow>
                           <TableHead className="text-right">المتجر</TableHead>
                           <TableHead className="text-right">الرصيد الإجمالي</TableHead>
-                          <TableHead className="text-right">الصافي (بعد 5% رسوم)</TableHead>
+                          <TableHead className="text-right">المتاح للسحب (الصافي)</TableHead>
                           <TableHead className="text-right">البنك</TableHead>
                           <TableHead className="text-right">المدينة</TableHead>
                           <TableHead className="text-right">إجراءات</TableHead>
@@ -312,8 +311,7 @@ export default function AdminWithdrawals() {
                       </TableHeader>
                       <TableBody>
                         {activeMerchants.map((merchant) => {
-                          const fees = Math.floor(merchant.balance * 5 / 100);
-                          const netBalance = merchant.balance - fees;
+                          const netBalance = merchant.balance;
                           return (
                             <TableRow key={merchant.id} data-testid={`row-wallet-${merchant.id}`}>
                               <TableCell>
